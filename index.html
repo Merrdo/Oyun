@@ -59,7 +59,24 @@
   /* ---------- Dinamik joystick ---------- */
   const joy = { id: null, active: false, bx: 0, by: 0, kx: 0, ky: 0, dx: 0, dy: 0, alpha: 0, R: 62 };
 
+  /* ---------- Test: çift dokunuşla arka plan değiştir ---------- */
+  let light = false, lastTap = { t: 0, x: 0, y: 0 };
+  function toggleBg() {
+    light = !light;
+    const c = light ? '#f2f2f2' : '#000';
+    document.documentElement.style.background = document.body.style.background = cv.style.background = c;
+    const tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', c);
+  }
+  function checkDoubleTap(e) {
+    const now = performance.now();
+    if (now - lastTap.t < 300 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+      toggleBg(); lastTap.t = 0;
+    } else lastTap = { t: now, x: e.clientX, y: e.clientY };
+  }
+
   function joyStart(e) {
+    checkDoubleTap(e);
     if (joy.id !== null) return;
     joy.id = e.pointerId; joy.active = true;
     joy.bx = joy.kx = e.clientX; joy.by = joy.ky = e.clientY;
@@ -120,17 +137,19 @@
     joy.alpha += ((joy.active ? 1 : 0) - joy.alpha) * (1 - Math.exp(-16 * dt));
 
     // çizim
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    const bgCol = light ? '#f2f2f2' : '#000';
+    const fg = light ? '0,0,0' : '255,255,255';
+    ctx.fillStyle = bgCol; ctx.fillRect(0, 0, W, H);
 
     // karakter (kuş bakışı)
     ctx.save();
     ctx.translate(player.x, player.y);
-    ctx.shadowColor = 'rgba(255,255,255,0.35)'; ctx.shadowBlur = 18;
-    ctx.fillStyle = '#fff';
+    ctx.shadowColor = `rgba(${fg},0.35)`; ctx.shadowBlur = 18;
+    ctx.fillStyle = `rgb(${fg})`;
     ctx.beginPath(); ctx.arc(0, 0, player.r, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.rotate(player.angle);
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = bgCol;
     ctx.beginPath(); ctx.arc(player.r * 0.5, 0, 3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
@@ -139,18 +158,18 @@
       ctx.save();
       ctx.globalAlpha = joy.alpha;
       const bg = ctx.createRadialGradient(joy.bx, joy.by, joy.R * 0.2, joy.bx, joy.by, joy.R);
-      bg.addColorStop(0, 'rgba(255,255,255,0.03)');
-      bg.addColorStop(1, 'rgba(255,255,255,0.12)');
+      bg.addColorStop(0, `rgba(${fg},0.03)`);
+      bg.addColorStop(1, `rgba(${fg},0.12)`);
       ctx.fillStyle = bg;
       ctx.beginPath(); ctx.arc(joy.bx, joy.by, joy.R, 0, Math.PI * 2); ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${fg},0.28)`; ctx.stroke();
 
       const kg = ctx.createRadialGradient(joy.kx - 6, joy.ky - 8, 2, joy.kx, joy.ky, 28);
-      kg.addColorStop(0, 'rgba(255,255,255,0.55)');
-      kg.addColorStop(1, 'rgba(255,255,255,0.22)');
+      kg.addColorStop(0, `rgba(${fg},0.55)`);
+      kg.addColorStop(1, `rgba(${fg},0.22)`);
       ctx.fillStyle = kg;
       ctx.beginPath(); ctx.arc(joy.kx, joy.ky, 27, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke();
+      ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.stroke();
       ctx.restore();
     }
     requestAnimationFrame(frame);
