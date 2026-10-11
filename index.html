@@ -11,15 +11,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Oyun">
 <style>
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    background: #000; overflow: hidden;
+  html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; overscroll-behavior: none; }
+  body {
+    position: fixed; top: 0; left: 0; margin: 0; padding: 0;
+    width: 100%; height: 100%; background: #000; overflow: visible;
     overscroll-behavior: none;
     -webkit-user-select: none; user-select: none;
     -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
     touch-action: none;
   }
-  canvas { position: fixed; top: 0; left: 0; bottom: 0; width: 100%; height: 100%; display: block; background: #000; }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; background: #000; }
 </style>
 </head>
 <body>
@@ -45,6 +46,8 @@
       const full = Math.max(screen.width, screen.height);
       if (H > W && full > H) H = full;
     }
+    const de = document.documentElement.style, bs = document.body.style;
+    bs.width = W + 'px'; bs.height = H + 'px';
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
