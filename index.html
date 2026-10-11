@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Oyun">
 <style>
-  html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; overscroll-behavior: none; }
+  html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overscroll-behavior: none; }
   body {
     position: fixed; top: 0; left: 0; margin: 0; padding: 0;
     width: 100%; height: 100%; background: #000; overflow: visible;
@@ -55,6 +55,22 @@
     player.y = Math.min(Math.max(player.y, player.r), H - player.r);
   }
 
+  /* ---------- Hata ayıklama bilgisi (açık zemin modunda görünür) ---------- */
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100vh;padding-bottom:env(safe-area-inset-bottom,0px);pointer-events:none;visibility:hidden';
+  document.body.appendChild(probe);
+  function debugLines() {
+    const sab = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+    return [
+      'tuval ' + W + 'x' + H,
+      'inner ' + innerWidth + 'x' + innerHeight,
+      'screen ' + screen.width + 'x' + screen.height,
+      '100vh ' + probe.getBoundingClientRect().height,
+      'alt guvenli alan ' + sab,
+      'standalone ' + navigator.standalone
+    ];
+  }
+
   /* ---------- Oyuncu ---------- */
   const player = { x: window.innerWidth / 2, y: window.innerHeight / 2, vx: 0, vy: 0, r: 14, angle: -Math.PI / 2 };
   const SPEED = 230;
@@ -84,7 +100,7 @@
     joy.id = e.pointerId; joy.active = true;
     joy.bx = joy.kx = e.clientX; joy.by = joy.ky = e.clientY;
     joy.dx = joy.dy = 0;
-    cv.setPointerCapture(e.pointerId);
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
   }
   function joyMove(e) {
     if (e.pointerId !== joy.id) return;
@@ -103,10 +119,10 @@
     joy.id = null; joy.active = false; joy.dx = joy.dy = 0;
     joy.kx = joy.bx; joy.ky = joy.by;
   }
-  cv.addEventListener('pointerdown', joyStart);
-  cv.addEventListener('pointermove', joyMove);
-  cv.addEventListener('pointerup', joyEnd);
-  cv.addEventListener('pointercancel', joyEnd);
+  window.addEventListener('pointerdown', joyStart);
+  window.addEventListener('pointermove', joyMove);
+  window.addEventListener('pointerup', joyEnd);
+  window.addEventListener('pointercancel', joyEnd);
   ['gesturestart', 'contextmenu'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
   document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
@@ -155,6 +171,11 @@
     ctx.fillStyle = bgCol;
     ctx.beginPath(); ctx.arc(player.r * 0.5, 0, 3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
+
+    if (light) {
+      ctx.font = '12px monospace'; ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      debugLines().forEach((t, i) => ctx.fillText(t, 20, 90 + i * 16));
+    }
 
     // joystick
     if (joy.alpha > 0.01) {
