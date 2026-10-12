@@ -676,7 +676,8 @@
     if (F.death >= 0) return;
     const ang = Math.atan2(e.y - player.y, e.x - player.x), front = Math.abs(wrap(ang - hero.face)) < GUARD_ARC;
     if (F.guarding && F.gw > 0.5 && front) {   // siper: hasar yok ama dayanıklılık azalır
-      const pry = F.gt < 0.22; F.dur -= pry ? 0 : (gc || 30) * 0.6; if (F.dur > 0) AU.sfx('block'); if (pry) { ftext(player.x, player.y - 62, 'Savuşturma!', null); hitFx(0, 4); }   // siperi yeni kapatınca isabet = tam savuşturma (bedava, düşman uzun süre açık kalır) F.fx = { x: player.x + Math.cos(ang) * 26, y: player.y - 22 + Math.sin(ang) * 14, t: 0, k: 'block' };
+      const pry = F.gt < 0.22; F.dur -= pry ? 0 : (gc || 30) * 0.6; if (F.dur > 0) AU.sfx('block'); if (pry) { ftext(player.x, player.y - 62, 'Savuşturma!', null); hitFx(0, 4); }   // siperi yeni kapatınca isabet = tam savuşturma (bedava, düşman uzun süre açık kalır)
+      F.fx = { x: player.x + Math.cos(ang) * 26, y: player.y - 22 + Math.sin(ang) * 14, t: 0, k: 'block' };
       sparks(F.fx.x, F.fx.y, 9, 230, ang, 0.8); hitFx(0.05, 2.5);
       e.stun = pry ? 0.9 : 0.5; e.kx = Math.cos(ang) * 260; e.ky = Math.sin(ang) * 260; e.st = 'rec'; e.t = 0.2; e.rd = pry ? 1.5 : 1.0; e.atk = ''; e.cd = pry ? 1.8 : 1.2; e.did = true;   // siperle karşılanan düşman sendeler, açık kalır
       player.vx -= Math.cos(ang) * 80; player.vy -= Math.sin(ang) * 80;
