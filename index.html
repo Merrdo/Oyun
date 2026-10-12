@@ -100,6 +100,7 @@
 
   function joyStart(e) {
     AU.unlock();
+    if (MENU.on) { if (MENU.t > 0.6) menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
     if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 14) { AU.toggleMute(); return; }   // ses aç/kapa düğmesi
     if (atk.id === null && atkActive() && Math.hypot(e.clientX - atk.x, e.clientY - atk.y) < atk.r + 14) {   // buton joystick'ten önceliklidir
       atk.id = e.pointerId; atk.down = true; pressAtk();
@@ -140,9 +141,9 @@
 
   /* ---------- Klavye (masaüstü testi) ---------- */
   const keys = {};
-  addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
+  addEventListener('keydown', e => { if (MENU.on) { if ((e.key === 'Enter' || e.key === ' ' || e.key === 'j') && MENU.t > 0.6) menuStart(); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
   addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if ((e.key === 'j' || e.key === ' ') && atk.kb) { atk.kb = false; relAtk(); } });
-  addEventListener('keydown', e => { if ((e.key === 'j' || e.key === ' ') && !e.repeat && !atk.kb) { atk.kb = true; pressAtk(); } });
+  addEventListener('keydown', e => { if (!MENU.on && (e.key === 'j' || e.key === ' ') && !e.repeat && !atk.kb) { atk.kb = true; pressAtk(); } });
 
   /* ---------- Karakter: animasyonlu, sade, karşıdan görünüm ---------- */
   const HS = 1.6;                 // karakterin görsel ölçeği
@@ -978,13 +979,67 @@
       if (k !== 'hit') { for (let i = 0; i < 6; i++) { const a = i * 1.047 + 0.4, r0 = 6 + 14 * u, r1 = r0 + 7; ctx.beginPath(); ctx.moveTo(F.fx.x + Math.cos(a) * r0, F.fx.y + Math.sin(a) * r0); ctx.lineTo(F.fx.x + Math.cos(a) * r1, F.fx.y + Math.sin(a) * r1); ctx.stroke(); } }
     }
   }
-  function drawHud(fg) {
-    if (!G.has) return;
-    const x = 16, y = 62, w = 110;
-    ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(x, y, w, 6); ctx.fillStyle = `rgba(${fg},0.85)`; ctx.fillRect(x, y, w * clamp(F.hp / 100, 0, 1), 6);   // can
-    ctx.fillStyle = `rgba(${fg},0.12)`; ctx.fillRect(x, y + 10, w, 4);
-    ctx.fillStyle = `rgba(${fg},${F.broken > 0 ? 0.25 + 0.35 * (Math.floor(F.time * 8) % 2) : F.tired ? 0.25 + 0.2 * (Math.floor(F.time * 3) % 2) : 0.55})`; ctx.fillRect(x, y + 10, w * clamp(F.dur / 100, 0, 1), 4);   // siper dayanıklılığı
-    if (F.guarding || F.dur < 100) { const sx = player.x - cam.x, sy = player.y - cam.y + 13; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
+  const HB = { hp: 1, lag: 1, du: 1, low: 0 };   // karakter barı: yumuşak akan can/dayanıklılık, gecikmeli iz
+  function hudHeart(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + 3.2 * s); ctx.bezierCurveTo(x - 6 * s, y - 1.5 * s, x - 3 * s, y - 5.5 * s, x, y - 2 * s); ctx.bezierCurveTo(x + 3 * s, y - 5.5 * s, x + 6 * s, y - 1.5 * s, x, y + 3.2 * s); ctx.fill(); }
+  function hudShield(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y + 0.5 * s); ctx.quadraticCurveTo(x + 4 * s, y + 4 * s, x, y + 5.5 * s); ctx.quadraticCurveTo(x - 4 * s, y + 4 * s, x - 4 * s, y + 0.5 * s); ctx.closePath(); ctx.fill(); }
+  function drawPortrait(cx, cy, R, fg, bgc) {   // oyun karakterinin çizim biçimiyle aynı: dolu daire kafa, nokta gözler, omuzlar
+    const col = `rgb(${fg})`, dead = F.death >= 0 || F.dp > 0.25, pain = dead ? 0 : sstep(0, 0.22, F.wince), tired = sstep(0.45, 0.9, hero.fat), t = F.time;
+    const shut = !dead && pain < 0.05 && (F.squint || t % 3.7 < 0.12 || t % 5.3 < 0.1);
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fillStyle = `rgba(${bgc},0.55)`; ctx.fill(); ctx.clip();
+    ctx.fillStyle = `rgba(${fg},0.07)`; ctx.fillRect(cx - R, cy + R * 0.35, R * 2, R);   // zemin
+    const sh = dead ? 5 : Math.sin(t * 2) * 0.6; ctx.fillStyle = col; ctx.strokeStyle = col;
+    ctx.beginPath(); ctx.ellipse(cx, cy + R * 0.98 + sh, R * 0.68, R * 0.46, 0, 0, TAU); ctx.fill();   // omuzlar
+    ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, cy + R * 0.3); ctx.lineTo(cx, cy + R * 0.62); ctx.stroke();   // boyun
+    const hy = cy - R * 0.1 + sh * 0.5, hr = R * 0.5, tilt = dead ? 0.25 : 0;
+    if (pain > 0.01) { const r0 = fg === '255,255,255' ? [255, 64, 56] : [214, 40, 40], a0 = fg.split(',').map(Number); ctx.fillStyle = `rgb(${Math.round(lerp(a0[0], r0[0], pain))},${Math.round(lerp(a0[1], r0[1], pain))},${Math.round(lerp(a0[2], r0[2], pain))})`; }
+    ctx.save(); ctx.translate(cx, hy); ctx.rotate(tilt); ctx.beginPath(); ctx.arc(0, 0, hr, 0, TAU); ctx.fill();
+    ctx.fillStyle = `rgb(${bgc})`; ctx.strokeStyle = `rgb(${bgc})`; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    const ex = hr * 0.42, ey = hr * 0.05;
+    [-1, 1].forEach(sd => { const x = sd * ex;
+      if (dead) { ctx.beginPath(); ctx.moveTo(x - 2.2, ey - 2.2); ctx.lineTo(x + 2.2, ey + 2.2); ctx.moveTo(x - 2.2, ey + 2.2); ctx.lineTo(x + 2.2, ey - 2.2); ctx.stroke(); }
+      else if (pain > 0.05) { ctx.beginPath(); ctx.moveTo(x + sd * 2.4, ey - 2.6); ctx.lineTo(x - sd * 1.8, ey); ctx.lineTo(x + sd * 2.4, ey + 2.6); ctx.stroke(); }
+      else if (shut) { ctx.beginPath(); ctx.moveTo(x - 2.2, ey); ctx.lineTo(x + 2.2, ey); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.ellipse(x, ey + 0.6 * tired, 2.1, 2.1 * (1 - 0.55 * tired), 0, 0, TAU); ctx.fill(); } });
+    if (dead || pain > 0.3) { ctx.beginPath(); ctx.ellipse(0, hr * 0.5, 2, 2.6 * Math.max(pain, 0.6), 0, 0, TAU); ctx.fill(); }
+    else if (F.guarding) { ctx.beginPath(); ctx.moveTo(-3, hr * 0.5); ctx.lineTo(3, hr * 0.5); ctx.stroke(); }
+    ctx.restore(); ctx.restore();
+  }
+  function drawHud(fg) {   // sol üst: karakter portresi + can + dayanıklılık + altın + anahtar
+    const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0';
+    HB.hp += (clamp(F.hp / 100, 0, 1) - HB.hp) * 0.25; HB.lag += (HB.hp - HB.lag) * 0.05; if (HB.lag < HB.hp) HB.lag = HB.hp; HB.du += (clamp(F.dur / 100, 0, 1) - HB.du) * 0.25;
+    const low = F.hp > 0 && F.hp < 30 ? 1 : 0; HB.low += (low - HB.low) * 0.1; const pulse = 0.5 + 0.5 * Math.sin(F.time * 7) ;
+    const X = 10, Y = 10, R = 22, cx = X + R + 2, cy = Y + R + 2, bx = cx + R + 9, bw = 104;
+    ctx.save();
+    // panel
+    ctx.fillStyle = `rgba(${bgc},0.42)`; rr(X - 4, Y - 4, bx + bw - X + 12, R * 2 + 12, 12); ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.14)`; ctx.stroke();
+    // portre çerçevesi (can azalınca kırmızı nabız)
+    drawPortrait(cx, cy, R, fg, bgc);
+    ctx.lineWidth = 2; const red = light ? '214,40,40' : '255,64,56';
+    ctx.strokeStyle = HB.low > 0.01 ? `rgba(${red},${(0.35 + 0.5 * pulse) * HB.low})` : `rgba(${fg},0.55)`; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+    if (HB.low > 0.01) { ctx.strokeStyle = `rgba(${fg},${0.55 * (1 - HB.low)})`; ctx.stroke(); }
+    ctx.font = '700 10px -apple-system, "Segoe UI", Roboto, sans-serif'; ctx.textBaseline = 'middle';
+    // can
+    const hy = Y + 7, hurt = F.flash > 0 ? Math.min(1, F.flash * 3) : 0;
+    hudHeart(bx + 4, hy, 0.95, HB.low > 0.01 ? `rgb(${red})` : `rgba(${fg},0.9)`);
+    const bx2 = bx + 13, bw2 = bw - 13 - 22;
+    ctx.fillStyle = `rgba(${fg},0.14)`; rr(bx2, hy - 3.5, bw2, 7, 3.5); ctx.fill();
+    ctx.save(); rr(bx2, hy - 3.5, bw2, 7, 3.5); ctx.clip();
+    ctx.fillStyle = `rgba(${light ? '214,40,40' : '255,64,56'},0.7)`; ctx.fillRect(bx2, hy - 3.5, bw2 * HB.lag, 7);   // gecikmeli iz
+    ctx.fillStyle = hurt > 0.01 ? `rgb(${red})` : `rgba(${fg},0.92)`; ctx.fillRect(bx2, hy - 3.5, bw2 * HB.hp, 7); ctx.restore();
+    ctx.textAlign = 'right'; ctx.fillStyle = `rgba(${fg},0.9)`; ctx.fillText(Math.ceil(F.hp), bx + bw, hy + 0.5);
+    // dayanıklılık (siper)
+    const dy = Y + 21, blink = F.broken > 0 ? 0.3 + 0.4 * (Math.floor(F.time * 8) % 2) : F.tired ? 0.3 + 0.25 * (Math.floor(F.time * 3) % 2) : 0.7;
+    hudShield(bx + 4, dy, 0.8, `rgba(${fg},${blink + 0.2})`);
+    ctx.fillStyle = `rgba(${fg},0.12)`; rr(bx2, dy - 2.5, bw2, 5, 2.5); ctx.fill();
+    ctx.fillStyle = `rgba(${fg},${blink})`; rr(bx2, dy - 2.5, Math.max(0, bw2 * HB.du), 5, 2.5); ctx.fill();
+    ctx.fillStyle = `rgba(${fg},0.7)`; ctx.fillText(Math.ceil(F.dur), bx + bw, dy + 0.5);
+    // altın + anahtar
+    const ry = Y + 38; ctx.font = '700 12px -apple-system, "Segoe UI", Roboto, sans-serif'; ctx.textAlign = 'left';
+    const cs = 1 + 0.35 * INV.gp; ctx.fillStyle = GOLD; ctx.strokeStyle = '#8a5e14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx + 5, ry, 5 * cs, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `rgb(${fg})`; ctx.fillText(INV.gold, bx + 15, ry + 0.5);
+    const kx = bx + 60; drawKey(kx, ry, -0.4, 0.7 * (1 + 0.35 * INV.kp)); ctx.fillStyle = `rgb(${fg})`; ctx.fillText('x' + INV.keys, kx + 11, ry + 0.5);
+    ctx.restore();
+    if (G.has && (F.guarding || F.dur < 100)) { const sx = player.x - cam.x, sy = player.y - cam.y + 13; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
   }
   function drawMute(fg, dt) {
     const b = AU.btn, m = AU.muted; b.x = W - 34; b.y = 66;
@@ -2100,10 +2155,141 @@
     ctx.stroke();
   }
 
+  /* ---------- Ana menü: Halaskâr uyanır · arada sırada kılıç belirir · Başla'da kılıç kafaya saplanır ve ekran kararır ---------- */
+  const GAME_TITLE = 'HALASKAR', GAME_SUB = 'karanlığın içinde bir kıvılcım';
+  const MENU = { on: true, st: 'idle', mode: 'zoom', sT: 0, blk: 0, t: 0, btns: [], mote: [], fl: 0, gx: 0, gy: 0, tgx: 0, tgy: 0, gT: 2.5, px: 0, py: 0, pt: -99, egg: 0, eggD: 0, eggT: rnd(14, 22), bT: rnd(3.5, 5.5), bP: -1, snd: 0 };
+  for (let i = 0; i < 48; i++) MENU.mote.push({ x: Math.random(), y: Math.random(), r: rnd(0.6, 1.9), v: rnd(0.012, 0.035), ph: rnd(0, 6), a: rnd(0.15, 0.5) });
+  const UIF = '-apple-system, "Segoe UI", Roboto, sans-serif';
+  addEventListener('pointermove', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });
+  function menuStart() { if (!MENU.on || MENU.st !== 'idle') return; MENU.st = 'go'; MENU.mode = Math.random() < 0.1 ? 'stab' : 'zoom'; MENU.sT = 0; MENU.snd = 0; MENU.fl = 1; if (MENU.mode === 'zoom') { try { AU.sfx('pickup'); } catch (_) {} } }   // çoğunlukla yakınlaşma; %10 ihtimalle kılıç saplanması (gizli)
+  function menuTap(px, py) { if (MENU.st !== 'idle') return false; for (const b of MENU.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return true; } return false; }
+  function menuPill(x, y, w, h, label, a, strong, t) {
+    ctx.save(); ctx.globalAlpha *= a; rr(x, y, w, h, h / 2);
+    const fg = light ? '0,0,0' : '255,255,255', fl = strong ? MENU.fl * 0.18 : 0;
+    ctx.fillStyle = `rgba(${fg},${(strong ? 0.05 : 0.025) + fl})`; ctx.fill();
+    ctx.lineWidth = strong ? 1.4 : 1; ctx.strokeStyle = `rgba(${fg},${strong ? 0.5 + 0.18 * Math.sin(t * 1.6) : 0.2})`; ctx.stroke();
+    if (strong) {   // yavaş akan ışık şeridi
+      ctx.save(); rr(x, y, w, h, h / 2); ctx.clip(); const ph = ((t * 0.28) % 1.6) - 0.3, gx = x + w * ph, g = ctx.createLinearGradient(gx - 40, 0, gx + 40, 0);
+      g.addColorStop(0, `rgba(${fg},0)`); g.addColorStop(0.5, `rgba(${fg},0.10)`); g.addColorStop(1, `rgba(${fg},0)`); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); ctx.restore();
+    }
+    ctx.fillStyle = `rgba(${fg},${strong ? 0.95 : 0.7})`; ctx.font = `${strong ? 600 : 500} ${strong ? 15 : 11.5}px ${UIF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const sp = strong ? 4.5 : 2, ch = [...label], tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = x + w / 2 - tw / 2; ctx.textAlign = 'left';
+    for (const c of ch) { ctx.fillText(c, lx, y + h / 2 + 0.5); lx += ctx.measureText(c).width + sp; }
+    ctx.restore();
+  }
+  function menuHead(cx, cy, R, o) {   // oyundaki karakterin kafası: dolu daire + nokta gözler
+    const fg = light ? '0,0,0' : '255,255,255', bgc = light ? '242,242,242' : '10,10,10';
+    ctx.save(); ctx.translate(cx + o.ox, cy); ctx.scale(o.sx, o.sy);
+    let fill = `rgb(${fg})`;
+    const tn = o.tint !== undefined ? o.tint : o.pain; if (tn > 0.01) { const a0 = light ? [0, 0, 0] : [255, 255, 255], r0 = light ? [214, 40, 40] : [255, 64, 56]; fill = `rgb(${a0.map((q, i) => Math.round(lerp(q, r0[i], tn))).join(',')})`; }
+    ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    const ex = R * 0.4, ey = -R * 0.02 + o.gy * R * 0.1, er = R * 0.095 * o.wide, gx = o.gx * R * 0.13;
+    ctx.fillStyle = ctx.strokeStyle = `rgb(${bgc})`; ctx.lineWidth = Math.max(2, R * 0.05); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    [-1, 1].forEach(sd => {
+      const x = sd * ex + gx;
+      if (o.dead) { const d = er * 1.05; ctx.beginPath(); ctx.moveTo(x - d, ey - d); ctx.lineTo(x + d, ey + d); ctx.moveTo(x - d, ey + d); ctx.lineTo(x + d, ey - d); ctx.stroke(); }
+      else if (o.pain > 0.3) { ctx.beginPath(); ctx.moveTo(x + sd * er * 1.1, ey - er * 1.2); ctx.lineTo(x - sd * er * 0.9, ey); ctx.lineTo(x + sd * er * 1.1, ey + er * 1.2); ctx.stroke(); }
+      else if (o.open < 0.14) { ctx.beginPath(); ctx.moveTo(x - er, ey); ctx.lineTo(x + er, ey); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.ellipse(x, ey, er, er * o.open, 0, 0, TAU); ctx.fill(); }
+    });
+    if (o.pain > 0.3 || o.dead) { ctx.beginPath(); ctx.ellipse(gx * 0.5, ey + R * 0.42, R * 0.05, R * 0.075, 0, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+  function drawMenu(dt) {
+    MENU.t += dt; MENU.fl = Math.max(0, MENU.fl - dt * 2.4);
+    const t = MENU.t, fg = light ? '0,0,0' : '255,255,255', bgCol = light ? '#f2f2f2' : '#0a0a0a', bgRGB = light ? '242,242,242' : '10,10,10';
+    const u = clamp(Math.min(W / 390, H / 760), 0.62, 1.35), cx = W / 2, ease = v => 1 - Math.pow(1 - clamp(v, 0, 1), 3), act = MENU.st === 'go', stab = act && MENU.mode === 'stab', zoom = act && MENU.mode === 'zoom';
+    if (act) MENU.sT += dt; const sT = MENU.sT;
+    // ---- sahne bitti: ani karartma, sonra oyun ----
+    const endT = stab ? 1.3 : 1.0;
+    if (act && sT >= endT) {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      if (sT >= endT + (stab ? 0.5 : 0.1)) { MENU.on = false; MENU.blk = 1; MENU.st = 'done'; }
+      return;
+    }
+    // ---- durumlar ----
+    const hy = H < 520 ? H * 0.22 : H * 0.285, R = 62 * u;
+    // bakış: dokunulan/imleç yönü, yoksa ara sıra rastgele göz gezdirme
+    MENU.gT -= dt; if (MENU.gT <= 0) { MENU.gT = rnd(2.2, 4.5); MENU.tgx = Math.random() < 0.35 ? 0 : rnd(-0.7, 0.7); MENU.tgy = Math.random() < 0.4 ? 0 : rnd(-0.4, 0.4); }
+    let tgx = MENU.tgx, tgy = MENU.tgy; if (t - MENU.pt < 3) { tgx = clamp((MENU.px - cx) / (W * 0.4), -1, 1); tgy = clamp((MENU.py - hy) / (H * 0.35), -1, 1); }
+    if (stab) { tgx = -1; tgy = 0.1; } else if (zoom) { tgx = 0; tgy = 0; }
+    MENU.gx += (tgx - MENU.gx) * dmp(act ? 14 : 4, dt); MENU.gy += (tgy - MENU.gy) * dmp(act ? 14 : 4, dt);
+    // göz kırpma
+    MENU.bT -= dt; if (MENU.bT <= 0 && MENU.bP < 0) { MENU.bP = 0; MENU.bT = rnd(3.2, 6); } if (MENU.bP >= 0) { MENU.bP += dt / 0.16; if (MENU.bP >= 1) MENU.bP = -1; }
+    const blink = MENU.bP >= 0 ? 1 - Math.sin(MENU.bP * PI) : 1;
+    // gizli kılıç: arada sırada kafanın yerini alır
+    if (!act) { MENU.eggT -= dt; if (MENU.eggT <= 0) { MENU.eggD = 6; MENU.eggT = rnd(22, 38); } MENU.eggD = Math.max(0, MENU.eggD - dt); }
+    MENU.egg += ((MENU.eggD > 0 && !act ? 1 : 0) - MENU.egg) * dmp(act ? 30 : 3.2, dt); if (MENU.egg < 0.003) MENU.egg = 0;
+    const egg = MENU.egg;
+    // ---- sahne anahtarları: saplanma ----
+    const FLY = 0.35, HIT = 0.47, hitP = stab ? clamp((sT - HIT) / 0.5, 0, 1) : 0, hitOn = stab && sT >= HIT;
+    if (stab) { if (MENU.snd < 1 && sT >= 0.3) { MENU.snd = 1; try { AU.sfx('swing'); } catch (_) {} } if (MENU.snd < 2 && sT >= HIT) { MENU.snd = 2; try { AU.sfx('hit', undefined, undefined, true); AU.sfx('hurt'); } catch (_) {} } }
+    const shk = hitOn ? Math.max(0, 1 - (sT - HIT - 0.05) / 0.45) * 13 * u : 0, shx = hitOn && sT > HIT + 0.05 ? (Math.random() - 0.5) * 2 * shk : 0, shy = hitOn && sT > HIT + 0.05 ? (Math.random() - 0.5) * 2 * shk : 0;
+    ctx.save(); ctx.translate(shx, shy);
+    // ---- arka plan ----
+    ctx.fillStyle = bgCol; ctx.fillRect(-30, -30, W + 60, H + 60);
+    const ocam = { x: cam.x, y: cam.y }; cam.x = player.x - W / 2 + t * 9; cam.y = player.y - H / 2 + Math.sin(t * 0.13) * 40; drawWorld(fg); cam.x = ocam.x; cam.y = ocam.y;   // yavaşça kayan zemin
+    const vg = ctx.createRadialGradient(cx, H * 0.4, Math.min(W, H) * 0.12, cx, H * 0.4, Math.max(W, H) * 0.78); vg.addColorStop(0, `rgba(${bgRGB},0.35)`); vg.addColorStop(1, `rgba(${bgRGB},0.97)`); ctx.fillStyle = vg; ctx.fillRect(-30, -30, W + 60, H + 60);
+    for (const m of MENU.mote) { const y = ((m.y - t * m.v) % 1 + 1) % 1, x = m.x + Math.sin(t * 0.4 + m.ph) * 0.012; ctx.fillStyle = `rgba(${fg},${m.a * (0.5 + 0.5 * Math.sin(t * 0.9 + m.ph)) * Math.min(1, t / 1.5) * Math.sin(y * Math.PI)})`; ctx.beginPath(); ctx.arc(x * W, y * H, m.r * u, 0, TAU); ctx.fill(); }
+    // ---- şafak ışığı ----
+    const hin = ease(t / 1.2), pu = 0.85 + 0.15 * Math.sin(t * 1.1), hr = (150 + 30 * egg) * u * pu, bob = Math.sin(t * 1.3) * 5 * u;
+    const hg = ctx.createRadialGradient(cx, hy + bob, 0, cx, hy + bob, hr); hg.addColorStop(0, `rgba(240,194,74,${0.16 * hin})`); hg.addColorStop(0.6, `rgba(240,194,74,${0.045 * hin})`); hg.addColorStop(1, 'rgba(240,194,74,0)'); ctx.fillStyle = hg; ctx.fillRect(cx - hr, hy + bob - hr, hr * 2, hr * 2);
+    ctx.fillStyle = `rgba(${fg},${0.1 * hin})`; ctx.beginPath(); ctx.ellipse(cx, hy + R * 1.22, (R * 0.5 - bob * 0.8), 5 * u, 0, 0, TAU); ctx.fill();   // yerdeki gölge
+    // ---- Halaskâr'ın kafası ----
+    const open = ease((t - 1.0) / 1.1) * blink, breath = 1 + 0.014 * Math.sin(t * 1.5);
+    if (egg < 0.995 || act) {
+      const o = { ox: 0, sx: breath, sy: breath, gx: MENU.gx, gy: MENU.gy, wide: 1, open, pain: 0, dead: false };
+      let hyy = hy + bob + (1 - hin) * 14 * u + egg * 20 * u, A = (1 - egg) * hin;
+      if (stab) { o.wide = 1 + 0.55 * sstep(0.04, 0.28, sT); o.open = 1; }
+      if (zoom) { const zp = clamp((sT - 0.15) / 0.85, 0, 1), k = 1 + 7 * Math.pow(zp, 2.4); o.wide = 1 + 0.7 * sstep(0.0, 0.18, sT) * (1 - 0.5 * zp); o.open = 1; o.sx *= k; o.sy *= k; hyy = lerp(hyy, H * 0.5, sstep(0, 1, zp)); }   // gözler parlar, kafa ekrana yaklaşır
+      if (hitOn) { const k = Math.exp(-(sT - HIT) * 9); o.ox = 16 * u * (1 - 0.35 * hitP) * Math.min(1, (sT - HIT) * 30); o.sx = 0.88 + 0.12 * (1 - k); o.sy = 1.07 - 0.07 * (1 - k); o.pain = sT < HIT + 0.55 ? 1 : 0.7; o.tint = 0.22 + 0.78 * Math.exp(-(sT - HIT) * 7); o.wide = 1; o.open = 0; o.dead = sT > HIT + 0.55; hyy += 3 * u * hitP; }
+      ctx.save(); ctx.globalAlpha = A; menuHead(cx, hyy, R, o); ctx.restore();
+      if (hitOn && sT < HIT + 0.3) { const k = (sT - HIT) / 0.3, ix = cx - R * 0.78 + o.ox; ctx.strokeStyle = `rgba(${fg},${0.9 * (1 - k)})`; ctx.lineWidth = 2; ctx.lineCap = 'round'; for (let i = 0; i < 8; i++) { const an = PI + (i - 3.5) * 0.42, r0 = 8 * u + k * 12 * u, r1 = r0 + (10 + 14 * (1 - k)) * u; ctx.beginPath(); ctx.moveTo(ix + Math.cos(an) * r0, hyy + Math.sin(an) * r0); ctx.lineTo(ix + Math.cos(an) * r1, hyy + Math.sin(an) * r1); ctx.stroke(); } }
+      // saplanan kılıç: soldan hızla gelir, kafaya girer
+      if (stab && sT > 0.1) {
+        const sc = 5.2 * u, tipOff = 22 * sc, tx1 = cx + o.ox + R * 0.1, y1 = hyy - R * 0.02, ang = -0.03;
+        const p = sT < 0.28 ? 0 : sT < FLY ? (sT - 0.28) / (FLY - 0.28) : 1, f = sT < FLY ? 0 : clamp((sT - FLY) / (HIT - FLY), 0, 1), fe = f * f * f;
+        const xOut = -tipOff - 30 * u, xPeek = xOut + 46 * u * ease(p) + Math.sin(sT * 70) * 1.6 * u * p;   // gerilme: kenardan hafifçe sızar
+        const tx = sT < FLY ? xPeek + tipOff : lerp(xOut + 46 * u + tipOff, tx1, fe), tip = hitOn ? tx1 : tx;
+        const quiv = hitOn ? Math.sin((sT - HIT) * 85) * 0.05 * Math.exp(-(sT - HIT) * 4.5) : 0;
+        if (f > 0 && !hitOn) for (let i = 3; i >= 1; i--) { ctx.globalAlpha = 0.14 * (4 - i); drawSword(tip - tipOff - i * 34 * u * (1 - fe * 0.2) + cam.x, y1 + cam.y, ang, sc, bgCol, `rgb(${fg})`); }
+        ctx.globalAlpha = 1; drawSword(tip - tipOff + cam.x, y1 + cam.y, ang + quiv, sc, bgCol, `rgb(${fg})`);
+      }
+    }
+    // ---- gizli kılıç (arada sırada) ----
+    if (egg > 0.003 && !stab) {
+      const sc = 6.2 * u, a2 = -PI / 2 + Math.sin(t * 0.8) * 0.05, sy2 = hy + bob * 1.2 + (1 - egg) * 22 * u, cxo = Math.cos(a2) * 6.5 * sc, cyo = Math.sin(a2) * 6.5 * sc;
+      ctx.save(); ctx.globalAlpha = egg; drawSword(cx - cxo + cam.x, sy2 - cyo + cam.y, a2, sc, bgCol, `rgb(${fg})`); ctx.restore();
+    }
+    // ---- başlık, düğmeler ----
+    const uiA = act ? 1 - clamp(sT / 0.25, 0, 1) : 1;
+    if (uiA > 0.002) {
+      ctx.save(); ctx.globalAlpha = uiA;
+      ctx.font = `300 100px ${UIF}`; const L = [...GAME_TITLE], w100 = L.reduce((q, c) => q + ctx.measureText(c).width + 20, -20), size = Math.min(60 * u + 8, (W * 0.86) / w100 * 100);
+      ctx.font = `300 ${size}px ${UIF}`; const sp = size * 0.2, ws = L.map(c => ctx.measureText(c).width), tot = ws.reduce((q, w) => q + w + sp, -sp), ty = H * 0.5; let lx = cx - tot / 2;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      L.forEach((c, i) => { const e = ease((t - 0.5 - i * 0.07) / 0.9), sh = 0.9 + 0.1 * Math.sin(t * 0.9 - i * 0.4); ctx.fillStyle = `rgba(${fg},${e * sh})`; ctx.fillText(c, lx, ty + (1 - e) * 10 * u); lx += ws[i] + sp; });
+      const le = ease((t - 1.3) / 1.0), ly = ty + 26 * u, lw = Math.min(W * 0.5, 190 * u) * le;
+      ctx.strokeStyle = `rgba(${fg},0.28)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - lw / 2, ly); ctx.lineTo(cx - 5, ly); ctx.moveTo(cx + 5, ly); ctx.lineTo(cx + lw / 2, ly); ctx.stroke();
+      ctx.fillStyle = `rgba(240,194,74,${0.85 * le})`; ctx.save(); ctx.translate(cx, ly); ctx.rotate(PI / 4); ctx.fillRect(-2.2, -2.2, 4.4, 4.4); ctx.restore();
+      const se = ease((t - 1.6) / 1.0); ctx.font = `400 ${12 * u + 1}px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.5 * se})`; ctx.fillText(GAME_SUB, cx, ly + 28 * u);
+      MENU.btns.length = 0; const be = ease((t - 1.9) / 0.9), by = H * 0.655 + (1 - be) * 12, bw = Math.min(W * 0.64, 250), bh = 54, ow = Math.min(W * 0.4, 128), oh = 38, og = 10, oy = by + bh + 22;
+      menuPill(cx - bw / 2, by, bw, bh, 'BAŞLA', be, true, t); MENU.btns.push({ x: cx - bw / 2, y: by - 6, w: bw, h: bh + 12, fn: menuStart });
+      menuPill(cx - ow - og / 2, oy, ow, oh, AU.muted ? 'SES  KAPALI' : 'SES  AÇIK', be, false, t); MENU.btns.push({ x: cx - ow - og / 2, y: oy - 4, w: ow, h: oh + 8, fn: () => AU.toggleMute() });
+      menuPill(cx + og / 2, oy, ow, oh, light ? 'TEMA  AÇIK' : 'TEMA  KOYU', be, false, t); MENU.btns.push({ x: cx + og / 2, y: oy - 4, w: ow, h: oh + 8, fn: toggleBg });
+      if (oy + oh + 14 < H - 40) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', cx, H - 26); }
+      ctx.restore();
+    } else MENU.btns.length = 0;
+    ctx.restore();
+    if (zoom && sT > 0.65) { ctx.fillStyle = `rgba(0,0,0,${sstep(0.65, 1.0, sT)})`; ctx.fillRect(0, 0, W, H); }   // yakınlaşırken kararır
+    if (hitOn && sT < HIT + 0.06) { ctx.fillStyle = `rgba(${fg},${0.55 * (1 - (sT - HIT) / 0.06)})`; ctx.fillRect(0, 0, W, H); }   // çarpma anı: tek karelik parlama
+  }
+
   /* ---------- Döngü ---------- */
   let last = performance.now();
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05); last = now;
+    if (MENU.on) { try { AU.update(dt, 0); } catch (_) {} drawMenu(dt); requestAnimationFrame(frame); return; }
     const stopped = FX.stop > 0; if (stopped) FX.stop -= dt;
     const sdt = stopped ? dt * 0.04 : dt;   // vuruş duraklaması: oyun neredeyse donar
 
@@ -2188,8 +2374,9 @@
       ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.stroke();
       ctx.restore();
     }
-    drawHud(fg); drawInv(fg);
+    drawHud(fg);
     drawAtk(fg, dt); drawMute(fg, dt);
+    if (MENU.blk > 0) { MENU.blk = Math.max(0, MENU.blk - dt / 0.7); ctx.fillStyle = `rgba(0,0,0,${MENU.blk})`; ctx.fillRect(0, 0, W, H); }   // karartmadan açılış
     cam.x -= FX.ox; cam.y -= FX.oy;
     requestAnimationFrame(frame);
   }
