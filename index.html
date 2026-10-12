@@ -99,6 +99,8 @@
   }
 
   function joyStart(e) {
+    AU.unlock();
+    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 10) { AU.toggleMute(); return; }   // ses aç/kapa düğmesi
     if (atk.id === null && Math.hypot(e.clientX - atk.x, e.clientY - atk.y) < atk.r + 14) {   // buton joystick'ten önceliklidir
       atk.id = e.pointerId; atk.down = true; pressAtk();
       try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
@@ -138,7 +140,7 @@
 
   /* ---------- Klavye (masaüstü testi) ---------- */
   const keys = {};
-  addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
   addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if ((e.key === 'j' || e.key === ' ') && atk.kb) { atk.kb = false; relAtk(); } });
   addEventListener('keydown', e => { if ((e.key === 'j' || e.key === ' ') && !e.repeat && !atk.kb) { atk.kb = true; pressAtk(); } });
 
@@ -152,6 +154,293 @@
   const wrap = a => { while (a > Math.PI) a -= 6.2832; while (a < -Math.PI) a += 6.2832; return a; };
   const dmp = (k, dt) => 1 - Math.exp(-k * dt), rnd = (a, b) => a + Math.random() * (b - a);
   const PI = Math.PI, TAU = 6.2832;
+
+  /* ---------- SES: tamamen sentezlenir (ses dosyası yok) · müzik, efektler, Doppler'lı heykel sesleri, fısıltılar ---------- */
+  const AU = (() => {
+    let ac = null, master, sfxBus, musBus, padBus, padLP, melBus, revIn, noiseBuf, muted = false, acc = 0;
+    const LS = { x: 0, y: 0 }, btn = { x: 0, y: 0, r: 18 }, voices = new Map();
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+    const C_SND = 800;            // oyun içi 'ses hızı' (px/sn): Doppler kayması net duyulsun diye düşük tutuldu
+    const MV = 0.55, SVL = 0.85;  // müzik / efekt seviyesi
+
+    /* ----- temel yapı taşları ----- */
+    function tone(d, type, f0, f1, t, dur, vol, o) {
+      o = o || {}; const os = ac.createOscillator(), g = ac.createGain(), att = Math.min(o.att || 0.005, dur * 0.9);
+      os.type = type; os.frequency.setValueAtTime(f0, t); if (f1 !== f0) os.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      if (o.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = o.vib[0]; lg.gain.value = o.vib[1]; l.connect(lg); lg.connect(os.frequency); l.start(t); l.stop(t + dur + 0.1); }
+      if (o.lp) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; os.connect(f); f.connect(g); } else os.connect(g);
+      g.connect(d); os.start(t); os.stop(t + dur + 0.05);
+    }
+    function nz(d, t, dur, vol, ft, f0, f1, q, att) {
+      const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); att = Math.min(att || 0.004, dur * 0.9);
+      s.buffer = noiseBuf; s.loop = true; f.type = ft; f.frequency.setValueAtTime(f0, t); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + dur); f.Q.value = q || 1;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f); f.connect(g); g.connect(d); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+    }
+    // konumlu çıkış: mesafeye göre kısılır / matlaşır, soldan sağdan gelir
+    function bus(x, y, rev) {
+      let pan = 0, g = 1, cut = 16000;
+      if (x !== undefined) { const dx = x - LS.x, dy = y - LS.y, dd = Math.hypot(dx, dy); if (dd > 950) return null; g = 1 / (1 + (dd / 230) * (dd / 230)); pan = clamp(dx / 330, -1, 1) * 0.85; cut = Math.min(16000, 700 + 15000 / Math.pow(1 + dd / 110, 1.5)); }
+      const gn = ac.createGain(), lp = ac.createBiquadFilter(); gn.gain.value = g; lp.type = 'lowpass'; lp.frequency.value = cut; gn.connect(lp);
+      let tail = lp; if (ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = pan; lp.connect(p); tail = p; }
+      tail.connect(sfxBus); if (rev > 0) { const r = ac.createGain(); r.gain.value = rev; tail.connect(r); r.connect(revIn); }
+      return gn;
+    }
+
+    /* ----- efektler ----- */
+    const SFX = {
+      swing(d, t) { nz(d, t, 0.24, 0.5, 'bandpass', 450, 2800, 1.1, 0.08); tone(d, 'sine', 230, 130, t, 0.2, 0.08); },
+      hit(d, t, kill) {   // kılıç düşmana isabet etti
+        tone(d, 'sine', 190, 55, t, 0.18, 0.9); nz(d, t, 0.1, 0.55, 'highpass', 1800, 2500, 0.7); nz(d, t, 0.2, 0.45, 'bandpass', 1100, 280, 1.4);
+        tone(d, 'sawtooth', 420, 110, t, 0.16, 0.2, { lp: 1200 });
+        if (kill) { tone(d, 'sine', 100, 32, t, 0.5, 0.8); tone(d, 'triangle', 640, 150, t, 0.35, 0.2); }
+      },
+      hurt(d, t) {        // biz hasar aldık
+        tone(d, 'sine', 160, 42, t, 0.32, 1.0); nz(d, t, 0.28, 0.8, 'lowpass', 900, 180, 0.8); nz(d, t, 0.06, 0.5, 'highpass', 2000, 2000, 0.7);
+        tone(d, 'sawtooth', 340, 85, t, 0.38, 0.3, { lp: 900 }); tone(d, 'sine', 2300, 2250, t + 0.02, 0.7, 0.03, { att: 0.02 });   // hafif kulak çınlaması
+      },
+      block(d, t) {
+        [[1180, 0.5, 0.4], [1760, 0.32, 0.3], [2650, 0.2, 0.22], [3480, 0.1, 0.15]].forEach(([f, v, dd]) => tone(d, 'sine', f, f * 0.995, t, dd, v * 0.5));
+        nz(d, t, 0.05, 0.5, 'highpass', 3000, 3000, 0.7); tone(d, 'sine', 210, 120, t, 0.1, 0.5);
+      },
+      guardBreak(d, t) {
+        SFX.block(d, t); nz(d, t, 0.5, 0.9, 'lowpass', 2400, 260, 0.8); tone(d, 'sawtooth', 240, 48, t, 0.55, 0.5, { lp: 700 });
+        for (let i = 0; i < 5; i++) tone(d, 'sine', 2400 + Math.random() * 3000, 2000, t + 0.03 + i * 0.04, 0.2, 0.07);
+      },
+      playerDeath(d, t) {
+        tone(d, 'sine', 130, 28, t, 1.6, 1.0, { att: 0.02 }); nz(d, t, 1.2, 0.6, 'lowpass', 900, 100, 0.7);
+        [220, 261.6, 329.6].forEach(f => tone(d, 'triangle', f, f * 0.5, t + 0.1, 1.8, 0.12, { att: 0.2, lp: 1200 }));
+      },
+      pickup(d, t) { nz(d, t, 0.4, 0.35, 'highpass', 3500, 9000, 0.8, 0.03); [1318.5, 1760, 2093, 2637].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.07, 0.8, 0.14)); },
+      sheath(d, t) { nz(d, t, 0.05, 0.4, 'bandpass', 3200, 2500, 2); tone(d, 'sine', 900, 500, t, 0.06, 0.25); },
+      unsheath(d, t) { nz(d, t, 0.22, 0.3, 'highpass', 2500, 7000, 0.8, 0.02); tone(d, 'sine', 1800, 2600, t, 0.2, 0.05); },
+      evilHit(d, t, h) {  // taş darbesi + uğursuz inilti (her darbede daha derin, daha öfkeli)
+        h = h || 1; tone(d, 'sine', 120, 38, t, 0.35, 1.0); nz(d, t, 0.38, 0.8, 'lowpass', 2000, 180, 0.8); nz(d, t, 0.07, 0.6, 'highpass', 2500, 2500, 0.7);
+        tone(d, 'sawtooth', 95 - h * 6, 48, t, 0.9, 0.4, { lp: 420, att: 0.05, vib: [6, 4] }); tone(d, 'sawtooth', 140 + h * 30, 90, t + 0.05, 0.6, 0.12, { lp: 900 });
+      },
+      evilShatter(d, t) {
+        tone(d, 'sine', 70, 24, t, 1.3, 1.2); nz(d, t, 1.6, 1.0, 'lowpass', 3000, 120, 0.7); tone(d, 'sawtooth', 600, 70, t, 1.6, 0.3, { lp: 900, vib: [6, 20] });
+        for (let i = 0; i < 14; i++) nz(d, t + 0.05 + i * 0.07 + Math.random() * 0.08, 0.06, 0.3, 'bandpass', 1500 + Math.random() * 2500, 1200, 3);
+      },
+      /* düşman sesleri: her yaratığın kendine ait perdesi var (e.vp) */
+      eSpawn(d, t, e) { const v = e.vp; nz(d, t, 0.85, 0.45, 'bandpass', 200, 1300, 2, 0.4); tone(d, 'sawtooth', 52 * v, 120 * v, t, 0.85, 0.35, { lp: 500, att: 0.3 }); tone(d, 'sine', 880 * v, 1320 * v, t + 0.2, 0.7, 0.05, { att: 0.3 }); },
+      eIdle(d, t, e) {
+        const v = e.vp, f = 105 * v;
+        tone(d, 'sawtooth', f * 1.1, f * 0.78, t, 1.0, 0.32, { lp: 380, att: 0.25, vib: [4.5 + v, 5] }); tone(d, 'sawtooth', f * 2.02, f * 1.5, t, 0.9, 0.08, { lp: 800, att: 0.3, vib: [5, 7] });
+        nz(d, t, 0.9, 0.12, 'bandpass', 700 * v, 500 * v, 3, 0.35);
+        if (Math.random() < 0.45) for (let i = 0; i < 4; i++) nz(d, t + 0.1 + i * 0.07 + Math.random() * 0.03, 0.03, 0.25, 'bandpass', 2600, 2600, 4);   // kemik şıkırtısı
+      },
+      eWind(d, t, e) {
+        const v = e.vp, w = e.wd;
+        if (e.atk === 'claw') {
+          if (e.cmb === 2) { tone(d, 'sine', 40, 95, t, w, 0.7, { att: w * 0.8 }); nz(d, t, w, 0.35, 'lowpass', 200, 900, 1, w * 0.8); tone(d, 'sawtooth', 70 * v, 180 * v, t, w, 0.3, { lp: 700, att: w * 0.6 }); }
+          else { tone(d, 'sawtooth', 75 * v, 160 * v, t, w, 0.3, { lp: 650, att: w * 0.7, vib: [9, 6] }); nz(d, t, w, 0.3, 'bandpass', 900, 1800, 2, w * 0.7); }
+        } else if (e.atk === 'lunge') { tone(d, 'sawtooth', 420 * v, 1250 * v, t, w, 0.2, { lp: 2600, att: w * 0.8, vib: [11, 25] }); tone(d, 'sine', 60, 110, t, w, 0.4, { att: w * 0.8 }); }
+        else { tone(d, 'sine', 170 * v, 720 * v, t, w, 0.3, { att: w * 0.8 }); tone(d, 'sawtooth', 85 * v, 360 * v, t, w, 0.15, { lp: 900, att: w * 0.8, vib: [13, 10] }); nz(d, t, w, 0.14, 'highpass', 3500, 7000, 1, w * 0.9); }
+      },
+      eClaw(d, t, e) {
+        if (e.cmb === 2) { tone(d, 'sine', 110, 32, t, 0.45, 1.0); nz(d, t, 0.5, 0.8, 'lowpass', 1500, 120, 0.8); nz(d, t, 0.06, 0.6, 'highpass', 2500, 2500, 0.7); tone(d, 'sawtooth', 150, 60, t, 0.4, 0.35, { lp: 600 }); }
+        else { nz(d, t, 0.16, 0.65, 'bandpass', 3200, 900, 1.6, 0.02); tone(d, 'sawtooth', 190 * e.vp, 90 * e.vp, t, 0.18, 0.28, { lp: 800 }); }
+      },
+      eLunge(d, t, e) { tone(d, 'sawtooth', 950 * e.vp, 300 * e.vp, t, 0.22, 0.3, { lp: 2200, vib: [14, 30] }); nz(d, t, 0.22, 0.55, 'bandpass', 2400, 500, 1.2, 0.02); },
+      eBolt(d, t) { tone(d, 'sine', 1300, 180, t, 0.28, 0.4); nz(d, t, 0.18, 0.35, 'highpass', 2500, 6000, 0.8); nz(d, t, 0.3, 0.4, 'bandpass', 500, 1900, 1.2, 0.05); },
+      boltHit(d, t) { nz(d, t, 0.3, 0.55, 'lowpass', 3200, 280, 0.8); tone(d, 'sine', 320, 60, t, 0.2, 0.5); },
+      boltBreak(d, t) { nz(d, t, 0.12, 0.4, 'highpass', 3200, 3200, 0.7); tone(d, 'sine', 950, 420, t, 0.12, 0.3); },
+      eBlinkOut(d, t) { nz(d, t, 0.4, 0.5, 'bandpass', 2200, 180, 1.5, 0.05); tone(d, 'sine', 760, 80, t, 0.4, 0.4, { att: 0.05 }); },
+      eBlinkIn(d, t) { nz(d, t, 0.28, 0.5, 'bandpass', 250, 3200, 1.5, 0.2); tone(d, 'sine', 130, 60, t + 0.22, 0.16, 0.7); },
+      eHurt(d, t, e) { const v = e.vp; tone(d, 'sawtooth', 640 * v, 210 * v, t, 0.3, 0.35, { lp: 2600, vib: [18, 22] }); nz(d, t, 0.12, 0.3, 'bandpass', 1500, 900, 1.5); },
+      eDie(d, t, e) {
+        const v = e.vp; tone(d, 'sawtooth', 720 * v, 46, t, 1.1, 0.42, { lp: 1500, vib: [7, 18], att: 0.02 }); nz(d, t, 1.0, 0.4, 'bandpass', 900, 180, 1.2, 0.05);
+        for (let i = 0; i < 6; i++) tone(d, 'sine', 1800 + Math.random() * 1800, 1500, t + 0.25 + i * 0.08, 0.35, 0.04);
+      },
+      eRage(d, t) { tone(d, 'sawtooth', 90, 40, t, 0.9, 0.55, { lp: 600, att: 0.05, vib: [16, 10] }); tone(d, 'sawtooth', 180, 70, t, 0.8, 0.25, { lp: 1200, vib: [12, 14] }); nz(d, t, 0.9, 0.4, 'bandpass', 500, 250, 1.5, 0.1); }
+    };
+    const REV = { evilHit: 0.45, evilShatter: 0.6, eIdle: 0.3, eSpawn: 0.4, eRage: 0.4, eDie: 0.3, playerDeath: 0.4, pickup: 0.35 }, GAP = { swing: 0.08, hit: 0.05, eIdle: 0.15, block: 0.05, boltHit: 0.05 }, last = {};
+    function sfx(name, x, y, a) {
+      if (!ac || ac.state !== 'running' || muted) return; const f = SFX[name]; if (!f) return;
+      const t = ac.currentTime; if (t - (last[name] || -9) < (GAP[name] || 0.03)) return; last[name] = t;
+      const d = bus(x, y, REV[name] === undefined ? 0.18 : REV[name]); if (d) f(d, t + 0.005, a);
+    }
+
+    /* ----- fısıltılar: anlamsız, ne dediği anlaşılmayan heceler (gürültü + formant filtreleri) ----- */
+    const VOW = [[730, 1090], [530, 1840], [270, 2290], [570, 840], [300, 870], [660, 1720]];
+    function whisper1(x, y, evil, delay, shift) {
+      const d = bus(x, y, evil ? 0.7 : 0.5); if (!d) return;
+      const t0 = ac.currentTime + 0.03 + delay, n = 5 + Math.floor(Math.random() * 5), sh = (evil ? 0.74 : 1) * shift, A = evil ? 1.15 : 0.8;
+      const s = ac.createBufferSource(), hp = ac.createBiquadFilter(), f1 = ac.createBiquadFilter(), f2 = ac.createBiquadFilter(), g = ac.createGain(), m2 = ac.createGain();
+      s.buffer = noiseBuf; s.loop = true; hp.type = 'highpass'; hp.frequency.value = 300; f1.type = f2.type = 'bandpass'; f1.Q.value = evil ? 7 : 5; f2.Q.value = evil ? 10 : 8; g.gain.value = 0; m2.gain.value = 0.7;
+      s.connect(hp); hp.connect(f1); hp.connect(f2); f1.connect(g); f2.connect(m2); m2.connect(g); g.connect(d);
+      let vg = null, vs = null;
+      if (evil) { vs = ac.createOscillator(); vs.type = 'sawtooth'; vs.frequency.value = (78 + Math.random() * 30) * shift; const vl = ac.createBiquadFilter(); vl.type = 'lowpass'; vl.frequency.value = 520; vg = ac.createGain(); vg.gain.value = 0; vs.connect(vl); vl.connect(vg); vg.connect(d); vs.start(t0); }
+      let t = t0;
+      for (let i = 0; i < n; i++) {
+        const dur = 0.07 + Math.random() * 0.15, env = Math.sin(Math.PI * (i + 0.6) / (n + 0.2)), fr = Math.random() < 0.28;
+        if (fr) { f1.frequency.setTargetAtTime(4800 * (0.9 + Math.random() * 0.2), t, 0.01); f2.frequency.setTargetAtTime(6500, t, 0.01); }
+        else { const v = VOW[Math.floor(Math.random() * VOW.length)]; f1.frequency.setTargetAtTime(v[0] * sh * (0.9 + Math.random() * 0.2), t, 0.02); f2.frequency.setTargetAtTime(v[1] * sh * (0.9 + Math.random() * 0.2), t, 0.02); }
+        const pk = (fr ? 1.2 : 3.0) * (0.45 + 0.55 * env) * (0.7 + 0.5 * Math.random()) * A;
+        g.gain.setTargetAtTime(pk, t, 0.012); g.gain.setTargetAtTime(pk * 0.12, t + dur * 0.65, 0.02);
+        if (vg) { vg.gain.setTargetAtTime(0.12 * env, t, 0.03); vg.gain.setTargetAtTime(0.01, t + dur * 0.7, 0.03); }
+        t += dur + 0.015 + Math.random() * 0.05;
+      }
+      g.gain.setTargetAtTime(0, t, 0.06); if (vg) vg.gain.setTargetAtTime(0, t, 0.06);
+      s.start(t0, Math.random() * 1.5); s.stop(t + 0.5); if (vs) vs.stop(t + 0.5);
+    }
+    function whisper(x, y, evil) { whisper1(x, y, evil, 0, 1); if (evil) { whisper1(x + rnd(-60, 60), y, true, 0.14, 0.88); if (Math.random() < 0.5) whisper1(x + rnd(-80, 80), y, true, 0.3, 1.1); } }
+
+    /* ----- heykel sesleri: kalıcı sesler, Doppler ile perde kayar (yaklaşırken incelir, uzaklaşırken kalınlaşır) ----- */
+    const PENT = [146.83, 174.61, 196, 220, 261.63, 293.66, 349.23, 392, 440];
+    function mkVoice(key, sx, sy, evil, kind) {
+      const out = ac.createGain(); out.gain.value = 0; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800; out.connect(lp);
+      let pn = null, tail = lp; if (ac.createStereoPanner) { pn = ac.createStereoPanner(); lp.connect(pn); tail = pn; }
+      tail.connect(sfxBus); const rs = ac.createGain(); rs.gain.value = evil ? 0.7 : 0.5; tail.connect(rs); rs.connect(revIn);
+      const V = { key, out, lp, pn, oscs: [], stops: [], d0: -1, vr: 0, whT: rnd(1, 4), R: evil ? 560 : 400, vol: evil ? 1.0 : 0.6, evil, scream: null };
+      const osc = (type, f, vol, dest, det) => { const o = ac.createOscillator(); o.type = type; o.frequency.value = f; if (det) o.detune.value = det; const g = ac.createGain(); g.gain.value = vol; o.connect(g); g.connect(dest); o.start(); V.oscs.push({ o, f }); V.stops.push(o); return o; };
+      const lfo = (rate, depth, param) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = rate; g.gain.value = depth; o.connect(g); g.connect(param); o.start(); V.stops.push(o); };
+      const flt = (type, f, q, dest) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(dest); return b; };
+      if (evil) {
+        const dr = flt('lowpass', 240, 3, out);   // alçak drone: tritone aralığı, uğursuz
+        osc('sawtooth', 55, 0.55, dr); osc('sawtooth', 77.8, 0.35, dr, 9); osc('sawtooth', 110.5, 0.2, dr, -11); lfo(0.21, 110, dr.frequency);
+        const gr = ac.createGain(); gr.gain.value = 0.35; lfo(19, 0.33, gr.gain); gr.connect(flt('bandpass', 180, 1.2, out)); osc('sawtooth', 61, 0.55, gr);   // hırıltı: titreyen genlik
+        const vo = ac.createGain(); vo.gain.value = 0.28; vo.connect(flt('bandpass', 420, 5, out)); vo.connect(flt('bandpass', 900, 6, out));   // iblis korosu 'ooo'
+        lfo(0.37, 7, osc('sawtooth', 92, 1, vo)); osc('sawtooth', 92.9, 1, vo);
+        const sc = ac.createGain(); sc.gain.value = 0.03; V.scream = sc; sc.connect(flt('bandpass', 1200, 2, out));   // mikrotonal çığlık kümesi
+        [880, 932.3, 1396.9, 1479].forEach(f => osc('sine', f, 0.5, sc)); lfo(5.3, 0.02, sc.gain);
+      } else {
+        const f = PENT[Math.floor(hashN(sx * 0.01, sy * 0.01, 21) * PENT.length)], mix = ac.createGain(); mix.gain.value = 0.3; mix.connect(out);
+        if (kind === 0) {        // koro: 'aaah'
+          const a = flt('bandpass', 700, 6, mix), b = flt('bandpass', 1100, 7, mix), g = ac.createGain(); g.connect(a); g.connect(b);
+          lfo(0.2, 150, a.frequency); lfo(5, 2.5, osc('sawtooth', f * 2, 0.5, g, -8)); osc('sawtooth', f * 2, 0.5, g, 8); osc('sawtooth', f * 3.002, 0.25, g);
+        } else if (kind === 1) { // şarkı söyleyen kase: titreşen cam tınısı
+          lfo(0.35, 0.18, mix.gain); osc('sine', f * 2, 0.5, mix); osc('sine', f * 2 * 1.004, 0.5, mix); osc('sine', f * 2 * 2.76, 0.12, mix); osc('sine', f * 2 * 5.4, 0.05, mix);
+        } else if (kind === 2) { // keşiş drone'u: sıcak, alçak
+          const l = flt('lowpass', 520, 0.7, mix); lfo(4.5, 1.5, osc('triangle', f, 0.6, l)); osc('triangle', f * 0.5 * 1.003, 0.7, l); osc('sine', f * 1.5, 0.15, l);
+        } else {                 // taşın içinden esen rüzgâr ıslığı
+          const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true; const b = flt('bandpass', f * 3, 30, mix); s.connect(b); s.start(); V.stops.push(s); V.oscs.push({ o: b, f: f * 3 }); lfo(0.3, f * 0.4, b.frequency);
+          V.vol = 1.6; osc('sine', f * 3, 0.05, mix);
+        }
+      }
+      return V;
+    }
+    function stopVoice(V) { const t = ac.currentTime; V.out.gain.setTargetAtTime(0, t, 0.12); setTimeout(() => { V.stops.forEach(s => { try { s.stop(); } catch (_) {} }); try { V.out.disconnect(); } catch (_) {} }, 800); }
+    function updVoice(V, d, dx, dt, es) {
+      const t = ac.currentTime, k = clamp(1 - d / V.R, 0, 1); let g = Math.pow(k, 1.5) * V.vol, pm = 1;
+      const rr = V.d0 < 0 ? 0 : (V.d0 - d) / Math.max(dt, 0.001); V.d0 = d; V.vr += (rr - V.vr) * (1 - Math.exp(-12 * dt));   // yaklaşma hızı (+ = yaklaşıyoruz)
+      if (es) {
+        const L = Math.min(es.hits, 4), dy = es.dying >= 0 ? clamp(es.dying / 1.15, 0, 1) : 0;
+        g *= 0.7 + 0.8 * (es.aw - 0.5) + 0.12 * L + 0.9 * dy; pm = 1 - 0.45 * dy;
+        V.scream.gain.setTargetAtTime(0.015 + 0.03 * L + 0.1 * dy + 0.05 * es.flare, t, 0.1);
+      }
+      const ratio = pm * (1 + clamp(V.vr / C_SND, -0.4, 0.45));   // Doppler: f' = f · (c + v) / c
+      for (const q of V.oscs) q.o.frequency.setTargetAtTime(q.f * ratio, t, 0.05);
+      V.out.gain.setTargetAtTime(g, t, 0.08); V.lp.frequency.setTargetAtTime(500 + 7000 * Math.pow(k, 1.1), t, 0.08);
+      if (V.pn) V.pn.pan.setTargetAtTime(clamp(dx / 240, -0.9, 0.9), t, 0.06);
+    }
+    function updStatues(dt) {
+      const R = 580, near = [];
+      for (const [sx, sy, id, ev] of statuesIn(LS.x - R, LS.y - R, LS.x + R, LS.y + R)) {
+        let es = null; if (ev) { es = evState(id); if (es.dead) continue; }
+        const d = Math.hypot(sx - LS.x, sy - 24 - LS.y);
+        if (d < (ev ? 560 : 400)) near.push({ key: ev ? 'e' + id : Math.round(sx) + ',' + Math.round(sy), sx, sy, ev, es, d, dx: sx - LS.x });
+      }
+      near.sort((a, b) => a.d - b.d); const use = near.slice(0, 4), keep = new Set(use.map(n => n.key));
+      for (const [k, V] of voices) if (!keep.has(k)) { stopVoice(V); voices.delete(k); }
+      for (const n of use) {
+        let V = voices.get(n.key); if (!V) { V = mkVoice(n.key, n.sx, n.sy, n.ev, Math.floor(hashN(n.sx * 0.01, n.sy * 0.01, 5) * 4)); voices.set(n.key, V); }
+        updVoice(V, n.d, n.dx, dt, n.es);
+        if (n.d < (n.ev ? 330 : 210) && !muted && (V.whT -= dt) <= 0) { whisper(n.sx + rnd(-30, 30), n.sy - 40, n.ev); V.whT = n.ev ? rnd(2.2, 5) : rnd(4, 9); }
+      }
+    }
+
+    /* ----- müzik: D minör ailesinde, yavaş akor dizileri · pad + çan melodisi + yumuşak kalp atışı; yoğunluk dalgalanır ----- */
+    const PROG = [[[50, 'm7'], [46, 'M7'], [53, 'M7'], [48, 'a9']], [[50, 'm7'], [55, 'm7'], [46, 'M7'], [57, 'm7']], [[46, 'M7'], [53, 'M7'], [48, 'a9'], [55, 'm7']], [[57, 'm7'], [50, 'm7'], [46, 'M7'], [53, 'M7']]];
+    const QUAL = { m7: [0, 3, 7, 10], M7: [0, 4, 7, 11], a9: [0, 4, 7, 14] }, BLK = [0.16, 0.34, 0.56, 0.42, 0.22, 0.5, 0.84, 0.6];
+    const mus = { next: 0, step: 0, bar: -1, blk: -1, last: -1, prog: PROG[0], ko: 0, inten: 0.12, alert: 0, mi: 14, rest: false, cpc: [], SC: [] };
+    const beat = 60 / 66, e8 = beat / 2;
+    const mkScale = () => { const pcs = [2, 5, 7, 9, 0].map(p => (p + mus.ko + 12) % 12), o = []; for (let m = 60; m <= 90; m++) if (pcs.includes(m % 12)) o.push(m); mus.SC = o; };
+    function pad(m, t, dur, vol) {
+      const f = mtof(m), g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 1.5); g.gain.setValueAtTime(vol, t + dur - 0.2); g.gain.linearRampToValueAtTime(0.0001, t + dur + 2.2);
+      [-7, 6].forEach((c, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = c; o.connect(g); o.start(t); o.stop(t + dur + 2.4); }); g.connect(padBus);
+    }
+    function bassN(m, t, dur, vol) {
+      const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.35); g.gain.setValueAtTime(vol, t + dur - 0.3); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.6);
+      [[mtof(m - 12), 'sine', 1], [mtof(m), 'triangle', 0.3]].forEach(([f, ty, a]) => { const o = ac.createOscillator(), og = ac.createGain(); o.type = ty; o.frequency.value = f; og.gain.value = a; o.connect(og); og.connect(g); o.start(t); o.stop(t + dur + 0.7); }); g.connect(musBus);
+    }
+    function bell(m, t, vel) {
+      const f = mtof(m), pk = (0.05 + 0.04 * mus.inten) * vel; let dest = melBus;
+      if (ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = Math.random() * 1.1 - 0.55; p.connect(melBus); dest = p; }
+      [[1, 1, 2.4], [2, 0.22, 1.0], [3.01, 0.07, 0.4]].forEach(([mul, a, dd]) => {
+        const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f * mul; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(pk * a, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dd); o.connect(g); g.connect(dest); o.start(t); o.stop(t + dd + 0.1);
+      });
+    }
+    function heart(t, v) {
+      const a = (mus.inten - 0.5) * v; if (a <= 0) return;
+      [[64, 38, 0.16, 'sine'], [130, 80, 0.05, 'triangle']].forEach(([f0, f1, vol, ty]) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = ty; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 0.28); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol * a * 2, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4); o.connect(g); g.connect(musBus); o.start(t); o.stop(t + 0.45); });
+    }
+    function newBar(t) {
+      mus.bar++;
+      if (mus.bar % 4 === 0) {   // yeni blok: yeni akor dizisi, 8 blokta bir ara sıra yeni tonalite
+        mus.blk++; if (mus.blk > 0 && mus.blk % 8 === 0) { mus.ko = [-2, 0, 2, 3, 5, 0][Math.floor(Math.random() * 6)]; mkScale(); }
+        let p; do { p = Math.floor(Math.random() * PROG.length); } while (p === mus.last); mus.last = p; mus.prog = PROG[p];
+      }
+      const [r, q] = mus.prog[mus.bar % 4], root = r + mus.ko, inten = mus.inten, dur = beat * 4 + 1.0;
+      mus.cpc = QUAL[q].map(i => (root + i) % 12); mus.rest = inten < 0.4 && Math.random() < 0.3;
+      padLP.frequency.setTargetAtTime(650 + 1900 * inten, t, 1.2);
+      const used = []; QUAL[q].forEach(i => { let n = root + i; while (n < 57) n += 12; while (n > 76) n -= 12; used.push(n); });
+      used.forEach(n => pad(n, t, dur, 0.05 * (0.75 + 0.5 * inten)));
+      if (inten > 0.55) pad(used[2] + 12, t + 0.1, dur, 0.02);
+      if (inten > 0.3) bassN(root, t, beat * 4, 0.11 + 0.05 * inten);
+    }
+    function musStep(t) {
+      const s = mus.step % 8; if (s === 0) newBar(t);
+      const inten = mus.inten; let p = s % 2 === 0 ? 0.22 + 0.5 * inten : 0.08 + 0.34 * inten; if (mus.rest) p *= 0.12; else if (s === 0) p = Math.max(p, 0.5);
+      if (Math.random() < p) {
+        const SC = mus.SC, cand = []; let tot = 0;
+        for (let k = -3; k <= 3; k++) { if (!k) continue; const i = mus.mi + k; if (i < 4 || i >= SC.length - 2) continue; const m = SC[i], w = (mus.cpc.includes(m % 12) ? 3 : 1) * (Math.abs(k) === 1 ? 1.6 : 1) * Math.max(0.1, 1 - Math.abs(m - 78) / 40); cand.push([i, w]); tot += w; }
+        let r = Math.random() * tot, idx = mus.mi; for (const [i, w] of cand) { r -= w; if (r <= 0) { idx = i; break; } }
+        mus.mi = idx; bell(SC[idx], t + (Math.random() - 0.5) * 0.03, 0.5 + 0.5 * Math.random());
+      }
+      if (inten > 0.6 && (s === 0 || s === 4)) heart(t, s === 0 ? 1 : 0.6);
+    }
+    function musTick() {
+      if (!ac || ac.state !== 'running') return; if (mus.next < ac.currentTime) mus.next = ac.currentTime + 0.1;
+      while (mus.next < ac.currentTime + 0.6) { musStep(mus.next); mus.next += e8; mus.step++; }
+    }
+
+    /* ----- kurulum ----- */
+    function build() {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) {}
+      try { ac = new AC(); } catch (_) { ac = null; return; }
+      master = ac.createGain(); master.gain.value = muted ? 0 : 0.9;
+      const cp = ac.createDynamicsCompressor(); cp.threshold.value = -16; cp.knee.value = 18; cp.ratio.value = 4; cp.attack.value = 0.005; cp.release.value = 0.25; master.connect(cp); cp.connect(ac.destination);
+      sfxBus = ac.createGain(); sfxBus.gain.value = SVL; sfxBus.connect(master);
+      musBus = ac.createGain(); musBus.gain.value = 0; musBus.gain.setValueAtTime(0, 0); musBus.gain.linearRampToValueAtTime(MV, ac.currentTime + 5); musBus.connect(master);
+      const len = Math.floor(ac.sampleRate * 2.6), ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < len; i++) { const k = i / len; lp += (Math.random() * 2 - 1 - lp) * (0.55 - 0.4 * k); d[i] = lp * 1.8 * Math.pow(1 - k, 2.6); } }
+      const cv2 = ac.createConvolver(); cv2.buffer = ir; revIn = ac.createGain(); const ro = ac.createGain(); ro.gain.value = 0.55; revIn.connect(cv2); cv2.connect(ro); ro.connect(master);
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      padBus = ac.createGain(); padLP = ac.createBiquadFilter(); padLP.type = 'lowpass'; padLP.frequency.value = 900; padLP.Q.value = 0.4; padBus.connect(padLP); padLP.connect(musBus);
+      const lf = ac.createOscillator(), lg = ac.createGain(); lf.frequency.value = 0.06; lg.gain.value = 350; lf.connect(lg); lg.connect(padLP.frequency); lf.start();
+      melBus = ac.createGain(); melBus.connect(musBus);
+      const dly = ac.createDelay(2), fb = ac.createGain(), dl = ac.createBiquadFilter(), ds = ac.createGain(), dOut = ac.createGain();
+      dly.delayTime.value = beat * 0.75; fb.gain.value = 0.36; dl.type = 'lowpass'; dl.frequency.value = 1800; ds.gain.value = 0.5; dOut.gain.value = 0.55;
+      melBus.connect(ds); ds.connect(dly); dly.connect(dl); dl.connect(fb); fb.connect(dly); dl.connect(dOut); dOut.connect(musBus);
+      const mr = ac.createGain(); mr.gain.value = 0.38; musBus.connect(mr); mr.connect(revIn);
+      mkScale(); mus.next = ac.currentTime + 0.3; setInterval(musTick, 100);
+    }
+    function unlock() { if (!ac) build(); if (ac && ac.state !== 'running') { try { ac.resume().catch(() => {}); } catch (_) {} } }
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(ev => addEventListener(ev, unlock, { passive: true }));
+    document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend().catch(() => {}); else ac.resume().catch(() => {}); });
+    function toggleMute() { muted = !muted; if (ac) master.gain.setTargetAtTime(muted ? 0 : 0.9, ac.currentTime, 0.05); }
+    function update(dt, alert) {
+      if (!ac || ac.state !== 'running') return;
+      mus.alert += (alert - mus.alert) * (1 - Math.exp(-2 * dt));
+      mus.inten += (clamp(BLK[Math.max(0, mus.blk) % 8] + mus.alert * 0.3, 0, 1) - mus.inten) * (1 - Math.exp(-0.3 * dt));
+      acc += dt; if (acc >= 0.04) { updStatues(acc); acc = 0; }
+    }
+    return { unlock, sfx, update, toggleMute, btn, setListener(x, y) { LS.x = x; LS.y = y; }, get muted() { return muted; } };
+  })();
 
   // kumaş / saç zinciri: gövdeye bağlı, hıza göre uzar, rüzgârla dalgalanır
   const mkChain = o => Object.assign({ pts: o.w.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, ox: 0, oy: 0 })),
@@ -203,7 +492,7 @@
     if (it) {
       it.pop = Math.min(1, it.pop + dt / 0.55); it.ring += dt;
       if (!G.has && Math.hypot(it.x - player.x, it.y - player.y) > 1100) { G.item = null; G.spawnT = 0.3; return; }
-      if (!G.has && it.pop > 0.8 && Math.hypot(player.x - it.x, player.y - it.y) < 36) { G.has = true; G.eq = 0; G.px = it.x; G.py = it.y - 15; }
+      if (!G.has && it.pop > 0.8 && Math.hypot(player.x - it.x, player.y - it.y) < 36) { G.has = true; G.eq = 0; G.px = it.x; G.py = it.y - 15; AU.sfx('pickup'); }
     }
     if (!G.has) return;
     const he = hero, walk = he.move > 0.3;
@@ -219,8 +508,8 @@
       if (G.idleT > 1.5 || G.runT > 0.3) G.stow = true;
     }
     G.sh = G.stow ? Math.min(1, G.sh + dt / 0.6) : Math.max(0, G.sh - dt / 0.14);
-    if (G.sh >= 1) { if (!G.clk) { G.clk = true; sparks(G.px, G.py, 6, 90, -PI / 2, 0.8); hitFx(0, 1.2); } }   // kına oturunca küçük 'tık'
-    else if (G.clk) { G.clk = false; sparks(G.px, G.py, 7, 210, -PI / 2, 0.9); }                               // kınından çekilince 'şing'
+    if (G.sh >= 1) { if (!G.clk) { G.clk = true; sparks(G.px, G.py, 6, 90, -PI / 2, 0.8); hitFx(0, 1.2); AU.sfx('sheath'); } }   // kına oturunca küçük 'tık'
+    else if (G.clk) { G.clk = false; sparks(G.px, G.py, 7, 210, -PI / 2, 0.9); AU.sfx('unsheath'); }                               // kınından çekilince 'şing'
     // (boşta kılıç çevirme animasyonu yerini kınlama gösterisine bıraktı)
     if (G.tw >= 0) { G.tw += dt; if (G.tw >= 1) { G.tw = -1; G.twA = 0; } else G.twA = -TAU * sstep(0, 1, G.tw); }
   }
@@ -232,7 +521,7 @@
     hp: 100, flash: 0, lunge: 0, drop: 0, tx: 0, ty: 0, squint: false, time: 0, fx: null, hit: [], stp: 0, wind: 0, wince: 0, death: -1, dp: 0, fall: 1, ds: null };
   /* ---------- Efektler: vuruş duraklaması, kamera sarsıntısı, kıvılcım, ayak izi ---------- */
   const FX = { stop: 0, shake: 0, ox: 0, oy: 0, t: 0 }, SPK = [], PR = [], DEB = [], SMK = [];   // DEB: taş parçaları · SMK: karanlık duman
-  const hitFx = (stop, shake) => { FX.stop = Math.max(FX.stop, stop); FX.shake = Math.max(FX.shake, shake); };
+  const hitFx = (stop, shake) => { FX.shake = Math.max(FX.shake, shake); };   // vuruş duraklaması (yavaşlatma) kaldırıldı; yalnızca kamera sarsıntısı
   function sparks(x, y, n, sp, dir, spread) {
     for (let i = 0; i < n && SPK.length < 90; i++) {
       const a = dir + rnd(-spread, spread), v = sp * rnd(0.45, 1);
@@ -247,6 +536,7 @@
       const k = 1 - 5 * sdt; p.x += p.vx * sdt; p.y += p.vy * sdt; p.vx *= k; p.vy = p.vy * k + 240 * sdt;
     }
     for (let i = PR.length - 1; i >= 0; i--) if ((PR[i].t += dt) > 1.8) PR.splice(i, 1);
+    for (let i = RN.length - 1; i >= 0; i--) if ((RN[i].t += sdt) >= RN[i].life) RN.splice(i, 1);
     for (let i = DEB.length - 1; i >= 0; i--) {   // taş parçaları: yerçekimi, zıplama, sonra solar
       const p = DEB[i]; if ((p.t += sdt) > 3.2) { DEB.splice(i, 1); continue; }
       if (p.rest) continue;
@@ -282,7 +572,7 @@
     for (const p of PR) { ctx.fillStyle = `rgba(${fg},${0.16 * (1 - p.t / 1.8)})`; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 1.5, p.a, 0, TAU); ctx.fill(); }
   }
   const swOff = p => p < 0.18 ? -1.4 : p < 0.5 ? lerp(-1.4, 1.4, sstep(0.18, 0.5, p)) : 1.4;
-  const nearestE = r => { let b = null, bd = r; for (const e of E) { if (e.em < 1) continue; const d = Math.hypot(e.x - player.x, e.y - player.y); if (d < bd) { bd = d; b = e; } } return b; };
+  const nearestE = r => { let b = null, bd = r; for (const e of E) { if (e.em < 1 || e.ghost) continue; const d = Math.hypot(e.x - player.x, e.y - player.y); if (d < bd) { bd = d; b = e; } } return b; };
   function nearestEvil(r) {   // yakındaki canlı kötücül heykel
     let b = null, bd = r;
     for (const [sx, sy, id, ev] of statuesIn(player.x - r - 40, player.y - r - 60, player.x + r + 40, player.y + r + 100)) {
@@ -294,26 +584,34 @@
   function startSwing() {
     const n = nearestE(130), v = n ? null : nearestEvil(150);   // yakında düşman (yoksa kötücül heykel) varsa ona doğru vurur
     F.aim = n ? Math.atan2(n.y - player.y, n.x - player.x) : v ? Math.atan2(v.y - player.y, v.x - player.x) : hero.face;
-    F.dir = -F.dir; F.pt = 0; F.buf = false; F.hold = 0; F.hit = []; F.stp = 0;
+    F.dir = -F.dir; F.pt = 0; F.buf = false; F.hold = 0; F.hit = []; F.stp = 0; AU.sfx('swing');
   }
   function pressAtk() { if (!G.has || G.eq < 1 || F.death >= 0) return; G.stow = false; G.idleT = G.runT = 0; G.sh = Math.min(G.sh, 0.3); F.down = true; F.hold = 0; if (F.pt < 0) startSwing(); else if (F.pt > ST * 0.5) F.buf = true; }
   function relAtk() { F.down = false; F.buf = false; F.hold = 0; F.guarding = false; }
   const burst = (x, y, n, sp) => { for (let i = 0; i < n; i++) { const a = rnd(0, TAU); hero.puffs.push({ x, y, vx: Math.cos(a) * sp * rnd(0.4, 1), vy: Math.sin(a) * sp * rnd(0.4, 1) - 8, t: 0, life: rnd(0.3, 0.55), r: rnd(1.6, 3) }); } };
   function hitEnemy(e, dmg, ang) {
-    e.hp -= dmg; e.flash = 0.12; e.stun = 0.35; e.st = 'chase'; e.t = 0; e.kx = Math.cos(ang) * 300; e.ky = Math.sin(ang) * 300;
-    F.fx = { x: e.x, y: e.y - 20, t: 0, k: 'hit' };
-    const kill = e.hp <= 0; sparks(e.x - Math.cos(ang) * 8, e.y - 20, kill ? 12 : 7, 200, ang, 0.9); hitFx(kill ? 0.12 : 0.07, kill ? 5 : 3);
-    if (e.hp <= 0) { burst(e.x, e.y - 16, 12, 70); E.splice(E.indexOf(e), 1); if (!e.src) E.spawnT = 2.5; }
+    e.hp -= dmg * (e.st === 'rec' ? 1.5 : 1); e.flash = 0.12;   // soluklanırken vurulursa fazla hasar
+    if (!e.armor) { e.stun = 0.35; e.st = 'chase'; e.t = 0; e.atk = ''; e.cd = Math.max(e.cd, 0.5); e.kx = Math.cos(ang) * 300; e.ky = Math.sin(ang) * 300; }
+    else { e.x += Math.cos(ang) * 4; e.y += Math.sin(ang) * 4; }
+    F.fx = { x: e.x, y: e.y - 24, t: 0, k: 'hit' };
+    const kill = e.hp <= 0; sparks(e.x - Math.cos(ang) * 8, e.y - 24, kill ? 12 : 7, 200, ang, 0.9); hitFx(kill ? 0.12 : 0.07, kill ? 5 : 3);
+    AU.sfx('hit', e.x, e.y, kill);
+    if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10); AU.sfx('eDie', e.x, e.y, e); E.splice(E.indexOf(e), 1); if (!e.src) E.spawnT = 2.5; }
+    else {
+      AU.sfx('eHurt', e.x, e.y, e);
+      if (!e.rg && e.hp <= e.max * 0.5) { e.rg = e.rage = true; AU.sfx('eRage', e.x, e.y); smoke(e.x, e.y - 20, 6, 60, 12); hitFx(0, 2); }   // yarı canda öfkelenir: daha hızlı, 3'lü küre
+    }
   }
   function swingHit() {
     const pcx = player.x, pcy = player.y - 22, hits = [];
     for (const e of E) {
-      if (F.hit.includes(e) || e.em < 1) continue;   // yeni doğan (belirmekte olan) yaratığa vurulmaz
-      const dx = e.x - pcx, dy = e.y - 14 - pcy;
+      if (F.hit.includes(e) || e.em < 1 || e.ghost) continue;   // yeni doğan (belirmekte olan) yaratığa vurulmaz
+      const dx = e.x - pcx, dy = e.y - 20 - pcy;
       if (Math.hypot(dx, dy) > 74 || Math.abs(wrap(Math.atan2(dy, dx) - F.aim)) > 1.6) continue;
       F.hit.push(e); hits.push(e);
     }
     hits.forEach(e => hitEnemy(e, 20, Math.atan2(e.y - player.y, e.x - player.x)));
+    for (let i = EP.length - 1; i >= 0; i--) { const bl = EP[i], bx = bl.x - pcx, by = bl.y - 22 - pcy; if (Math.hypot(bx, by) < 86 && Math.abs(wrap(Math.atan2(by, bx) - F.aim)) < 1.7) { sparks(bl.x, bl.y - 22, 8, 200, F.aim, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(i, 1); } }   // kılıç kara küreleri keser
     for (const [sx, sy, id, ev] of statuesIn(pcx - 170, pcy - 120, pcx + 170, pcy + 170)) {   // kötücül heykel
       if (!ev) continue;
       const s = evState(id); if (s.dead || s.dying >= 0 || F.hit.includes(s)) continue;
@@ -322,21 +620,21 @@
       F.hit.push(s); hitEvil(s, sx, sy, Math.atan2(sy - player.y, sx - player.x));
     }
   }
-  function hurtPlayer(e, dmg) {
+  function hurtPlayer(e, dmg, gc) {
     if (F.death >= 0) return;
     const ang = Math.atan2(e.y - player.y, e.x - player.x), front = Math.abs(wrap(ang - hero.face)) < 1.5;
     if (F.guarding && F.gw > 0.5 && front) {   // siper: hasar yok ama dayanıklılık azalır
-      F.dur -= 30; F.fx = { x: player.x + Math.cos(ang) * 26, y: player.y - 22 + Math.sin(ang) * 14, t: 0, k: 'block' };
+      F.dur -= (gc || 30); if (F.dur > 0) AU.sfx('block'); F.fx = { x: player.x + Math.cos(ang) * 26, y: player.y - 22 + Math.sin(ang) * 14, t: 0, k: 'block' };
       sparks(F.fx.x, F.fx.y, 9, 230, ang, 0.8); hitFx(0.05, 2.5);
-      e.stun = 0.5; e.kx = Math.cos(ang) * 260; e.ky = Math.sin(ang) * 260; e.st = 'rec'; e.t = 0.2;
+      e.stun = 0.5; e.kx = Math.cos(ang) * 260; e.ky = Math.sin(ang) * 260; e.st = 'rec'; e.t = 0.2; e.rd = 1.0; e.atk = ''; e.cd = 1.2; e.did = true;   // siperle karşılanan düşman sendeler, açık kalır
       player.vx -= Math.cos(ang) * 80; player.vy -= Math.sin(ang) * 80;
-      if (F.dur <= 0) { F.dur = 0; F.broken = 2.4; F.guarding = false; F.hp -= dmg * 0.5; F.flash = 0.25; F.fx.k = 'break'; F.wince = 0.6; sparks(F.fx.x, F.fx.y, 14, 260, 0, TAU); hitFx(0.13, 6); burst(F.fx.x, F.fx.y, 8, 60); }
+      if (F.dur <= 0) { F.dur = 0; F.broken = 2.4; F.guarding = false; F.hp -= dmg * 0.5; F.flash = 0.25; F.fx.k = 'break'; F.wince = 0.6; AU.sfx('guardBreak'); sparks(F.fx.x, F.fx.y, 14, 260, 0, TAU); hitFx(0.13, 6); burst(F.fx.x, F.fx.y, 8, 60); }
     } else {
-      F.hp -= dmg; F.flash = 0.3; player.vx -= Math.cos(ang) * 420; player.vy -= Math.sin(ang) * 420;
+      F.hp -= dmg; F.flash = 0.3; AU.sfx('hurt'); player.vx -= Math.cos(ang) * 420; player.vy -= Math.sin(ang) * 420;
       F.fx = { x: player.x, y: player.y - 22, t: 0, k: 'hurt' };
       F.wince = 0.6; sparks(player.x, player.y - 22, 7, 170, ang + PI, 1); hitFx(0.09, 5);
     }
-    if (F.hp <= 0) { F.hp = 0; F.death = 0; F.fall = player.x >= e.x ? 1 : -1; F.guarding = false; F.pt = -1; F.buf = false; F.ds = null; hitFx(0.2, 9); sparks(player.x, player.y - 22, 14, 220, 0, TAU); }
+    if (F.hp <= 0) { F.hp = 0; F.death = 0; AU.sfx('playerDeath'); F.fall = player.x >= e.x ? 1 : -1; F.guarding = false; F.pt = -1; F.buf = false; F.ds = null; hitFx(0.2, 9); sparks(player.x, player.y - 22, 14, 220, 0, TAU); }
   }
   function updateFight(dt) {
     F.time += dt; F.flash = Math.max(0, F.flash - dt); F.wince = Math.max(0, F.wince - dt);
@@ -355,7 +653,7 @@
         if (d.y > gy) { d.y = gy; if (d.vy > 160) { d.vy *= -0.32; d.vx *= 0.5; d.vr *= 0.45; sparks(d.x, d.y, 5, 120, -PI / 2, 0.9); } else { d.rest = true; d.vx = d.vy = d.vr = 0; } }
       }
       if (t0 < 0.8 && F.death >= 0.8) { burst(player.x, player.y - 4, 9, 55); hitFx(0, 3); }
-      if (F.death > 2.3) { F.death = -1; F.hp = 100; F.dur = 100; E.length = 0; E.spawnT = 3; EV.forEach(s => { s.spawnT = Math.max(s.spawnT, 3.5); }); F.ds = null; F.flash = 0.8; F.fx = { x: player.x, y: player.y - 22, t: 0, k: 'hit' }; burst(player.x, player.y - 6, 8, 50); }
+      if (F.death > 2.3) { F.death = -1; F.hp = 100; F.dur = 100; E.length = 0; EP.length = 0; E.spawnT = 3; EV.forEach(s => { s.spawnT = Math.max(s.spawnT, 3.5); }); F.ds = null; F.flash = 0.8; F.fx = { x: player.x, y: player.y - 22, t: 0, k: 'hit' }; burst(player.x, player.y - 6, 8, 50); }
       return;
     }
     if (F.pt >= 0) {
@@ -384,49 +682,213 @@
     }
   }
 
-  /* ---------- Düşman: gölge yaratık (yaklaşır, hazırlanır, atılır) ---------- */
+  /* ---------- Düşman: HORTLAK — pençeli, kemikli bir ruh. Üçlü pençe kombosu (sonuncusu ağır ezme), atılma, kara küre, arkadan belirme; yarısında öfkelenir ---------- */
+  const NAT_CAP = 3;                  // doğal olarak dolaşan en çok hortlak
+  const EP = [], RN = [];             // EP: kara küreler · RN: yer şok halkaları
+  const atkCount = ex => { let n = 0; for (const o of E) if (o !== ex && (o.st === 'wind' || o.st === 'strike')) n++; return n; };   // aynı anda en çok 2 saldırgan
+  function newEnemy(x, y, src, em) {
+    const hp = src ? 50 : 70;
+    return { x, y, hp, max: hp, st: 'chase', t: 0, stun: 0, flash: 0, ph: rnd(0, 6), kx: 0, ky: 0, did: false, face: 0, lk: 0, src, em, al: 1, atk: '', cmb: 0, dir: 1, wd: 0.5, sd: 0.14, rd: 0.8,
+      cd: rnd(0.8, 2), thk: 0, rage: false, rg: false, armor: 0, ghost: false, vp: rnd(0.8, 1.25), sT: rnd(1, 3), orb: Math.random() < 0.5 ? 1 : -1, bt: rnd(1, 3), fast: false, bf: false };
+  }
+  function enemyAttack(e, kind) {
+    e.atk = kind; e.t = 0; e.did = false; e.cmb = 0; e.thk = 0.2;
+    if (kind === 'blink') { e.st = 'bo'; AU.sfx('eBlinkOut', e.x, e.y); smoke(e.x, e.y - 14, 4, 40, 10); return; }
+    e.st = 'wind';
+    if (kind === 'claw') { e.dir = Math.random() < 0.5 ? 1 : -1; e.wd = e.fast ? 0.36 : e.rage ? 0.4 : 0.5; }
+    else if (kind === 'lunge') e.wd = e.rage ? 0.45 : 0.58;
+    else e.wd = e.rage ? 0.6 : 0.78;
+    AU.sfx('eWind', e.x, e.y, e);
+  }
+  function fireBolt(e) {
+    const a0 = Math.atan2(player.y - e.y, player.x - e.x), n = e.rage ? 3 : 1, spd = e.rage ? 230 : 190;
+    for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.3; EP.push({ x: e.x + Math.cos(a) * 18, y: e.y + Math.sin(a) * 10, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, t: 0, tr: 0 }); }
+    AU.sfx('eBolt', e.x, e.y);
+  }
   function updateEnemies(dt) {
     const on = G.has && G.eq >= 1;
-    for (let i = E.length - 1; i >= 0; i--) if (E[i].src && Math.hypot(E[i].x - player.x, E[i].y - player.y) > 1500) E.splice(i, 1);   // çok uzakta kalan heykel yaratıkları silinir
-    if (on && !E.some(e => !e.src) && (E.spawnT -= dt) <= 0) {   // doğal düşman; heykel yaratıkları sayılmaz
-      const a = rnd(0, TAU);
-      E.push({ x: player.x + Math.cos(a) * 470, y: player.y + Math.sin(a) * 470, hp: 40, st: 'chase', t: 0, stun: 0, flash: 0, ph: rnd(0, 6), kx: 0, ky: 0, did: false, face: 0, sx: 0, sy: 0 });
+    for (let i = E.length - 1; i >= 0; i--) if (E[i].src && Math.hypot(E[i].x - player.x, E[i].y - player.y) > 1500) E.splice(i, 1);
+    let nat = 0; for (const e of E) if (!e.src) nat++;
+    if (on && nat < NAT_CAP && (E.spawnT -= dt) <= 0) {
+      const a = rnd(0, TAU), r = rnd(430, 520);
+      E.push(newEnemy(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r, undefined, -0.3)); E.spawnT = rnd(3.5, 6);
     }
     for (const e of E) {
       e.t += dt; e.flash = Math.max(0, e.flash - dt); if (F.death >= 0) continue;
-      if (e.em < 1) {   // heykelden yeni doğuyor: dumanın içinden belirir, o sırada zararsızdır
-        const pe = e.em; e.em += dt / 0.8; if (pe < 0 && e.em >= 0) smoke(e.x, e.y - 4, 4, 40, 10);
+      e.armor = (e.st === 'wind' || e.st === 'strike') && e.atk === 'claw' && e.cmb === 2 ? 1 : 0;   // ağır ezmede süper zırh: sendelemez
+      e.ghost = e.st === 'bo' || e.st === 'bi';
+      if (e.em < 1) {   // doğuyor: dumanın içinden belirir, o sırada zararsızdır
+        const pe = e.em; e.em += dt / 0.8; if (pe < 0 && e.em >= 0) { smoke(e.x, e.y - 4, 4, 40, 10); AU.sfx('eSpawn', e.x, e.y, e); }
         e.face = Math.atan2(player.y - e.y, player.x - e.x); continue;
       }
-      const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
-      if (e.st === 'chase' || e.st === 'wind') e.face = Math.atan2(dy, dx);
-      if (e.stun > 0) { e.stun -= dt; e.x += e.kx * dt; e.y += e.ky * dt; const k = Math.max(0, 1 - 7 * dt); e.kx *= k; e.ky *= k; continue; }
-      if (e.st === 'chase') { e.ph += dt * TAU * 1.7; if (d > 40) { e.x += ux * 88 * dt; e.y += uy * 88 * dt; } if (d < 54 && on) { e.st = 'wind'; e.t = 0; } }
-      else if (e.st === 'wind') { if (e.t > 0.5) { e.st = 'strike'; e.t = 0; e.did = false; e.sx = ux; e.sy = uy; } }   // 0.5 sn uyarı: kaçabilirsin
-      else if (e.st === 'strike') {
-        e.x += e.sx * 240 * dt; e.y += e.sy * 240 * dt;
-        if (!e.did) { e.did = true; if (Math.hypot(player.x - e.x, player.y - e.y) < 62) hurtPlayer(e, 14); }
-        if (e.t > 0.16) { e.st = 'rec'; e.t = 0; }
-      } else if (e.st === 'rec' && e.t > 0.7) { e.st = 'chase'; e.t = 0; }
+      const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, ap = Math.atan2(dy, dx);
+      if (e.stun > 0) { e.stun -= dt; e.x += e.kx * dt; e.y += e.ky * dt; const k = Math.max(0, 1 - 7 * dt); e.kx *= k; e.ky *= k; e.face += wrap(ap - e.face) * dmp(8, dt); continue; }
+      const sp = e.rage ? 122 : 94;
+      if (e.st === 'chase') {
+        e.cd -= dt; e.ph += dt * TAU * (e.rage ? 1.7 : 1.2); e.sT -= dt; if ((e.bt -= dt) <= 0) { e.orb = -e.orb; e.bt = rnd(2, 4.5); }
+        e.face += wrap(ap - e.face) * dmp(10, dt);
+        const ready = on && e.cd <= 0 && atkCount(e) < 2, tx = -uy * e.orb, ty = ux * e.orb;
+        let mx, my;
+        if (ready) { mx = d > 50 ? ux : 0; my = d > 50 ? uy : 0; }                                   // saldırıya hazır: yaklaş
+        else if (d < 105) { mx = -ux * 0.45 + tx * 0.8; my = -uy * 0.45 + ty * 0.8; }                // sıra bekleyen: geri çekil, etrafında dön
+        else if (d < 200) { mx = tx * 0.9 + ux * 0.25; my = ty * 0.9 + uy * 0.25; }
+        else { mx = ux; my = uy; }
+        for (const o of E) if (o !== e && o.em >= 1) { const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy); if (od > 0 && od < 42) { mx += ox / od * 0.9; my += oy / od * 0.9; } }   // birbirine yığılmaz
+        e.x += mx * sp * dt; e.y += my * sp * dt;
+        if (ready && (e.thk -= dt) <= 0) {
+          e.thk = 0.18; const r = Math.random();
+          if (d < 66) enemyAttack(e, 'claw');
+          else if (d < 150) { if (r < 0.4) enemyAttack(e, 'lunge'); }
+          else if (d < 450) { if (r < 0.4) enemyAttack(e, 'bolt'); else if (!e.src && r < 0.6) enemyAttack(e, 'blink'); }
+        }
+        if (e.sT <= 0) { e.sT = rnd(2.4, 4.8); if (d < 560) AU.sfx('eIdle', e.x, e.y, e); }
+      } else if (e.st === 'wind') {   // uyarı: kılıç kolu kalkar, yerde kırmızı alan belirir — bu sırada kaçabilir ya da siper alabilirsin
+        if (e.t < e.wd - 0.14) e.face += wrap(ap - e.face) * dmp(e.atk === 'bolt' ? 12 : 7, dt);   // son 0.14 sn yönü kilitlenir
+        if (e.atk === 'claw' && d > 46) { e.x += Math.cos(e.face) * 28 * dt; e.y += Math.sin(e.face) * 28 * dt; }
+        if (e.t >= e.wd) {
+          if (e.atk === 'bolt') { fireBolt(e); e.st = 'rec'; e.t = 0; e.rd = 0.7; e.cd = rnd(1.2, 2.2) * (e.rage ? 0.7 : 1); }
+          else { e.st = 'strike'; e.t = 0; e.did = false; e.lk = e.face; e.sd = e.atk === 'lunge' || e.cmb === 2 ? 0.22 : 0.14; AU.sfx(e.atk === 'lunge' ? 'eLunge' : 'eClaw', e.x, e.y, e); }
+        }
+      } else if (e.st === 'strike') {
+        const cx = Math.cos(e.lk), cy = Math.sin(e.lk);
+        if (e.atk === 'lunge') {
+          e.x += cx * 400 * dt; e.y += cy * 400 * dt;
+          if (!e.did && Math.hypot(player.x - e.x, player.y - e.y) < 54) { e.did = true; hurtPlayer(e, 13, 26); }
+        } else {
+          e.x += cx * 120 * dt; e.y += cy * 120 * dt;
+          if (!e.did && e.t >= (e.cmb === 2 ? 0.07 : 0.04)) {
+            e.did = true;
+            if (e.cmb === 2) {   // ağır ezme: önünde yer şoku
+              const px = e.x + cx * 40, py = e.y + cy * 40;
+              RN.push({ x: px, y: py, t: 0, life: 0.5, r: 74 }); chips(px, py - 6, 6, 160, -PI / 2, 1.2, py + 8); smoke(px, py, 3, 40, 14); hitFx(0, 4);
+              if (Math.hypot(player.x - px, (player.y - py) / 0.8) < 66) hurtPlayer(e, 16, 34);
+            } else if (d < 74 && Math.abs(wrap(ap - e.lk)) < 1.1) hurtPlayer(e, 8, 22);
+          }
+        }
+        if (e.t >= e.sd) {
+          if (e.atk === 'claw' && e.cmb < 2) { e.cmb++; e.st = 'wind'; e.t = 0; e.dir = -e.dir; e.did = false; e.wd = e.cmb === 2 ? (e.rage ? 0.55 : 0.68) : (e.rage ? 0.26 : 0.32); AU.sfx('eWind', e.x, e.y, e); }
+          else { e.st = 'rec'; e.t = 0; e.rd = e.atk === 'lunge' ? 0.85 : 0.95; e.cd = rnd(0.9, 1.7) * (e.rage ? 0.7 : 1); e.fast = false; }
+        }
+      } else if (e.st === 'rec') {   // soluklanır: bu sırada vurulursa %50 fazla hasar alır
+        e.cd -= dt; e.face += wrap(ap - e.face) * dmp(5, dt); if (e.t >= e.rd) { e.st = 'chase'; e.t = 0; }
+      } else if (e.st === 'bo') {    // kaybolur
+        e.al = Math.max(0, 1 - e.t / 0.32);
+        if (e.t >= 0.32) { smoke(e.x, e.y - 20, 6, 60, 12); const a = hero.face + PI + rnd(-0.6, 0.6); e.x = player.x + Math.cos(a) * 72; e.y = player.y + Math.sin(a) * 58; e.al = 0; e.st = 'bi'; e.t = 0; e.bf = false; }
+      } else if (e.st === 'bi') {    // arkandan belirir, hemen pençe savurur
+        e.face = ap; e.al = clamp((e.t - 0.4) / 0.2, 0, 1);
+        if (e.t > 0.4 && !e.bf) { e.bf = true; AU.sfx('eBlinkIn', e.x, e.y); smoke(e.x, e.y - 12, 5, 50, 10); }
+        if (e.t >= 0.62) { e.al = 1; e.fast = true; enemyAttack(e, 'claw'); }
+      }
     }
+  }
+  function updateBolts(dt) {
+    for (let i = EP.length - 1; i >= 0; i--) {
+      const p = EP[i]; p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.t > 3.4) { smoke(p.x, p.y - 22, 2, 20, 5); EP.splice(i, 1); continue; }
+      if ((p.tr -= dt) <= 0) { p.tr = 0.045; if (SMK.length < 120) SMK.push({ x: p.x, y: p.y - 22, vx: rnd(-6, 6), vy: rnd(-8, 2), t: 0, life: 0.5, r: 3 }); }
+      if (F.death < 0 && Math.hypot(player.x - p.x, player.y - p.y) < 22) {
+        EP.splice(i, 1); AU.sfx('boltHit', p.x, p.y); smoke(p.x, p.y - 20, 3, 40, 6); burst(p.x, p.y - 20, 6, 70);
+        hurtPlayer({ x: p.x, y: p.y, stun: 0, kx: 0, ky: 0, st: '', t: 0 }, 11, 18);
+      }
+    }
+  }
+  function drawTele(fg) {   // yerdeki tehlike alanları: kaçınmak ya da siper almak için okunur uyarı
+    for (const e of E) {
+      if (e.em < 1 || e.st !== 'wind') continue;
+      const wp = clamp(e.t / e.wd, 0, 1), a = 0.05 + 0.2 * wp * wp;
+      ctx.save(); ctx.lineWidth = 1.5; ctx.fillStyle = `rgba(255,84,64,${a})`; ctx.strokeStyle = `rgba(255,120,96,${Math.min(0.8, a * 2.6)})`;
+      if (e.atk === 'claw' && e.cmb < 2) { ctx.translate(e.x, e.y); ctx.scale(1, 0.8); ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 74, e.face - 1.1, e.face + 1.1); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      else if (e.atk === 'claw') { ctx.translate(e.x + Math.cos(e.face) * 40, e.y + Math.sin(e.face) * 40); ctx.scale(1, 0.8); ctx.beginPath(); ctx.arc(0, 0, 66, 0, TAU); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 66 * (1 - wp), 0, TAU); ctx.stroke(); }
+      else if (e.atk === 'lunge') { ctx.translate(e.x, e.y); ctx.scale(1, 0.8); ctx.rotate(e.face); ctx.beginPath(); ctx.rect(0, -46, 90, 92); ctx.fill(); ctx.beginPath(); ctx.arc(90, 0, 46, -PI / 2, PI / 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(0, -46); ctx.lineTo(90, -46); ctx.arc(90, 0, 46, -PI / 2, PI / 2); ctx.lineTo(0, 46); ctx.stroke(); }
+      else if (e.atk === 'bolt') { ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.face) * 330, e.y + Math.sin(e.face) * 264); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+  function drawRings() { for (const p of RN) { const u = p.t / p.life, k = 0.3 + 0.7 * u; ctx.strokeStyle = `rgba(255,120,96,${0.7 * (1 - u)})`; ctx.lineWidth = 3 * (1 - u) + 0.6; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r * k, p.r * 0.8 * k, 0, 0, TAU); ctx.stroke(); } }
+  function drawBolt(p, fg) {
+    const y = p.y - 22 + Math.sin(p.t * 14) * 1.5;
+    ctx.fillStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.ellipse(p.x, p.y, 8, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(150,90,255,0.22)'; ctx.beginPath(); ctx.arc(p.x, y, 17, 0, TAU); ctx.fill();
+    ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(183,155,255,0.8)'; ctx.lineWidth = 1.4;
+    for (let i = 0; i < 4; i++) { const a = p.t * 7 + i * 1.571; ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(p.x + Math.cos(a) * 14, y + Math.sin(a) * 14); ctx.stroke(); }
+    ctx.fillStyle = '#1a0f2e'; ctx.beginPath(); ctx.arc(p.x, y, 8, 0, TAU); ctx.fill(); ctx.strokeStyle = '#b79bff'; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.fillStyle = '#fff0c8'; ctx.beginPath(); ctx.arc(p.x, y, 3.2, 0, TAU); ctx.fill();
   }
   function drawEnemy(e, fg) {
     if (e.em <= 0) return;
-    const em = e.em < 1 ? e.em : 1;
-    ctx.save(); ctx.globalAlpha = em;
-    const hop = (e.st === 'chase' && e.stun <= 0 ? Math.abs(Math.sin(e.ph)) * 3 : 0) - (1 - em) * 12, k = e.st === 'wind' ? sstep(0, 0.5, e.t) : 0, st = e.st === 'strike' ? 1 : 0;
-    const sY = 1 - 0.2 * k + 0.1 * st, ux = Math.cos(e.face), uy = Math.sin(e.face);
-    ctx.fillStyle = `rgba(${fg},0.14)`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 14 * (1 - hop / 20), 4.6, 0, 0, TAU); ctx.fill();
-    ctx.save(); ctx.translate(e.x, e.y - 2 - hop); ctx.scale(1 / sY, sY);
-    ctx.beginPath(); ctx.moveTo(-14, -22); ctx.arc(0, -22, 14, PI, 0); ctx.lineTo(14, -1);
-    ctx.quadraticCurveTo(9.3, 5, 4.7, -1); ctx.quadraticCurveTo(0, 5, -4.7, -1); ctx.quadraticCurveTo(-9.3, 5, -14, -1); ctx.closePath();
-    ctx.fillStyle = e.flash > 0 ? '#fff' : '#3b3358'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#7d73a8'; ctx.stroke();
-    ctx.strokeStyle = k > 0.5 || st ? '#fff' : '#ffb13b'; ctx.lineWidth = 2.4 + k; ctx.lineCap = 'round';
-    [-1, 1].forEach(sd => { ctx.beginPath(); ctx.moveTo(sd * 7 + ux * 2, -25 + uy); ctx.lineTo(sd * 3 + ux * 2, -22 + uy); ctx.stroke(); });
+    const em = e.em < 1 ? e.em : 1, al = em * e.al; if (al < 0.02) return;
+    const T0 = FX.t, st = e.st, wind = st === 'wind', strike = st === 'strike', rec = st === 'rec', kind = e.atk, slam = kind === 'claw' && e.cmb === 2;
+    const wp = wind ? sstep(0, e.wd, e.t) : 0, spr = strike ? clamp(e.t / e.sd, 0, 1) : 0, cx = Math.cos(e.face);
+    const hov = 8 + Math.sin(e.ph) * 3 + (1 - em) * 10, hurt = e.flash > 0, rg = e.rage, bgc = light ? '#f2f2f2' : '#0a0a0a';
+    const body = hurt ? '#fff' : '#231c3a', edge = hurt ? '#fff' : '#7d73a8', bone = hurt ? '#fff' : '#cfc7ea';
+    const eyeC = hurt ? '#fff' : (wind && wp > 0.5) || strike ? '#ff4a3a' : rg ? '#ff5a3c' : rec ? '#85765a' : '#ffb13b';
+    ctx.save(); ctx.globalAlpha = al;
+    ctx.fillStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 15 * (1 - (hov - 8) / 50), 4.8, 0, 0, TAU); ctx.fill();
+    const lean = strike ? 7 * spr : wind ? -5 * wp : 0, dip = rec ? 3 : 0;
+    ctx.translate(e.x + cx * lean, e.y - hov + dip); ctx.scale(1.35, 1.35); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // aura: öfkelenince kızıl alevler, normalde soluk mor dumanlar
+    for (let i = 0; i < 5; i++) { const p = (T0 * 0.8 + i * 0.21) % 1; ctx.fillStyle = rg ? `rgba(255,70,50,${0.3 * (1 - p)})` : `rgba(126,108,186,${0.16 * (1 - p)})`; ctx.beginPath(); ctx.arc(Math.sin(i * 2.3 + T0 * 1.5) * 13, -4 - p * 50, 3.2 * (1 - p) + 0.8, 0, TAU); ctx.fill(); }
+    // pelerin: yırtık, dalgalanan etek uçları
+    const sw = i => Math.sin(e.ph * 1.1 + i * 1.3);
+    ctx.beginPath(); ctx.moveTo(-8, -35); ctx.bezierCurveTo(-14, -27, -18, -14, -18, -3);
+    for (let i = 0; i < 7; i++) { const b = -18 + i * 36 / 7, n = b + 36 / 7; ctx.lineTo(b + 18 / 7 + sw(i) * 2.5, 4 + (i % 3) * 4 + 4 * Math.abs(sw(i + 2))); ctx.lineTo(n, -3); }
+    ctx.bezierCurveTo(18, -14, 14, -27, 8, -35); ctx.closePath(); ctx.fillStyle = body; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 1.4; ctx.stroke();
+    // yırtıktan görünen kaburgalar ve titreyen kalp ışığı
+    poly([[-3, -31], [3, -31], [4.5, -14], [0, -8], [-4.5, -14]]); ctx.fillStyle = '#0a0714'; ctx.fill();
+    ctx.strokeStyle = 'rgba(190,180,235,0.55)'; ctx.lineWidth = 1; for (let k = 0; k < 4; k++) { const y = -28 + k * 4.6; ctx.beginPath(); ctx.moveTo(-3.2 + k * 0.4, y); ctx.quadraticCurveTo(0, y + 2.2, 3.2 - k * 0.4, y); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(0, -31); ctx.lineTo(0, -9); ctx.stroke();
+    const hb = 0.5 + 0.5 * Math.sin(T0 * (rg ? 9 : 5)); ctx.fillStyle = eyeC; ctx.globalAlpha = al * (0.25 + 0.2 * hb); ctx.beginPath(); ctx.arc(0, -22, 5.5, 0, TAU); ctx.fill(); ctx.globalAlpha = al * (0.6 + 0.4 * hb); ctx.beginPath(); ctx.arc(0, -22, 1.8, 0, TAU); ctx.fill(); ctx.globalAlpha = al;
+    // omuz dikenleri
+    [-1, 1].forEach(sd => { poly([[sd * 8, -35], [sd * 17, -43], [sd * 13, -32]]); ctx.fillStyle = bone; ctx.fill(); ctx.strokeStyle = bgc; ctx.lineWidth = 0.6; ctx.stroke(); });
+    // kukuleta, karanlık yüz, boynuzlar
+    ctx.beginPath(); ctx.moveTo(-9, -33); ctx.bezierCurveTo(-11, -45, -6, -50, 1, -55); ctx.bezierCurveTo(7, -49, 11, -44, 9, -33); ctx.quadraticCurveTo(0, -29, -9, -33); ctx.closePath();
+    ctx.fillStyle = hurt ? '#fff' : '#2a2347'; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = '#050309'; ctx.beginPath(); ctx.ellipse(0, -40, 5.4, 6.6, 0, 0, TAU); ctx.fill();
+    [-1, 1].forEach(sd => {
+      ctx.beginPath(); ctx.moveTo(sd * 5.5, -46); ctx.bezierCurveTo(sd * 13, -47, sd * 16, -54, sd * 11, -63); ctx.bezierCurveTo(sd * 12, -55, sd * 9, -50, sd * 4, -49); ctx.closePath(); ctx.fillStyle = bone; ctx.fill(); ctx.strokeStyle = '#2a2347'; ctx.lineWidth = 0.6; ctx.stroke();
+      ctx.fillStyle = eyeC; ctx.globalAlpha = al * 0.28; ctx.beginPath(); ctx.arc(sd * 2.6, -41.3, 5, 0, TAU); ctx.fill(); ctx.globalAlpha = al;
+      poly([[sd * 1.2, -41], [sd * 4.6, -43], [sd * 4, -39.8]]); ctx.fillStyle = eyeC; ctx.fill();
+    });
+    const open = wind ? wp * 0.8 : strike ? 1 : rg ? 0.25 : 0;   // ağız: saldırıya hazırlanırken açılır
+    if (open > 0.05) { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(0, -35.2, 3.2, 0.8 + 2.6 * open, 0, 0, TAU); ctx.fill(); ctx.strokeStyle = bone; ctx.lineWidth = 0.8; ctx.beginPath(); for (let i = 0; i <= 6; i++) { const x = -3.2 + i * 1.07, y = -35.2 - (0.8 + 2.6 * open) + (i % 2) * 1.4; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+    // kollar
+    const Z = sd => [-sd * 22, -9], R = sd => [sd * 25, -57], mixp = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k)];
+    const hands = [-1, 1].map(sd => {
+      let idle = [sd * 15 + Math.sin(e.ph * 1.1) * sd * 1.5, -13 + Math.sin(e.ph * 1.3 + sd) * 2], h = idle;
+      if (rec) h = [sd * 13, -5];
+      else if (st === 'bo' || st === 'bi') h = [-sd * 6, -26];
+      else if (wind || strike) {
+        if (kind === 'claw' && !slam) {
+          if (sd === e.dir) h = wind ? mixp(idle, R(sd), wp) : mixp(R(sd), Z(sd), sstep(0, 1, spr));
+          else h = wind && e.cmb > 0 ? mixp(Z(sd), idle, sstep(0, 0.6, wp)) : idle;
+        } else if (slam) {
+          const s0 = sd === -e.dir ? Z(sd) : idle, up = [sd * 9, -63];
+          h = wind ? mixp(s0, up, sstep(0, 0.5, wp)) : mixp(up, [sd * 10, 7], spr * spr);
+        } else if (kind === 'lunge') h = wind ? mixp(idle, [sd * 20, -24], wp) : [sd * 8, -30];
+        else if (kind === 'bolt') h = mixp(idle, [sd * (8 - 4 * wp), -44 - 3 * wp], sstep(0, 0.6, wp));
+      }
+      return h;
+    });
+    if (strike && kind === 'claw' && !slam) {   // pençe izi
+      const sd = e.dir; ctx.lineCap = 'round';
+      for (const [w, c] of [[4, `rgba(255,130,110,${0.5 * (1 - spr * 0.5)})`], [1.5, `rgba(255,255,255,${0.6 * (1 - spr * 0.5)})`]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); for (let j = 0; j <= 8; j++) { const p = mixp(R(sd), Z(sd), sstep(0, 1, spr * j / 8)); j ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); } ctx.stroke(); }
+    }
+    if (strike && kind === 'lunge') { ctx.strokeStyle = 'rgba(255,130,110,0.5)'; ctx.lineWidth = 1.5; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-Math.sign(cx || 1) * 14, -22 + i * 9); ctx.lineTo(-Math.sign(cx || 1) * 36, -22 + i * 9); ctx.stroke(); } }
+    [-1, 1].forEach((sd, i) => {
+      const hx = hands[i][0], hy = hands[i][1], sx = sd * 10, sy = -32; let nx = -(hy - sy), ny = hx - sx; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl; if (nx * sd < 0) { nx = -nx; ny = -ny; }
+      const ex = (sx + hx) / 2 + nx * 5, ey = (sy + hy) / 2 + ny * 5;
+      ctx.strokeStyle = bgc; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke(); ctx.strokeStyle = hurt ? '#fff' : '#8d83bf'; ctx.lineWidth = 3; ctx.stroke();
+      const a = Math.atan2(hy - ey, hx - ex), L = strike ? 11 : 8; ctx.strokeStyle = bone; ctx.lineWidth = 1.5;
+      for (const o of [-0.55, 0, 0.55]) { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(a + o) * L, hy + Math.sin(a + o) * L); ctx.stroke(); }
+      ctx.fillStyle = bone; ctx.beginPath(); ctx.arc(hx, hy, 2, 0, TAU); ctx.fill();
+    });
+    if (wind && kind === 'bolt') {   // iki elin arasında toplanan kara küre
+      const r = 2 + 9 * wp, oy = -46 - 2 * wp; ctx.fillStyle = 'rgba(150,90,255,0.25)'; ctx.beginPath(); ctx.arc(0, oy, r * 1.8, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#1a0f2e'; ctx.beginPath(); ctx.arc(0, oy, r, 0, TAU); ctx.fill(); ctx.strokeStyle = eyeC; ctx.lineWidth = 1.4; ctx.stroke(); ctx.fillStyle = '#fff0c8'; ctx.beginPath(); ctx.arc(0, oy, r * 0.4, 0, TAU); ctx.fill();
+      ctx.fillStyle = eyeC; for (let i = 0; i < 6; i++) { const a = T0 * 6 + i * 1.047, rr = 24 * (1 - wp) + r + 2; ctx.beginPath(); ctx.arc(Math.cos(a) * rr, oy + Math.sin(a) * rr * 0.8, 1.1, 0, TAU); ctx.fill(); }
+    }
     ctx.restore();
-    if (st) { ctx.strokeStyle = 'rgba(255,177,59,0.85)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(e.x + ux * 24 - uy * i * 9, e.y - 18 + uy * 24 + ux * i * 9); ctx.lineTo(e.x + ux * 38 - uy * i * 9, e.y - 18 + uy * 38 + ux * i * 9); ctx.stroke(); } }
-    if (e.hp < 40) { ctx.fillStyle = `rgba(${fg},0.2)`; ctx.fillRect(e.x - 12, e.y - 46, 24, 3); ctx.fillStyle = `rgba(${fg},0.85)`; ctx.fillRect(e.x - 12, e.y - 46, 24 * e.hp / 40, 3); }
-    ctx.restore();
+    if (e.hp < e.max && e.al > 0.5) { const by = e.y - hov - 78; ctx.fillStyle = `rgba(${fg},0.2)`; ctx.fillRect(e.x - 14, by, 28, 3); ctx.fillStyle = rg ? 'rgba(255,90,70,0.9)' : `rgba(${fg},0.85)`; ctx.fillRect(e.x - 14, by, 28 * e.hp / e.max, 3); }
   }
   function drawSlash(fg) {   // savurma izi + vuruş / siper kıvılcımı
     if (F.pt >= 0 && G.has) {
@@ -458,6 +920,16 @@
     ctx.fillStyle = `rgba(${fg},0.12)`; ctx.fillRect(x, y + 10, w, 4);
     ctx.fillStyle = `rgba(${fg},${F.broken > 0 ? 0.25 + 0.35 * (Math.floor(F.time * 8) % 2) : 0.55})`; ctx.fillRect(x, y + 10, w * clamp(F.dur / 100, 0, 1), 4);   // siper dayanıklılığı
     if (F.guarding || F.dur < 100) { const sx = player.x - cam.x, sy = player.y - cam.y + 13; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
+  }
+  function drawMute(fg) {
+    const b = AU.btn, m = AU.muted; b.x = W - 34; b.y = 66;
+    ctx.save(); ctx.translate(b.x, b.y); ctx.globalAlpha = 0.55; ctx.fillStyle = `rgba(${fg},0.08)`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.lineWidth = 1.2; ctx.stroke(); ctx.fillStyle = `rgba(${fg},0.9)`;
+    ctx.beginPath(); ctx.moveTo(-7, -3); ctx.lineTo(-3.5, -3); ctx.lineTo(1, -7); ctx.lineTo(1, 7); ctx.lineTo(-3.5, 3); ctx.lineTo(-7, 3); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    if (m) { ctx.beginPath(); ctx.moveTo(4, -4); ctx.lineTo(10, 4); ctx.moveTo(10, -4); ctx.lineTo(4, 4); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(1, 0, 5, -0.9, 0.9); ctx.stroke(); ctx.beginPath(); ctx.arc(1, 0, 9, -0.9, 0.9); ctx.stroke(); }
+    ctx.restore();
   }
   function drawAtk(fg) {
     const a = atk, on = a.down || a.kb, k = on ? 0.94 : 1;
@@ -873,9 +1345,9 @@
 
   /* ---------- Kötücül heykel: kötü bir ruhun taş kabı. Düşman doğurur; her darbede güçlenir, 5. darbede kırılır ---------- */
   const ES = 1.25;                          // normal heykelden belirgin şekilde büyük
-  const EV_INT = [7, 5.6, 4.4, 3.4, 2.6];   // doğurma dalgası aralığı (sn): her hasarda kısalır
-  const EV_CNT = [1, 1, 2, 2, 3];           // dalga başına yaratık sayısı
-  const EV_CAP = [2, 3, 4, 5, 6];           // heykelden aynı anda en çok canlı yaratık
+  const EV_INT = [6.5, 5.2, 4.2, 3.4, 2.7];   // doğurma dalgası aralığı (sn): her hasarda kısalır
+  const EV_CNT = [1, 2, 2, 3, 3];           // dalga başına yaratık sayısı
+  const EV_CAP = [3, 4, 5, 6, 7];           // heykelden aynı anda en çok canlı yaratık
   const EV = new Map();                     // heykel kimliği -> kalıcı durum (hasar, çatlaklar, kırık mı)
   const EV_CRACKS = [   // çatlaklar, darbe sayısına göre sırayla açılır (son ikisi ölürken)
     [[-2, -61], [-4.5, -55], [-1, -50], [-5.5, -44], [-3, -37]], [[3, -81], [1.5, -77.5], [5, -74], [3, -69.5]],
@@ -888,7 +1360,7 @@
     return s;
   }
   function spawnMinion(sx, sy, id, k) {   // heykelin önünde, dumanın içinden belirir
-    E.push({ x: sx + rnd(-34, 34), y: sy + rnd(14, 30), hp: 40, st: 'chase', t: 0, stun: 0, flash: 0, ph: rnd(0, 6), kx: 0, ky: 0, did: false, face: 0, sx: 0, sy: 0, src: id, em: -k * 0.35 });
+    E.push(newEnemy(sx + rnd(-34, 34), sy + rnd(14, 30), id, -k * 0.35));
   }
   function hitEvil(s, sx, sy, ang) {
     s.hp -= 20; s.hits++; s.flash = 0.14; s.flare = 1; s.pulse = 1;
@@ -898,10 +1370,11 @@
     F.fx = { x: hx, y: hy, t: 0, k: 'hit' };
     sparks(hx, hy, 9, 230, ang, 0.9); chips(hx, hy, 4 + s.hits, 190, ang + PI, 1.0, gy); smoke(hx, hy, 2, 30, 8); burst(hx, hy, 6, 60);
     hitFx(0.09, 4);
+    AU.sfx('evilHit', sx, sy - 40, s.hits);
     if (s.hp <= 0) { s.hp = 0; s.dying = 0; s.chipT = 0; hitFx(0.16, 7); }
   }
   function shatterEvil(s, sx, sy, id) {   // taş dağılır, ruh duman olup dağılır, yaratıkları da onunla gider
-    s.dead = true; s.dying = -1;
+    s.dead = true; s.dying = -1; AU.sfx('evilShatter', sx, sy - 40);
     for (let i = 0; i < 34; i++) { const px = sx + rnd(-26, 26), py = sy - rnd(6, 110); chip(px, py, (px - sx) * rnd(2, 5) + rnd(-30, 30), -rnd(40, 260), sy + rnd(2, 20), rnd(2, 6.5)); }
     smoke(sx, sy - 50, 22, 90, 24); smoke(sx, sy - 95, 10, 70, 14); sparks(sx, sy - 50, 16, 300, 0, TAU); burst(sx, sy - 10, 14, 90);
     hitFx(0.22, 11);
@@ -1112,8 +1585,11 @@
     updateGun(sdt);
     updateFight(sdt);
     updateEnemies(sdt);
+    updateBolts(sdt);
     updateEvil(sdt);
     updateFx(dt, sdt);
+    let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
+    AU.setListener(player.x, player.y); AU.update(dt, clamp(alert, 0, 1));   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
 
     joy.alpha += ((joy.active ? 1 : 0) - joy.alpha) * (1 - Math.exp(-16 * dt));
 
@@ -1126,11 +1602,12 @@
     drawWorld(fg);
     setBase();
     drawPrints(fg);
+    drawTele(fg);
 
     drawGroundGun(fg, light);
     const sfg = light ? '105,105,105' : '150,150,150';
     const sObjs = statuesIn(cam.x - 80, cam.y - 20, cam.x + W + 80, cam.y + H + 140).map(([x, y, id, ev]) => ({ y, f: ev ? () => drawEvil(x, y, id, light) : () => drawStatue(x, y, SS, sfg, light) }));
-    const eObjs = E.map(e => ({ y: e.y, f: () => drawEnemy(e, fg) })), allO = sObjs.concat(eObjs).sort((a, b) => a.y - b.y);
+    const eObjs = E.map(e => ({ y: e.y, f: () => drawEnemy(e, fg) })).concat(EP.map(p => ({ y: p.y, f: () => drawBolt(p, fg) }))), allO = sObjs.concat(eObjs).sort((a, b) => a.y - b.y);
     allO.filter(o => o.y < player.y).forEach(o => o.f());
     ctx.globalAlpha = F.flash > 0 && Math.floor(F.time * 30) % 2 ? 0.4 : 1;   // hasar alınca yanıp söner
     drawHero(fg, light);
@@ -1138,7 +1615,7 @@
     drawSlash(fg);
     drawSparks(fg);
     allO.filter(o => o.y >= player.y).forEach(o => o.f());
-    drawSmoke(light); drawDebris(light);
+    drawSmoke(light); drawDebris(light); drawRings();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     if (light) {
@@ -1167,7 +1644,7 @@
       ctx.restore();
     }
     drawHud(fg);
-    drawAtk(fg);
+    drawAtk(fg); drawMute(fg);
     cam.x -= FX.ox; cam.y -= FX.oy;
     requestAnimationFrame(frame);
   }
