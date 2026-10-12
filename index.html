@@ -100,7 +100,7 @@
 
   function joyStart(e) {
     AU.unlock();
-    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 10) { AU.toggleMute(); return; }   // ses aç/kapa düğmesi
+    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 14) { AU.toggleMute(); return; }   // ses aç/kapa düğmesi
     if (atk.id === null && Math.hypot(e.clientX - atk.x, e.clientY - atk.y) < atk.r + 14) {   // buton joystick'ten önceliklidir
       atk.id = e.pointerId; atk.down = true; pressAtk();
       try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
@@ -158,7 +158,7 @@
   /* ---------- SES: tamamen sentezlenir (ses dosyası yok) · müzik, efektler, Doppler'lı heykel sesleri, fısıltılar ---------- */
   const AU = (() => {
     let ac = null, master, sfxBus, musBus, padBus, padLP, melBus, revIn, noiseBuf, muted = false, acc = 0;
-    const LS = { x: 0, y: 0 }, btn = { x: 0, y: 0, r: 18 }, voices = new Map();
+    const LS = { x: 0, y: 0 }, btn = { x: 0, y: 0, r: 20, mt: 1, pop: 0, ring: 0 }, voices = new Map(), bad = new Set();
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const C_SND = 800;            // oyun içi 'ses hızı' (px/sn): Doppler kayması net duyulsun diye düşük tutuldu
     const MV = 0.55, SVL = 0.85;  // müzik / efekt seviyesi
@@ -260,7 +260,7 @@
     function sfx(name, x, y, a) {
       if (!ac || ac.state !== 'running' || muted) return; const f = SFX[name]; if (!f) return;
       const t = ac.currentTime; if (t - (last[name] || -9) < (GAP[name] || 0.03)) return; last[name] = t;
-      const d = bus(x, y, REV[name] === undefined ? 0.18 : REV[name]); if (d) f(d, t + 0.005, a);
+      try { const d = bus(x, y, REV[name] === undefined ? 0.18 : REV[name]); if (d) f(d, t + 0.005, a); } catch (_) {}
     }
 
     /* ----- fısıltılar: anlamsız, ne dediği anlaşılmayan heceler (gürültü + formant filtreleri) ----- */
@@ -296,7 +296,7 @@
       tail.connect(sfxBus); const rs = ac.createGain(); rs.gain.value = evil ? 0.7 : 0.5; tail.connect(rs); rs.connect(revIn);
       const V = { key, out, lp, pn, oscs: [], stops: [], d0: -1, vr: 0, whT: rnd(1, 4), R: evil ? 560 : 400, vol: evil ? 1.0 : 0.6, evil, scream: null };
       const osc = (type, f, vol, dest, det) => { const o = ac.createOscillator(); o.type = type; o.frequency.value = f; if (det) o.detune.value = det; const g = ac.createGain(); g.gain.value = vol; o.connect(g); g.connect(dest); o.start(); V.oscs.push({ o, f }); V.stops.push(o); return o; };
-      const lfo = (rate, depth, param) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = rate; g.gain.value = depth; o.connect(g); g.connect(param); o.start(); V.stops.push(o); };
+      const lfo = (rate, depth, param) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = rate; g.gain.value = depth; o.connect(g); g.connect(param.frequency && !param.setValueAtTime ? param.frequency : param); o.start(); V.stops.push(o); };   // düğüm verilirse onun frekansına bağlanır
       const flt = (type, f, q, dest) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.connect(dest); return b; };
       if (evil) {
         const dr = flt('lowpass', 240, 3, out);   // alçak drone: tritone aralığı, uğursuz
@@ -346,7 +346,8 @@
       near.sort((a, b) => a.d - b.d); const use = near.slice(0, 4), keep = new Set(use.map(n => n.key));
       for (const [k, V] of voices) if (!keep.has(k)) { stopVoice(V); voices.delete(k); }
       for (const n of use) {
-        let V = voices.get(n.key); if (!V) { V = mkVoice(n.key, n.sx, n.sy, n.ev, Math.floor(hashN(n.sx * 0.01, n.sy * 0.01, 5) * 4)); voices.set(n.key, V); }
+        let V = voices.get(n.key);
+        if (!V) { if (bad.has(n.key)) continue; try { V = mkVoice(n.key, n.sx, n.sy, n.ev, Math.floor(hashN(n.sx * 0.01, n.sy * 0.01, 5) * 4)); } catch (_) { bad.add(n.key); continue; } voices.set(n.key, V); }
         updVoice(V, n.d, n.dx, dt, n.es);
         if (n.d < (n.ev ? 330 : 210) && !muted && (V.whT -= dt) <= 0) { whisper(n.sx + rnd(-30, 30), n.sy - 40, n.ev); V.whT = n.ev ? rnd(2.2, 5) : rnd(4, 9); }
       }
@@ -432,7 +433,10 @@
     function unlock() { if (!ac) build(); if (ac && ac.state !== 'running') { try { ac.resume().catch(() => {}); } catch (_) {} } }
     ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(ev => addEventListener(ev, unlock, { passive: true }));
     document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend().catch(() => {}); else ac.resume().catch(() => {}); });
-    function toggleMute() { muted = !muted; if (ac) master.gain.setTargetAtTime(muted ? 0 : 0.9, ac.currentTime, 0.05); }
+    function toggleMute() {
+      muted = !muted; btn.pop = 1; btn.ring = 1;   // düğme animasyonunu tetikle
+      if (ac) { const t = ac.currentTime, g = master.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.setTargetAtTime(muted ? 0 : 0.9, t, muted ? 0.07 : 0.12); }   // sesi yumuşakça kıs / aç
+    }
     function update(dt, alert) {
       if (!ac || ac.state !== 'running') return;
       mus.alert += (alert - mus.alert) * (1 - Math.exp(-2 * dt));
@@ -921,14 +925,21 @@
     ctx.fillStyle = `rgba(${fg},${F.broken > 0 ? 0.25 + 0.35 * (Math.floor(F.time * 8) % 2) : 0.55})`; ctx.fillRect(x, y + 10, w * clamp(F.dur / 100, 0, 1), 4);   // siper dayanıklılığı
     if (F.guarding || F.dur < 100) { const sx = player.x - cam.x, sy = player.y - cam.y + 13; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
   }
-  function drawMute(fg) {
+  function drawMute(fg, dt) {
     const b = AU.btn, m = AU.muted; b.x = W - 34; b.y = 66;
-    ctx.save(); ctx.translate(b.x, b.y); ctx.globalAlpha = 0.55; ctx.fillStyle = `rgba(${fg},0.08)`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.lineWidth = 1.2; ctx.stroke(); ctx.fillStyle = `rgba(${fg},0.9)`;
-    ctx.beginPath(); ctx.moveTo(-7, -3); ctx.lineTo(-3.5, -3); ctx.lineTo(1, -7); ctx.lineTo(1, 7); ctx.lineTo(-3.5, 3); ctx.lineTo(-7, 3); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
-    if (m) { ctx.beginPath(); ctx.moveTo(4, -4); ctx.lineTo(10, 4); ctx.moveTo(10, -4); ctx.lineTo(4, 4); ctx.stroke(); }
-    else { ctx.beginPath(); ctx.arc(1, 0, 5, -0.9, 0.9); ctx.stroke(); ctx.beginPath(); ctx.arc(1, 0, 9, -0.9, 0.9); ctx.stroke(); }
+    const tgt = m ? 0 : 1; b.mt += (tgt - b.mt) * dmp(9, dt); if (Math.abs(b.mt - tgt) < 0.003) b.mt = tgt;   // 1 = ses açık, 0 = kapalı
+    b.pop = Math.max(0, b.pop - dt * 2.2); b.ring = Math.max(0, b.ring - dt * 2.2);
+    const on = b.mt, off = 1 - on, u = 1 - b.pop, sc = 1 + 0.24 * b.pop * Math.sin(u * 10);   // basınca yaylanır
+    const w1 = sstep(0, 0.6, on), w2 = sstep(0.35, 1, on), x1 = sstep(0, 0.55, off), x2 = sstep(0.3, 0.85, off);
+    ctx.save(); ctx.translate(b.x, b.y);
+    if (b.ring > 0.01) { const k = 1 - b.ring; ctx.globalAlpha = 0.5 * b.ring; ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6 * b.ring + 0.4; ctx.beginPath(); ctx.arc(0, 0, b.r + 26 * k, 0, TAU); ctx.stroke(); }   // dalga halkası
+    ctx.scale(sc, sc); ctx.globalAlpha = 0.55 + 0.35 * b.pop;
+    ctx.fillStyle = `rgba(${fg},${0.06 + 0.05 * on})`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(${fg},${0.25 + 0.15 * on})`; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = `rgba(${fg},0.9)`; ctx.beginPath(); ctx.moveTo(-8, -3); ctx.lineTo(-4.5, -3); ctx.lineTo(0, -7.5); ctx.lineTo(0, 7.5); ctx.lineTo(-4.5, 3); ctx.lineTo(-8, 3); ctx.closePath(); ctx.fill();
+    ctx.lineCap = 'round'; ctx.lineWidth = 1.6;
+    [[w1, 5], [w2, 9.5]].forEach(([p, r]) => { if (p < 0.02) return; ctx.strokeStyle = `rgba(${fg},${0.9 * p})`; ctx.beginPath(); ctx.arc(0, 0, r * (0.7 + 0.3 * p), -0.9 * p, 0.9 * p); ctx.stroke(); });   // dalgalar açılır / kapanır
+    [[x1, 3.5, -4, 9.5, 4], [x2, 9.5, -4, 3.5, 4]].forEach(([p, ax, ay, bx, by]) => { if (p < 0.02) return; ctx.strokeStyle = `rgba(${fg},${0.9 * p})`; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + (bx - ax) * p, ay + (by - ay) * p); ctx.stroke(); });   // çarpı çizilir
     ctx.restore();
   }
   function drawAtk(fg) {
@@ -1589,7 +1600,7 @@
     updateEvil(sdt);
     updateFx(dt, sdt);
     let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
-    AU.setListener(player.x, player.y); AU.update(dt, clamp(alert, 0, 1));   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
+    try { AU.setListener(player.x, player.y); AU.update(dt, clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
 
     joy.alpha += ((joy.active ? 1 : 0) - joy.alpha) * (1 - Math.exp(-16 * dt));
 
@@ -1644,7 +1655,7 @@
       ctx.restore();
     }
     drawHud(fg);
-    drawAtk(fg); drawMute(fg);
+    drawAtk(fg); drawMute(fg, dt);
     cam.x -= FX.ox; cam.y -= FX.oy;
     requestAnimationFrame(frame);
   }
