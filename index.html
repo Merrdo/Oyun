@@ -688,20 +688,21 @@
 
   /* ---------- Düşman: HORTLAK — pençeli, kemikli bir ruh. Üçlü pençe kombosu (sonuncusu ağır ezme), atılma, kara küre, arkadan belirme; yarısında öfkelenir ---------- */
   const NAT_CAP = 3;                  // doğal olarak dolaşan en çok hortlak
+  const E_SPD = 1, E_DMG = 1, E_WIND = 1, E_HP = 1, E_ATKS = 2, E_AIM = 1.12;   // hız · hasar · uyarı süresi çarpanı (düşük = daha hızlı saldırır) · can · aynı anda saldıran sayısı · isabet payı (vuruş alanı çarpanı; eski zorluk = 1, şimdi bir tık yüksek)
   const EP = [], RN = [];             // EP: kara küreler · RN: yer şok halkaları
-  const atkCount = ex => { let n = 0; for (const o of E) if (o !== ex && (o.st === 'wind' || o.st === 'strike')) n++; return n; };   // aynı anda en çok 2 saldırgan
+  const atkCount = ex => { let n = 0; for (const o of E) if (o !== ex && (o.st === 'wind' || o.st === 'strike')) n++; return n; };   // aynı anda en çok E_ATKS saldırgan
   function newEnemy(x, y, src, em) {
-    const hp = src ? 50 : 70;
+    const hp = Math.round((src ? 50 : 70) * E_HP);
     return { x, y, hp, max: hp, st: 'chase', t: 0, stun: 0, flash: 0, ph: rnd(0, 6), kx: 0, ky: 0, did: false, face: 0, lk: 0, src, em, al: 1, atk: '', cmb: 0, dir: 1, wd: 0.5, sd: 0.14, rd: 0.8,
-      cd: rnd(0.8, 2), thk: 0, rage: false, rg: false, armor: 0, ghost: false, vp: rnd(0.8, 1.25), sT: rnd(1, 3), orb: Math.random() < 0.5 ? 1 : -1, bt: rnd(1, 3), fast: false, bf: false };
+      cd: rnd(0.8, 2), thk: 0, rage: false, rg: false, armor: 0, ghost: false, vp: rnd(0.8, 1.25), sT: rnd(1, 3), orb: Math.random() < 0.5 ? 1 : -1, bt: rnd(1, 3), fast: false, bf: false, kind: 'ghost', heal: 0 };   // kind: heykelin iyileştirmesi yalnızca 'ghost' türüne işler (ileride yeni türler eklenecek)
   }
   function enemyAttack(e, kind) {
     e.atk = kind; e.t = 0; e.did = false; e.cmb = 0; e.thk = 0.2;
     if (kind === 'blink') { e.st = 'bo'; AU.sfx('eBlinkOut', e.x, e.y); smoke(e.x, e.y - 14, 4, 40, 10); return; }
     e.st = 'wind';
-    if (kind === 'claw') { e.dir = Math.random() < 0.5 ? 1 : -1; e.wd = e.fast ? 0.36 : e.rage ? 0.4 : 0.5; }
-    else if (kind === 'lunge') e.wd = e.rage ? 0.45 : 0.58;
-    else e.wd = e.rage ? 0.6 : 0.78;
+    if (kind === 'claw') { e.dir = Math.random() < 0.5 ? 1 : -1; e.wd = (e.fast ? 0.36 : e.rage ? 0.4 : 0.5) * E_WIND; }
+    else if (kind === 'lunge') e.wd = (e.rage ? 0.45 : 0.58) * E_WIND;
+    else e.wd = (e.rage ? 0.6 : 0.78) * E_WIND;
     AU.sfx('eWind', e.x, e.y, e);
   }
   function fireBolt(e) {
@@ -717,6 +718,7 @@
       const a = rnd(0, TAU), r = rnd(430, 520);
       E.push(newEnemy(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r, undefined, -0.3)); E.spawnT = rnd(3.5, 6);
     }
+    const wells = []; if (E.length) for (const [sx, sy, id, ev] of statuesIn(player.x - 900, player.y - 900, player.x + 900, player.y + 900)) if (ev) { const es = evState(id); if (!es.dead && es.dying < 0) wells.push([sx, sy]); }   // ayakta olan kötücül heykeller
     for (const e of E) {
       e.t += dt; e.flash = Math.max(0, e.flash - dt); if (F.death >= 0) continue;
       e.armor = (e.st === 'wind' || e.st === 'strike') && e.atk === 'claw' && e.cmb === 2 ? 1 : 0;   // ağır ezmede süper zırh: sendelemez
@@ -725,13 +727,17 @@
         const pe = e.em; e.em += dt / 0.8; if (pe < 0 && e.em >= 0) { smoke(e.x, e.y - 4, 4, 40, 10); AU.sfx('eSpawn', e.x, e.y, e); }
         e.face = Math.atan2(player.y - e.y, player.x - e.x); continue;
       }
+      if (e.kind === 'ghost') {   // heykel ayaktayken çevresindeki hortlaklar canını yeniler
+        let near = false; for (const w of wells) if (Math.hypot(e.x - w[0], (e.y - w[1]) * 1.25) < EV_HEAL_R) { near = true; break; }
+        const heal = near && e.hp < e.max; e.heal += ((heal ? 1 : 0) - e.heal) * dmp(6, dt); if (heal) e.hp = Math.min(e.max, e.hp + e.max * EV_HEAL * dt);
+      }
       const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, ap = Math.atan2(dy, dx);
       if (e.stun > 0) { e.stun -= dt; e.x += e.kx * dt; e.y += e.ky * dt; const k = Math.max(0, 1 - 7 * dt); e.kx *= k; e.ky *= k; e.face += wrap(ap - e.face) * dmp(8, dt); continue; }
-      const sp = e.rage ? 122 : 94;
+      const sp = (e.rage ? 122 : 94) * E_SPD;
       if (e.st === 'chase') {
         e.cd -= dt; e.ph += dt * TAU * (e.rage ? 1.7 : 1.2); e.sT -= dt; if ((e.bt -= dt) <= 0) { e.orb = -e.orb; e.bt = rnd(2, 4.5); }
         e.face += wrap(ap - e.face) * dmp(10, dt);
-        const ready = on && e.cd <= 0 && atkCount(e) < 2, tx = -uy * e.orb, ty = ux * e.orb;
+        const ready = on && e.cd <= 0 && atkCount(e) < E_ATKS, tx = -uy * e.orb, ty = ux * e.orb;
         let mx, my;
         if (ready) { mx = d > 50 ? ux : 0; my = d > 50 ? uy : 0; }                                   // saldırıya hazır: yaklaş
         else if (d < 105) { mx = -ux * 0.45 + tx * 0.8; my = -uy * 0.45 + ty * 0.8; }                // sıra bekleyen: geri çekil, etrafında dön
@@ -756,8 +762,8 @@
       } else if (e.st === 'strike') {
         const cx = Math.cos(e.lk), cy = Math.sin(e.lk);
         if (e.atk === 'lunge') {
-          e.x += cx * 400 * dt; e.y += cy * 400 * dt;
-          if (!e.did && Math.hypot(player.x - e.x, player.y - e.y) < 54) { e.did = true; hurtPlayer(e, 13, 26); }
+          e.x += cx * 400 * E_SPD * dt; e.y += cy * 400 * E_SPD * dt;
+          if (!e.did && Math.hypot(player.x - e.x, player.y - e.y) < 54 * E_AIM) { e.did = true; hurtPlayer(e, Math.round(13 * E_DMG), 26); }
         } else {
           e.x += cx * 120 * dt; e.y += cy * 120 * dt;
           if (!e.did && e.t >= (e.cmb === 2 ? 0.07 : 0.04)) {
@@ -765,12 +771,12 @@
             if (e.cmb === 2) {   // ağır ezme: önünde yer şoku
               const px = e.x + cx * 40, py = e.y + cy * 40;
               RN.push({ x: px, y: py, t: 0, life: 0.5, r: 74 }); chips(px, py - 6, 6, 160, -PI / 2, 1.2, py + 8); smoke(px, py, 3, 40, 14); hitFx(0, 4);
-              if (Math.hypot(player.x - px, (player.y - py) / 0.8) < 66) hurtPlayer(e, 16, 34);
-            } else if (d < 74 && Math.abs(wrap(ap - e.lk)) < 1.1) hurtPlayer(e, 8, 22);
+              if (Math.hypot(player.x - px, (player.y - py) / 0.8) < 66 * E_AIM) hurtPlayer(e, Math.round(16 * E_DMG), 34);
+            } else if (d < 74 * E_AIM && Math.abs(wrap(ap - e.lk)) < 1.1 * E_AIM) hurtPlayer(e, Math.round(8 * E_DMG), 22);
           }
         }
         if (e.t >= e.sd) {
-          if (e.atk === 'claw' && e.cmb < 2) { e.cmb++; e.st = 'wind'; e.t = 0; e.dir = -e.dir; e.did = false; e.wd = e.cmb === 2 ? (e.rage ? 0.55 : 0.68) : (e.rage ? 0.26 : 0.32); AU.sfx('eWind', e.x, e.y, e); }
+          if (e.atk === 'claw' && e.cmb < 2) { e.cmb++; e.st = 'wind'; e.t = 0; e.dir = -e.dir; e.did = false; e.wd = (e.cmb === 2 ? (e.rage ? 0.55 : 0.68) : (e.rage ? 0.26 : 0.32)) * E_WIND; AU.sfx('eWind', e.x, e.y, e); }
           else { e.st = 'rec'; e.t = 0; e.rd = e.atk === 'lunge' ? 0.85 : 0.95; e.cd = rnd(0.9, 1.7) * (e.rage ? 0.7 : 1); e.fast = false; }
         }
       } else if (e.st === 'rec') {   // soluklanır: bu sırada vurulursa %50 fazla hasar alır
@@ -790,9 +796,9 @@
       const p = EP[i]; p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt;
       if (p.t > 3.4) { smoke(p.x, p.y - 22, 2, 20, 5); EP.splice(i, 1); continue; }
       if ((p.tr -= dt) <= 0) { p.tr = 0.045; if (SMK.length < 120) SMK.push({ x: p.x, y: p.y - 22, vx: rnd(-6, 6), vy: rnd(-8, 2), t: 0, life: 0.5, r: 3 }); }
-      if (F.death < 0 && Math.hypot(player.x - p.x, player.y - p.y) < 22) {
+      if (F.death < 0 && Math.hypot(player.x - p.x, player.y - p.y) < 22 * E_AIM) {
         EP.splice(i, 1); AU.sfx('boltHit', p.x, p.y); smoke(p.x, p.y - 20, 3, 40, 6); burst(p.x, p.y - 20, 6, 70);
-        hurtPlayer({ x: p.x, y: p.y, stun: 0, kx: 0, ky: 0, st: '', t: 0 }, 11, 18);
+        hurtPlayer({ x: p.x, y: p.y, stun: 0, kx: 0, ky: 0, st: '', t: 0 }, Math.round(11 * E_DMG), 18);
       }
     }
   }
@@ -813,8 +819,6 @@
     const y = p.y - 22 + Math.sin(p.t * 14) * 1.5;
     ctx.fillStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.ellipse(p.x, p.y, 8, 3, 0, 0, TAU); ctx.fill();
     ctx.fillStyle = 'rgba(150,90,255,0.22)'; ctx.beginPath(); ctx.arc(p.x, y, 17, 0, TAU); ctx.fill();
-    ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(183,155,255,0.8)'; ctx.lineWidth = 1.4;
-    for (let i = 0; i < 4; i++) { const a = p.t * 7 + i * 1.571; ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(p.x + Math.cos(a) * 14, y + Math.sin(a) * 14); ctx.stroke(); }
     ctx.fillStyle = '#1a0f2e'; ctx.beginPath(); ctx.arc(p.x, y, 8, 0, TAU); ctx.fill(); ctx.strokeStyle = '#b79bff'; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.fillStyle = '#fff0c8'; ctx.beginPath(); ctx.arc(p.x, y, 3.2, 0, TAU); ctx.fill();
   }
@@ -830,31 +834,27 @@
     ctx.fillStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.ellipse(e.x, e.y, 15 * (1 - (hov - 8) / 50), 4.8, 0, 0, TAU); ctx.fill();
     const lean = strike ? 7 * spr : wind ? -5 * wp : 0, dip = rec ? 3 : 0;
     ctx.translate(e.x + cx * lean, e.y - hov + dip); ctx.scale(1.35, 1.35); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    // aura: öfkelenince kızıl alevler, normalde soluk mor dumanlar
-    for (let i = 0; i < 5; i++) { const p = (T0 * 0.8 + i * 0.21) % 1; ctx.fillStyle = rg ? `rgba(255,70,50,${0.3 * (1 - p)})` : `rgba(126,108,186,${0.16 * (1 - p)})`; ctx.beginPath(); ctx.arc(Math.sin(i * 2.3 + T0 * 1.5) * 13, -4 - p * 50, 3.2 * (1 - p) + 0.8, 0, TAU); ctx.fill(); }
-    // pelerin: yırtık, dalgalanan etek uçları
+    // aura: birkaç yumuşak duman lekesi
+    for (let i = 0; i < 3; i++) { const p = (T0 * 0.6 + i * 0.33) % 1; ctx.fillStyle = rg ? `rgba(255,80,60,${0.22 * (1 - p)})` : `rgba(126,108,186,${0.13 * (1 - p)})`; ctx.beginPath(); ctx.arc(Math.sin(i * 2.3 + T0) * 9, -6 - p * 46, 4.2 * (1 - p) + 1, 0, TAU); ctx.fill(); }
+    // pelerin: tek, akıcı gövde; etek yumuşak üç dalga
     const sw = i => Math.sin(e.ph * 1.1 + i * 1.3);
-    ctx.beginPath(); ctx.moveTo(-8, -35); ctx.bezierCurveTo(-14, -27, -18, -14, -18, -3);
-    for (let i = 0; i < 7; i++) { const b = -18 + i * 36 / 7, n = b + 36 / 7; ctx.lineTo(b + 18 / 7 + sw(i) * 2.5, 4 + (i % 3) * 4 + 4 * Math.abs(sw(i + 2))); ctx.lineTo(n, -3); }
-    ctx.bezierCurveTo(18, -14, 14, -27, 8, -35); ctx.closePath(); ctx.fillStyle = body; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 1.4; ctx.stroke();
-    // yırtıktan görünen kaburgalar ve titreyen kalp ışığı
-    poly([[-3, -31], [3, -31], [4.5, -14], [0, -8], [-4.5, -14]]); ctx.fillStyle = '#0a0714'; ctx.fill();
-    ctx.strokeStyle = 'rgba(190,180,235,0.55)'; ctx.lineWidth = 1; for (let k = 0; k < 4; k++) { const y = -28 + k * 4.6; ctx.beginPath(); ctx.moveTo(-3.2 + k * 0.4, y); ctx.quadraticCurveTo(0, y + 2.2, 3.2 - k * 0.4, y); ctx.stroke(); }
-    ctx.beginPath(); ctx.moveTo(0, -31); ctx.lineTo(0, -9); ctx.stroke();
-    const hb = 0.5 + 0.5 * Math.sin(T0 * (rg ? 9 : 5)); ctx.fillStyle = eyeC; ctx.globalAlpha = al * (0.25 + 0.2 * hb); ctx.beginPath(); ctx.arc(0, -22, 5.5, 0, TAU); ctx.fill(); ctx.globalAlpha = al * (0.6 + 0.4 * hb); ctx.beginPath(); ctx.arc(0, -22, 1.8, 0, TAU); ctx.fill(); ctx.globalAlpha = al;
-    // omuz dikenleri
-    [-1, 1].forEach(sd => { poly([[sd * 8, -35], [sd * 17, -43], [sd * 13, -32]]); ctx.fillStyle = bone; ctx.fill(); ctx.strokeStyle = bgc; ctx.lineWidth = 0.6; ctx.stroke(); });
-    // kukuleta, karanlık yüz, boynuzlar
+    const rb = ctx.createLinearGradient(0, -40, 0, 8); rb.addColorStop(0, hurt ? '#fff' : '#30285a'); rb.addColorStop(1, hurt ? '#fff' : '#171230');
+    ctx.beginPath(); ctx.moveTo(-8, -35); ctx.bezierCurveTo(-14, -27, -17, -14, -17, -2);
+    ctx.quadraticCurveTo(-11.3, 7 + sw(0) * 2, -5.7, -1); ctx.quadraticCurveTo(0, 8 + sw(1) * 2, 5.7, -1); ctx.quadraticCurveTo(11.3, 7 + sw(2) * 2, 17, -2);
+    ctx.bezierCurveTo(17, -14, 14, -27, 8, -35); ctx.closePath(); ctx.fillStyle = rb; ctx.fill(); ctx.strokeStyle = edge; ctx.globalAlpha = al * 0.55; ctx.lineWidth = 0.9; ctx.stroke(); ctx.globalAlpha = al;
+    // kalp ışığı: yalnızca yumuşak bir nabız
+    const hb = 0.5 + 0.5 * Math.sin(T0 * (rg ? 9 : 5)); ctx.fillStyle = eyeC; ctx.globalAlpha = al * (0.16 + 0.14 * hb); ctx.beginPath(); ctx.arc(0, -21, 6.5, 0, TAU); ctx.fill(); ctx.globalAlpha = al * (0.55 + 0.4 * hb); ctx.beginPath(); ctx.arc(0, -21, 1.7, 0, TAU); ctx.fill(); ctx.globalAlpha = al;
+    // kukuleta + karanlık yüz
     ctx.beginPath(); ctx.moveTo(-9, -33); ctx.bezierCurveTo(-11, -45, -6, -50, 1, -55); ctx.bezierCurveTo(7, -49, 11, -44, 9, -33); ctx.quadraticCurveTo(0, -29, -9, -33); ctx.closePath();
-    ctx.fillStyle = hurt ? '#fff' : '#2a2347'; ctx.fill(); ctx.strokeStyle = edge; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = hurt ? '#fff' : '#2c2550'; ctx.fill(); ctx.strokeStyle = edge; ctx.globalAlpha = al * 0.55; ctx.lineWidth = 0.9; ctx.stroke(); ctx.globalAlpha = al;
     ctx.fillStyle = '#050309'; ctx.beginPath(); ctx.ellipse(0, -40, 5.4, 6.6, 0, 0, TAU); ctx.fill();
-    [-1, 1].forEach(sd => {
-      ctx.beginPath(); ctx.moveTo(sd * 5.5, -46); ctx.bezierCurveTo(sd * 13, -47, sd * 16, -54, sd * 11, -63); ctx.bezierCurveTo(sd * 12, -55, sd * 9, -50, sd * 4, -49); ctx.closePath(); ctx.fillStyle = bone; ctx.fill(); ctx.strokeStyle = '#2a2347'; ctx.lineWidth = 0.6; ctx.stroke();
-      ctx.fillStyle = eyeC; ctx.globalAlpha = al * 0.28; ctx.beginPath(); ctx.arc(sd * 2.6, -41.3, 5, 0, TAU); ctx.fill(); ctx.globalAlpha = al;
-      poly([[sd * 1.2, -41], [sd * 4.6, -43], [sd * 4, -39.8]]); ctx.fillStyle = eyeC; ctx.fill();
+    [-1, 1].forEach(sd => {   // sade, kavisli boynuz + göz
+      ctx.beginPath(); ctx.moveTo(sd * 5.5, -46); ctx.bezierCurveTo(sd * 13, -47, sd * 16, -54, sd * 11, -63); ctx.bezierCurveTo(sd * 12, -55, sd * 9, -50, sd * 4, -49); ctx.closePath(); ctx.fillStyle = bone; ctx.globalAlpha = al * 0.92; ctx.fill(); ctx.globalAlpha = al;
+      ctx.fillStyle = eyeC; ctx.globalAlpha = al * 0.22; ctx.beginPath(); ctx.arc(sd * 2.6, -41.3, 4.6, 0, TAU); ctx.fill(); ctx.globalAlpha = al;
+      ctx.beginPath(); ctx.ellipse(sd * 2.6, -41.3, 2, 1.1, -sd * 0.4, 0, TAU); ctx.fill();
     });
     const open = wind ? wp * 0.8 : strike ? 1 : rg ? 0.25 : 0;   // ağız: saldırıya hazırlanırken açılır
-    if (open > 0.05) { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(0, -35.2, 3.2, 0.8 + 2.6 * open, 0, 0, TAU); ctx.fill(); ctx.strokeStyle = bone; ctx.lineWidth = 0.8; ctx.beginPath(); for (let i = 0; i <= 6; i++) { const x = -3.2 + i * 1.07, y = -35.2 - (0.8 + 2.6 * open) + (i % 2) * 1.4; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+    if (open > 0.05) { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(0, -35.4, 2.8, 0.8 + 2.4 * open, 0, 0, TAU); ctx.fill(); }
     // kollar
     const Z = sd => [-sd * 22, -9], R = sd => [sd * 25, -57], mixp = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k)];
     const hands = [-1, 1].map(sd => {
@@ -881,9 +881,9 @@
     [-1, 1].forEach((sd, i) => {
       const hx = hands[i][0], hy = hands[i][1], sx = sd * 10, sy = -32; let nx = -(hy - sy), ny = hx - sx; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl; if (nx * sd < 0) { nx = -nx; ny = -ny; }
       const ex = (sx + hx) / 2 + nx * 5, ey = (sy + hy) / 2 + ny * 5;
-      ctx.strokeStyle = bgc; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke(); ctx.strokeStyle = hurt ? '#fff' : '#8d83bf'; ctx.lineWidth = 3; ctx.stroke();
-      const a = Math.atan2(hy - ey, hx - ex), L = strike ? 11 : 8; ctx.strokeStyle = bone; ctx.lineWidth = 1.5;
-      for (const o of [-0.55, 0, 0.55]) { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(a + o) * L, hy + Math.sin(a + o) * L); ctx.stroke(); }
+      ctx.strokeStyle = hurt ? '#fff' : '#8076b4'; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(ex, ey, hx, hy); ctx.stroke();
+      const a = Math.atan2(hy - ey, hx - ex), L = strike ? 10 : 7; ctx.strokeStyle = bone; ctx.lineWidth = 1.4;
+      for (const o of [-0.4, 0.4]) { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(a + o) * L, hy + Math.sin(a + o) * L); ctx.stroke(); }
       ctx.fillStyle = bone; ctx.beginPath(); ctx.arc(hx, hy, 2, 0, TAU); ctx.fill();
     });
     if (wind && kind === 'bolt') {   // iki elin arasında toplanan kara küre
@@ -892,7 +892,17 @@
       ctx.fillStyle = eyeC; for (let i = 0; i < 6; i++) { const a = T0 * 6 + i * 1.047, rr = 24 * (1 - wp) + r + 2; ctx.beginPath(); ctx.arc(Math.cos(a) * rr, oy + Math.sin(a) * rr * 0.8, 1.1, 0, TAU); ctx.fill(); }
     }
     ctx.restore();
-    if (e.hp < e.max && e.al > 0.5) { const by = e.y - hov - 78; ctx.fillStyle = `rgba(${fg},0.2)`; ctx.fillRect(e.x - 14, by, 28, 3); ctx.fillStyle = rg ? 'rgba(255,90,70,0.9)' : `rgba(${fg},0.85)`; ctx.fillRect(e.x - 14, by, 28 * e.hp / e.max, 3); }
+    e.bd = e.bd === undefined ? e.hp / e.max : e.bd + (e.hp / e.max - e.bd) * 0.16;   // yumuşak akan can
+    if (e.bd < 0.995 && e.al > 0.5) {
+      const bw = 26, bx = e.x - bw / 2, by = e.y - hov - 80, k = clamp(1 - e.bd / 0.6, 0, 1), ink = light ? [0, 0, 0] : [255, 255, 255];
+      const c = e.heal > 0.3 ? '140,255,190' : [0, 1, 2].map(j => Math.round(lerp(ink[j], [255, 100, 80][j], rg ? 1 : k))).join(',');
+      ctx.save(); ctx.globalAlpha = clamp((1 - e.bd) * 8, 0, 1) * 0.95; rr(bx, by, bw, 2.4, 1.2); ctx.clip();
+      ctx.fillStyle = `rgba(${fg},0.16)`; ctx.fillRect(bx, by, bw, 2.4); ctx.fillStyle = `rgba(${c},0.92)`; ctx.fillRect(bx, by, bw * clamp(e.bd, 0, 1), 2.4); ctx.restore();
+    }
+    if (e.heal > 0.3 && e.al > 0.5) for (let i = 0; i < 3; i++) {   // yükselen küçük '+' işaretleri
+      const q = (T0 * 0.9 + i / 3) % 1, px = e.x + Math.sin(i * 2.1 + T0) * 9, py = e.y - hov - 18 - q * 34; ctx.strokeStyle = `rgba(140,255,190,${0.8 * Math.sin(PI * q) * e.heal})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(px - 2.2, py); ctx.lineTo(px + 2.2, py); ctx.moveTo(px, py - 2.2); ctx.lineTo(px, py + 2.2); ctx.stroke();
+    }
   }
   function drawSlash(fg) {   // savurma izi + vuruş / siper kıvılcımı
     if (F.pt >= 0 && G.has) {
@@ -1354,27 +1364,36 @@
     });
   }
 
-  /* ---------- Kötücül heykel: kötü bir ruhun taş kabı. Düşman doğurur; her darbede güçlenir, 5. darbede kırılır ---------- */
+  /* ---------- Kötücül heykel: kötü bir ruhun taş kabı. Düşman doğurur; her darbede güçlenir, 8. darbede kırılır ---------- */
   const ES = 1.25;                          // normal heykelden belirgin şekilde büyük
+  const EV_HITS = 8, EV_HP = EV_HITS * 20;  // heykel canı: 8 darbe (darbe başına 20)
+  const EV_HEAL = 0.09, EV_HEAL_R = 300;   // heykel ayaktayken çevresindeki hortlaklar saniyede canının %9'u kadar yenilenir (yarıçap px)
   const EV_INT = [6.5, 5.2, 4.2, 3.4, 2.7];   // doğurma dalgası aralığı (sn): her hasarda kısalır
   const EV_CNT = [1, 2, 2, 3, 3];           // dalga başına yaratık sayısı
   const EV_CAP = [3, 4, 5, 6, 7];           // heykelden aynı anda en çok canlı yaratık
   const EV = new Map();                     // heykel kimliği -> kalıcı durum (hasar, çatlaklar, kırık mı)
-  const EV_CRACKS = [   // çatlaklar, darbe sayısına göre sırayla açılır (son ikisi ölürken)
-    [[-2, -61], [-4.5, -55], [-1, -50], [-5.5, -44], [-3, -37]], [[3, -81], [1.5, -77.5], [5, -74], [3, -69.5]],
-    [[12, -66], [15, -60], [12, -54], [16, -47]], [[-6, -34], [-9.5, -26], [-5, -18], [-10.5, -10], [-8, -3]],
-    [[9, -32], [12, -24], [8.5, -15], [13, -6]], [[-12, -60], [-15, -53], [-12, -47], [-17, -42]], [[6, -62], [9, -56], [6, -50]]
+  const SEAMS = [   // tek, akıcı ışık çizgileri: hasar arttıkça yavaşça uzar (başlangıç, uzunluk)
+    [[[2, -71], [-3, -61], [2, -51], [-2.5, -41], [3, -29], [-1, -15], [1, -1]], 0, 0.55],
+    [[[13, -66], [10, -57], [14.5, -48], [11.5, -38]], 0.4, 0.35],
+    [[[-14, -63], [-11, -54], [-15, -45], [-12, -36]], 0.68, 0.3]
   ];
+  function seam(pts, p) {   // çizginin p (0..1) kadarını yumuşak eğriyle çizer
+    const n = pts.length - 1, f = clamp(p, 0, 1) * n, q = [pts[0]];
+    for (let i = 1; i <= n; i++) { if (f >= i) q.push(pts[i]); else { const u = f - (i - 1); if (u > 0.001) q.push([lerp(pts[i - 1][0], pts[i][0], u), lerp(pts[i - 1][1], pts[i][1], u)]); break; } }
+    ctx.beginPath(); if (q.length < 2) return false; ctx.moveTo(q[0][0], q[0][1]);
+    for (let i = 1; i < q.length - 1; i++) ctx.quadraticCurveTo(q[i][0], q[i][1], (q[i][0] + q[i + 1][0]) / 2, (q[i][1] + q[i + 1][1]) / 2);
+    const l = q[q.length - 1]; ctx.lineTo(l[0], l[1]); return true;
+  }
   function evState(id) {
     let s = EV.get(id);
-    if (!s) EV.set(id, s = { hp: 100, hits: 0, t: rnd(0, 40), flash: 0, flare: 0, pulse: 0, rot: 0, rv: 0, crack: 0, aw: 0.5, spawnT: 3.5, dying: -1, dead: false, chipT: 0 });
+    if (!s) EV.set(id, s = { hp: EV_HP, hits: 0, t: rnd(0, 40), flash: 0, flare: 0, pulse: 0, rot: 0, rv: 0, crack: 0, aw: 0.5, spawnT: 3.5, dying: -1, dead: false, chipT: 0, bar: 1, lag: 1, barA: 0, barT: 0 });
     return s;
   }
   function spawnMinion(sx, sy, id, k) {   // heykelin önünde, dumanın içinden belirir
     E.push(newEnemy(sx + rnd(-34, 34), sy + rnd(14, 30), id, -k * 0.35));
   }
   function hitEvil(s, sx, sy, ang) {
-    s.hp -= 20; s.hits++; s.flash = 0.14; s.flare = 1; s.pulse = 1;
+    s.hp -= 20; s.hits = Math.min(5, Math.ceil((1 - Math.max(0, s.hp) / EV_HP) * 5 - 1e-6)); s.flash = 0.14; s.flare = 1; s.pulse = 1; s.barT = 3;
     s.rv += Math.cos(ang) * 1.1 + rnd(-0.15, 0.15);                  // darbeyle sallanır
     s.spawnT = Math.min(s.spawnT, 0.55);                             // öfkelenir: hemen yaratık yollar
     const hx = sx + clamp(player.x - sx, -24, 24), hy = sy - rnd(22, 56), gy = sy + rnd(4, 14);
@@ -1384,48 +1403,53 @@
     AU.sfx('evilHit', sx, sy - 40, s.hits);
     if (s.hp <= 0) { s.hp = 0; s.dying = 0; s.chipT = 0; hitFx(0.16, 7); }
   }
-  function shatterEvil(s, sx, sy, id) {   // taş dağılır, ruh duman olup dağılır, yaratıkları da onunla gider
+  function shatterEvil(s, sx, sy, id) {   // iki yarı devrilirken altı taş kütlesine bölünür; ruh duman olup dağılır
     s.dead = true; s.dying = -1; AU.sfx('evilShatter', sx, sy - 40);
-    for (let i = 0; i < 34; i++) { const px = sx + rnd(-26, 26), py = sy - rnd(6, 110); chip(px, py, (px - sx) * rnd(2, 5) + rnd(-30, 30), -rnd(40, 260), sy + rnd(2, 20), rnd(2, 6.5)); }
-    smoke(sx, sy - 50, 22, 90, 24); smoke(sx, sy - 95, 10, 70, 14); sparks(sx, sy - 50, 16, 300, 0, TAU); burst(sx, sy - 10, 14, 90);
+    const gs = ES * 1.08, th1 = 0.108, a2 = 0.62, tcx = crx(-60);
+    [-1, 1].forEach(sd => [[-124, -68, 1.6], [-68, -34, 1.1], [-34, 8, 0.6]].forEach(([yA, yB, fl]) => {
+      const poly = bandPoly(sd, yA, yB), cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, cy = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+      let p = rotAt(cx, cy, tcx, -60, -sd * th1); p = rotAt(p[0], p[1], sd * 17, 2, sd * a2);
+      SH.push({ poly, cx, cy, gs, x: sx + gs * (p[0] + sd * 15), y: sy + gs * (p[1] + 5 - 8), r: sd * (a2 - th1), vx: sd * rnd(50, 150) * (0.6 + fl * 0.5), vy: -rnd(40, 130) * fl, vr: sd * rnd(1, 4), gy: sy - 4 + rnd(0, 12), t: 0, b: 0, rest: false });
+    }));
+    for (let i = 0; i < 14; i++) { const px = sx + rnd(-26, 26), py = sy - rnd(6, 110); chip(px, py, (px - sx) * rnd(2, 5) + rnd(-30, 30), -rnd(40, 260), sy + rnd(2, 20), rnd(1.6, 4)); }
+    smoke(sx, sy - 50, 14, 90, 24); sparks(sx, sy - 50, 16, 300, 0, TAU); burst(sx, sy - 10, 14, 90);
     hitFx(0.22, 11);
-    for (let i = E.length - 1; i >= 0; i--) if (E[i].src === id) { const e = E[i]; smoke(e.x, e.y - 16, 5, 50, 8); burst(e.x, e.y - 16, 8, 60); E.splice(i, 1); }
   }
   function updateEvil(dt) {
+    for (let i = SH.length - 1; i >= 0; i--) { const p = SH[i]; if ((p.t += dt) > 3.4) { SH.splice(i, 1); continue; } if (p.rest) continue; p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt; if (p.y > p.gy) { p.y = p.gy; if (p.vy > 110 && p.b < 2) { p.vy *= -0.3; p.vx *= 0.55; p.vr *= 0.5; p.b++; } else p.rest = true; } }
     const on = G.has && G.eq >= 1 && F.death < 0;
     for (const [sx, sy, id, ev] of statuesIn(player.x - 760, player.y - 760, player.x + 760, player.y + 760)) {
       if (!ev) continue;
       const s = evState(id), L = Math.min(s.hits, 4);
       s.t += dt; s.flash = Math.max(0, s.flash - dt); s.flare = Math.max(0, s.flare - dt * 2.2); s.pulse = Math.max(0, s.pulse - dt * 1.1);
       s.rv += (-70 * s.rot - 8 * s.rv) * dt; s.rot += s.rv * dt;
-      s.crack = Math.min(s.dying >= 0 ? 7 : s.hits, s.crack + dt * 4);
+      s.crack = Math.min(s.dying >= 0 ? 9 : (1 - s.hp / EV_HP) * 7, s.crack + dt * 4);
+      { const tg = s.hp / EV_HP, pd = Math.hypot(player.x - sx, player.y - sy); s.barT = Math.max(0, s.barT - dt);   // can çubuğu: yumuşak akış, gecikmeli iz, kendiliğinden belirip silinir
+        s.bar += (tg - s.bar) * dmp(9, dt); if (s.lag > s.bar && s.barT < 2.5) s.lag += (s.bar - s.lag) * dmp(2.6, dt); else if (s.lag < s.bar) s.lag = s.bar;
+        const want = s.dead || s.dying >= 0 ? 0 : (s.barT > 0 || (s.hits > 0 && pd < 230)) ? 1 : 0; s.barA += (want - s.barA) * dmp(want ? 10 : 3.2, dt); }
       if (s.dead) continue;
       if (s.dying >= 0) {   // ölüyor: çatlaklardan ışık sızar, parçalar dökülür, sonra patlar
         const u0 = s.dying; s.dying += dt;
-        hitFx(0, 1 + 2.4 * clamp(s.dying / 1.15, 0, 1));
+        hitFx(0, 1 + 2.4 * clamp(s.dying / 0.78, 0, 1));
         if ((s.chipT -= dt) <= 0) { s.chipT = 0.07; const cx = sx + rnd(-22, 22), cy = sy - rnd(10, 100); chips(cx, cy, 2, 90, rnd(0, TAU), PI, sy + rnd(4, 14)); smoke(cx, cy, 1, 40, 6); }
-        if (s.dying >= 1.15) shatterEvil(s, sx, sy, id);
+        if (s.dying >= 0.78) shatterEvil(s, sx, sy, id);
         continue;
       }
       const act = on && Math.hypot(player.x - sx, player.y - sy) < 560;   // kılıç kuşanıldıktan sonra, yakındaysa uyanık
       s.aw += ((act ? 1 : 0.5) - s.aw) * dmp(3, dt);
       if (!act) continue;
       if ((s.spawnT -= dt) <= 0) {
+        if (E.length >= 28) { s.spawnT = 1; continue; }   // genel üst sınır: performans
         const alive = E.reduce((n, e) => n + (e.src === id ? 1 : 0), 0), n = Math.min(EV_CNT[L], EV_CAP[L] - alive);
         if (n > 0) { for (let i = 0; i < n; i++) spawnMinion(sx, sy, id, i); s.pulse = 1; s.flare = Math.max(s.flare, 0.7); s.spawnT = EV_INT[L] * rnd(0.9, 1.1); }
         else s.spawnT = 0.8;
       }
     }
   }
-  function crackPath(pts, p) {   // çatlağın p (0..1) kadarını çizer: yavaş yavaş açılır
-    const n = pts.length - 1, f = p * n; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
-    for (let i = 1; i <= n; i++) { if (f >= i) ctx.lineTo(pts[i][0], pts[i][1]); else { const u = f - (i - 1); if (u > 0) ctx.lineTo(lerp(pts[i - 1][0], pts[i][0], u), lerp(pts[i - 1][1], pts[i][1], u)); break; } }
-  }
   function drawRubble(sx, sy, light) {   // kırılmış heykelin enkazı
     const fg = light ? '88,80,112' : '132,124,156', col = `rgb(${fg})`, bg = light ? '#f2f2f2' : '#0a0a0a';
     ctx.save(); ctx.translate(sx, sy); ctx.scale(ES, ES); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    ctx.fillStyle = `rgba(${fg},0.5)`; rr(-27, -2, 54, 9, 2); ctx.fill();
-    ctx.fillStyle = `rgba(${fg},0.85)`; poly([[-23, -9], [-4, -9], [-9, -6], [-1, -3], [-21, -3]]); ctx.fill();
+    [-1, 1].forEach(sd => { ctx.save(); ctx.translate(sd * 1.6, 0); ctx.rotate(sd * 0.03); ctx.fillStyle = `rgba(${fg},0.5)`; poly([[sd * 1.4, 6], [sd * 30, 6], [sd * 27, -1], [sd * 1.2, -1]]); ctx.fill(); ctx.fillStyle = `rgba(${fg},0.85)`; poly([[sd * 2.4, -1], [sd * 24, -1], [sd * 20, -7], [sd * 3.6, -8]]); ctx.fill(); ctx.restore(); });
     ctx.save(); ctx.translate(-5, -3); ctx.rotate(-0.25);   // kırık kılıç parçası
     poly([[-2.6, -1], [2.6, -1], [2.2, -14], [0.8, -12], [-0.4, -16], [-2.2, -13]]); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.8; ctx.stroke(); ctx.restore();
     poly([[8, -3], [16, -8], [24, -6], [18, -2]]); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.7; ctx.stroke();   // yere düşmüş boynuz
@@ -1434,120 +1458,166 @@
     });
     ctx.restore();
   }
+
+  /* ---- Çatlak geometrisi: çatlak plakanın en alt ortasından başlar, yukarı tırmanır; son vuruşta baştan ikiye yarar ---- */
+  const CRK = [[0, 6], [-2.4, -6], [2.2, -17], [-2.8, -29], [2.6, -41], [-2.2, -53], [2.4, -65], [-1.8, -78], [1.6, -92], [0, -112]];
+  const crx = y => { if (y >= 6) return 0; for (let i = 1; i < CRK.length; i++) { const a = CRK[i - 1], b = CRK[i]; if (y >= b[1]) return lerp(a[0], b[0], (a[1] - y) / (a[1] - b[1])); } return 0; };
+  const jg = d => Math.sin(d * 0.62 + 0.4) * 2.8 * Math.min(1, d / 5);   // pürüzlü kırık kenar
+  const crackPts = ty => { const q = CRK.filter(p => p[1] > ty); q.push([crx(ty), ty]); return q; };
+  const pth = pts => { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); };
+  function bandPoly(sd, yA, yB) {   // sd tarafındaki yarı: yA (üst) ile yB (alt) arası, çatlak çizgisinden dışa
+    const p = [], cA = crx(yA), cB = crx(yB), jA = yA <= -110 ? 0 : 1, jB = yB >= 6 ? 0 : 1;
+    for (let y = yB; y >= yA; y -= 4) p.push([crx(y), y]);
+    p.push([cA, yA]);
+    for (let d = 5; d <= 42; d += 5) p.push([cA + sd * d, yA + jA * jg(d)]);
+    for (let d = 42; d >= 0; d -= 5) p.push([cB + sd * d, yB + jB * jg(d)]);
+    return p;
+  }
+  function abovePoly(ty) {   // çatlak ucunun üstünde kalan bütün parça
+    const c = crx(ty), p = [[c + 44, -126], [c - 44, -126]];
+    for (let d = 42; d >= 5; d -= 5) p.push([c - d, ty + jg(d)]);
+    p.push([c, ty]);
+    for (let d = 5; d <= 42; d += 5) p.push([c + d, ty + jg(d)]);
+    return p;
+  }
+  const rotAt = (x, y, cx, cy, a) => { const c = Math.cos(a), s = Math.sin(a), dx = x - cx, dy = y - cy; return [cx + dx * c - dy * s, cy + dx * s + dy * c]; };
+  function evPal(light, flash, u, glow, wk) {
+    const fg = flash ? (light ? '0,0,0' : '255,255,255') : (light ? '88,80,112' : '132,124,156');
+    const eg = Math.round(lerp(lerp(177, 48, u), 236, wk)), eb = Math.round(lerp(lerp(59, 48, u), 205, wk));
+    return { fg, col: `rgb(${fg})`, bg: light ? '#f2f2f2' : '#0a0a0a', glow, ec: a => `rgba(255,${eg},${eb},${clamp(a, 0, 1)})`, sh: light ? 'rgba(30,20,60,0.3)' : 'rgba(0,0,0,0.34)' };
+  }
+  const SH = [];   // son vuruşta kopan taş kütleleri
+  /* ---- Heykel gövdesi: keskin, açılı, ince hatlı; düz iki tonlu yüzeyler (gradyan yok) ---- */
+  function evBody(P) {
+    const { col, bg, ec, glow, sh } = P, VOID = '#000', g1 = clamp(glow, 0, 1);
+    const pf = (pts, c, w) => { pth(pts); ctx.fillStyle = c || col; ctx.fill(); if (w) { ctx.strokeStyle = bg; ctx.lineWidth = w; ctx.stroke(); } };
+    const mir = (pts, sd) => pts.map(([x, y]) => [x * sd, y]);
+    const ln = (a, w, c) => { ctx.beginPath(); a.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.strokeStyle = c || bg; ctx.lineWidth = w; ctx.stroke(); };
+    ctx.lineJoin = 'miter'; ctx.lineCap = 'round'; ctx.miterLimit = 3;
+    // yırtık pelerin
+    ctx.globalAlpha = 0.4; pf([[-12, -64], [-31, -42], [-26, -31], [-35, -15], [-27, -8], [-32, 3], [-19, -3], [-12, 4], [-5, -4], [0, 5], [5, -4], [12, 4], [19, -3], [32, 3], [27, -8], [35, -15], [26, -31], [31, -42], [12, -64]]); ctx.globalAlpha = 1;
+    // cüppe + kıvrım çizgileri
+    pf([[-11, -34], [11, -34], [19, -1], [10, 5], [5, -3], [0, 6], [-5, -3], [-10, 5], [-19, -1]], col, 0.8);
+    pf([[0, -34], [11, -34], [19, -1], [10, 5], [5, -3], [0, 6]], sh);
+    [-1, 1].forEach(sd => { ln(mir([[6, -33], [9, -2]], sd), 0.8); ln(mir([[13, -29], [16.5, -3]], sd), 0.7); });
+    // yere dikili büyük kılıç
+    pf([[-3.2, -39], [3.2, -39], [2.7, -14], [0, 3], [-2.7, -14]], col, 0.8); pf([[0, -39], [3.2, -39], [2.7, -14], [0, 3]], sh); ln([[0, -36], [0, -8]], 0.7);
+    [-1, 1].forEach(sd => pf(mir([[0, -42], [-6, -45], [-15, -42], [-17, -37.5], [-8, -39.5], [0, -38.5]], sd), col, 0.8));
+    pf([[-1.3, -53], [1.3, -53], [1.3, -42], [-1.3, -42]], col, 0.7); pf([[0, -58], [3, -55], [0, -52], [-3, -55]], col, 0.7);
+    // göğüs zırhı
+    pf([[-13, -67], [13, -67], [16, -55], [10, -38], [8, -32], [-8, -32], [-10, -38], [-16, -55]], col, 0.9);
+    pf([[0, -67], [13, -67], [16, -55], [10, -38], [8, -32], [0, -32]], sh);
+    ln([[-14.5, -61], [0, -49], [14.5, -61]], 0.9); [-1, 1].forEach(sd => ln(mir([[5.5, -45], [6.5, -34]], sd), 0.7));
+    pf([[-9, -35], [9, -35], [9, -31], [-9, -31]], col, 0.8); pf([[0, -37], [3.4, -33], [0, -29], [-3.4, -33]], col, 0.8);
+    // çekirdek: keskin elmas
+    pf([[0, -65], [7, -57], [0, -49], [-7, -57]], ec(0.13 * g1)); pf([[0, -61], [2.6, -57], [0, -53], [-2.6, -57]], ec(0.45 + 0.55 * g1));
+    // kollar + gantlet
+    [-1, 1].forEach(sd => { ctx.lineJoin = 'miter'; ln([[sd * 17, -62], [sd * 22, -50], [sd * 3, -48]], 6.4, bg); ln([[sd * 17, -62], [sd * 22, -50], [sd * 3, -48]], 4.4, col); pf([[sd * 5, -52], [sd * 0.4, -52], [sd * 0.4, -45.5], [sd * 5.5, -45.5]], col, 0.7); });
+    // omuzluklar: katmanlı, dikenli plakalar
+    [-1, 1].forEach(sd => {
+      const base = mir([[5, -67], [17, -71], [27, -66], [29, -58], [22, -53], [11, -57]], sd);
+      pf(base, col, 0.9); if (sd > 0) pf(base, sh);
+      pf(mir([[19, -69], [23.5, -83], [26.5, -66]], sd), col, 0.8); pf(mir([[8.5, -69], [10.5, -79], [14.5, -70]], sd), col, 0.8);
+      ln(mir([[9, -61], [25.5, -59]], sd), 0.8); ln(mir([[10, -64.5], [24, -64]], sd), 0.6);
+    });
+    // boyunluk
+    pf([[-7, -68], [7, -68], [9, -62], [-9, -62]], col, 0.8); [-1, 1].forEach(sd => pf(mir([[7, -67], [12.5, -74], [9.5, -62]], sd), col, 0.8));
+    // miğfer + karanlık yüz
+    const hm = [[-7.5, -68], [7.5, -68], [9.5, -76], [7.5, -86], [2.5, -92], [0, -96], [-2.5, -92], [-7.5, -86], [-9.5, -76]];
+    pf(hm, col, 0.9); pf([[0, -96], [2.5, -92], [7.5, -86], [9.5, -76], [7.5, -68], [0, -68]], sh);
+    pf([[-5.4, -82], [5.4, -82], [4.8, -73], [1.3, -67], [-1.3, -67], [-4.8, -73]], VOID);
+    ln([[-6.2, -83.4], [0, -80.6], [6.2, -83.4]], 1); ln([[0, -96], [0, -86]], 0.8);
+    [-1, 1].forEach(sd => { pf(mir([[0.6, -75], [6.4, -79.8], [5.7, -75], [1.6, -73]], sd), ec(0.16 * g1)); pf(mir([[1, -75.2], [5, -78.4], [4.6, -76.2], [1.8, -74.4]], sd), ec(g1)); });
+    // uzun, geriye süpürülen boynuzlar
+    [-1, 1].forEach(sd => {
+      ctx.beginPath(); ctx.moveTo(sd * 5.5, -86); ctx.bezierCurveTo(sd * 15, -86, sd * 24, -94, sd * 21, -110); ctx.bezierCurveTo(sd * 17, -98, sd * 12, -93, sd * 4, -91); ctx.closePath();
+      ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.8; ctx.stroke();
+      ln(mir([[10, -88.5], [11, -92.8]], sd), 0.8); ln(mir([[15.2, -91.2], [16.8, -95.3]], sd), 0.8); ln(mir([[18.8, -96.5], [20.4, -100]], sd), 0.8);
+    });
+  }
+  function drawShards(light) {
+    if (!SH.length) return; const P = evPal(light, false, 0.9, 1, 0.7);
+    for (const p of SH) {
+      const a = p.t > 2.6 ? 1 - (p.t - 2.6) / 0.8 : 1; ctx.save(); ctx.globalAlpha = Math.max(a, 0);
+      ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.scale(p.gs, p.gs); ctx.translate(-p.cx, -p.cy);
+      pth(p.poly); ctx.save(); ctx.clip(); evBody(P); ctx.restore(); pth(p.poly); ctx.strokeStyle = P.bg; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+    }
+  }
   function drawEvil(sx, sy, id, light) {
     const s = evState(id);
     if (s.dead) { drawRubble(sx, sy, light); return; }
-    const L = Math.min(s.hits, 4), u = L / 4, dy = s.dying >= 0 ? clamp(s.dying / 1.15, 0, 1) : 0, t = s.t;
-    const bg = light ? '#f2f2f2' : '#0a0a0a', VOID = '#000';
-    const fg = s.flash > 0 ? (light ? '0,0,0' : '255,255,255') : (light ? '88,80,112' : '132,124,156'), col = `rgb(${fg})`;
-    const gs = ES * (1 + 0.02 * L + 0.035 * s.pulse);   // her darbede biraz daha heybetli
+    const L = Math.min(s.hits, 4), u = L / 4, dg = s.dying >= 0 ? s.dying : -1, dy = dg >= 0 ? clamp(dg / 0.78, 0, 1) : 0, t = s.t;
     const glow = clamp((0.5 + 0.5 * u) * (0.86 + 0.14 * Math.sin(t * 6.3)) * s.aw + 0.7 * s.flare + 0.5 * s.pulse + dy, 0, 1.3);
-    const wk = clamp(Math.max(s.flare, dy) * 0.7, 0, 0.7);   // göz rengi: kehribar -> kızıl (öfkeyle), darbede/ölürken beyaza kayar
-    const eg = Math.round(lerp(lerp(177, 48, u), 236, wk)), eb = Math.round(lerp(lerp(59, 48, u), 205, wk));
-    const ec = a => `rgba(255,${eg},${eb},${clamp(a, 0, 1)})`, smk = light ? '78,60,130' : '126,108,186';
-    const po = (pts, w) => { poly(pts); ctx.fillStyle = col; ctx.fill(); if (w) { ctx.strokeStyle = bg; ctx.lineWidth = w; ctx.stroke(); } };
-    const ln = (x1, y1, x2, y2, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+    const P = evPal(light, s.flash > 0, u, glow, clamp(Math.max(s.flare, dy) * 0.7, 0, 0.7)), { fg, bg, ec } = P, smk = light ? '78,60,130' : '126,108,186';
+    const gs = ES * (1 + 0.02 * L + 0.035 * s.pulse);   // her darbede biraz daha heybetli
     ctx.save(); ctx.translate(sx, sy); ctx.scale(gs, gs); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-    // zemin: karanlık hale (öfkeyle büyür) + doğurma/darbe dalgası
-    { const R = 50 + 8 * L, a = (0.16 + 0.06 * L) * s.aw + 0.1 * dy;
-      ctx.save(); ctx.translate(0, 2); ctx.scale(1, 0.3);
-      const g = ctx.createRadialGradient(0, 0, 6, 0, 0, R); g.addColorStop(0, `rgba(${smk},${a})`); g.addColorStop(1, `rgba(${smk},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
-      if (s.pulse > 0.02) { ctx.strokeStyle = `rgba(${smk},${0.6 * s.pulse})`; ctx.lineWidth = 3 * s.pulse + 0.5; ctx.beginPath(); ctx.arc(0, 0, 24 + 70 * (1 - s.pulse), 0, TAU); ctx.stroke(); }
+    // zemin: sekizgen mühür halkaları + doğurma dalgası
+    { const R = 46 + 7 * L, a = (0.16 + 0.05 * L) * s.aw + 0.1 * dy;
+      ctx.save(); ctx.translate(0, 2); ctx.scale(1, 0.3); ctx.strokeStyle = `rgba(${smk},${a + 0.1})`; ctx.lineWidth = 1.6;
+      pth(Array.from({ length: 8 }, (_, i) => [Math.cos(i * PI / 4 + PI / 8) * R, Math.sin(i * PI / 4 + PI / 8) * R])); ctx.stroke();
+      ctx.lineWidth = 0.9; pth(Array.from({ length: 8 }, (_, i) => [Math.cos(i * PI / 4 + t * 0.15) * (R - 9), Math.sin(i * PI / 4 + t * 0.15) * (R - 9)])); ctx.stroke();
+      if (s.pulse > 0.02) { ctx.strokeStyle = `rgba(${smk},${0.6 * s.pulse})`; ctx.lineWidth = 2.4 * s.pulse + 0.5; ctx.beginPath(); ctx.arc(0, 0, 24 + 70 * (1 - s.pulse), 0, TAU); ctx.stroke(); }
       ctx.restore(); }
-    // arkada yükselen karanlık dumanlar (öfkelendikçe artar)
-    const nw = 5 + 2 * L;
-    for (let i = 0; i < nw; i++) {
-      const ph = (t * 0.32 + i / nw) % 1, a = 0.2 * Math.sin(PI * ph) * (0.55 + 0.45 * u + 0.5 * dy) * s.aw;
-      ctx.fillStyle = `rgba(${smk},${a})`; ctx.beginPath(); ctx.arc(Math.sin(i * 2.7 + t * 0.9) * (12 + 10 * ph) + (i % 2 ? 9 : -9), -8 - ph * 88, 3 + 5 * ph, 0, TAU); ctx.fill();
-    }
+    if (dg < 0) { ctx.save(); ctx.translate(0, 2); ctx.scale(1, 0.8); ctx.strokeStyle = `rgba(${smk},${(0.045 + 0.025 * Math.sin(t * 2.2)) * (0.5 + s.aw)})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, EV_HEAL_R / gs, 0, TAU); ctx.stroke(); ctx.restore(); }
+    // yükselen keskin kor parçacıkları
+    const nw = 3 + L;
+    for (let i = 0; i < nw; i++) { const ph = (t * 0.3 + i / nw) % 1; ctx.save(); ctx.translate(Math.sin(i * 2.7 + t * 0.9) * (12 + 10 * ph) + (i % 2 ? 11 : -11), -8 - ph * 92); ctx.rotate(t * 1.7 + i); ctx.fillStyle = ec(0.5 * Math.sin(PI * ph) * (0.5 + 0.5 * u + 0.5 * dy) * s.aw); ctx.fillRect(-1.5, -1.5, 3, 3); ctx.restore(); }
 
-    // kaide: iki kat, üstünde öfkeyle parlayan rünler
-    ctx.fillStyle = `rgba(${fg},0.5)`; rr(-27, -2, 54, 9, 2); ctx.fill();
-    ctx.fillStyle = `rgba(${fg},0.85)`; rr(-23, -9, 46, 8, 1.8); ctx.fill();
-    const rg = clamp(0.1 + 0.8 * u * s.aw + 0.6 * s.pulse + dy, 0, 1);
-    [-14, 0, 14].forEach(x => { poly([[x, -7.4], [x + 2, -5], [x, -2.6], [x - 2, -5]]); ctx.fillStyle = ec(rg); ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.6; ctx.stroke(); });
+    // çatlak ucu: 7 darbeye kadar yükselir; son vuruşta baştan sona yarar
+    const f = clamp(s.crack / 7, 0, 1.3), tipD = dg >= 0 ? 66 + 56 * sstep(0, 0.24, dg) : 66 * Math.pow(clamp(f / 0.875, 0, 1), 0.85), ty = 6 - tipD;
 
-    // ---- heykel gövdesi: kaidenin üstünde, darbeyle ayak ucundan sallanır ----
+    // kaide (açılı, basamaklı) + çatlağı
+    ctx.fillStyle = `rgba(${fg},0.45)`; pth([[-31, 6], [31, 6], [27, -1], [-27, -1]]); ctx.fill();
+    ctx.fillStyle = `rgba(${fg},0.85)`; pth([[-24, -1], [24, -1], [20, -9], [-20, -9]]); ctx.fill();
+    ctx.strokeStyle = bg; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(-27, -1); ctx.lineTo(27, -1); ctx.stroke();
+    if (tipD > 1.5) { const pc = [[0, 6], [-1.8, 0.5], [1.4, -4.5], [-0.3, -9]]; for (const [c, w] of [[bg, 1.5], [ec(0.35 + 0.6 * dy), 0.6]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); pc.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); } }
+
+    // ---- heykel gövdesi ----
     ctx.save(); ctx.translate(0, -8);
-    const shk = s.dying >= 0 ? Math.sin(t * 95) * (0.4 + 2.4 * dy) : L >= 3 ? Math.sin(t * 53) * 0.18 : 0;
-    ctx.translate(shk, 0); ctx.rotate(s.rot + (dy ? Math.sin(t * 71) * 0.02 * dy : 0));
-    ctx.strokeStyle = bg;
-
-    // pelerin (arka katman, yırtık etek)
-    ctx.fillStyle = `rgba(${fg},0.55)`; ctx.beginPath(); ctx.moveTo(-12, -62); ctx.lineTo(12, -62);
-    ctx.bezierCurveTo(20, -50, 28, -26, 31, -2);
-    [[24, -8], [20, -1], [14, -9], [9, -2], [4, -8], [-1, -1], [-6, -8], [-11, -2], [-16, -9], [-21, -1], [-25, -8], [-31, -2]].forEach(p => ctx.lineTo(p[0], p[1]));
-    ctx.bezierCurveTo(-28, -26, -20, -50, -12, -62); ctx.closePath(); ctx.fill();
-    // uzun cüppe: kıvrımlar + dişli etek ucu
-    po([[-12, -40], [12, -40], [16, -20], [19, -1], [-19, -1], [-16, -20]], 0);
-    ctx.strokeStyle = bg; [-1, 1].forEach(sd => { ln(sd * 6, -30, sd * 7.5, -4, 0.6); ln(sd * 12, -32, sd * 15.5, -4, 0.6); });
-    ctx.lineWidth = 0.6; for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 5.4 - 2.4, -5.5); ctx.lineTo(i * 5.4, -2); ctx.lineTo(i * 5.4 + 2.4, -5.5); ctx.stroke(); }
-    // göğüs zırhı + kemer
-    ctx.fillStyle = col; rr(-11, -62, 22, 26, 4); ctx.fill();
-    ctx.strokeStyle = bg; ln(0, -60, 0, -40, 0.7);
-    [-55, -50, -45].forEach(y => { ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-9, y); ctx.quadraticCurveTo(0, y + 3, 9, y); ctx.stroke(); });
-    ln(-11, -38, 11, -38, 2.2);
-    ctx.fillStyle = col; rr(-6.5, -67, 13, 7, 2.5); ctx.fill();   // boyunluk
-
-    // yere dikili devasa kılıç: kabzası iki elde, ucu kaideye dayalı
-    po([[-3, -38], [3, -38], [2.4, -14], [0, -1], [-2.4, -14]], 1); ctx.strokeStyle = bg; ln(0, -36, 0, -8, 0.6);
-    po([[-10, -40], [-4, -41.5], [4, -41.5], [10, -40], [8.5, -37.8], [0, -38.6], [-8.5, -37.8]], 0.8);   // siper
-    po([[-10, -40], [-13, -44], [-8.5, -41]], 0.6); po([[10, -40], [13, -44], [8.5, -41]], 0.6);
-    ctx.fillStyle = col; rr(-1.3, -53, 2.6, 12, 1); ctx.fill();   // sap
-    // kollar (gövdeden ayrışsın diye koyu çerçeveli)
-    [-1, 1].forEach(sd => { for (const [c, w] of [[bg, 6], [col, 4.2]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(sd * 16, -57); ctx.lineTo(sd * 19, -45); ctx.lineTo(sd * 2, -48); ctx.stroke(); } });
-    [[-0.6, -49.5], [0.6, -45.5]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 2.6, 0, TAU); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.9; ctx.stroke(); });   // eller
-    ctx.beginPath(); ctx.arc(0, -55, 2.4, 0, TAU); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.8; ctx.stroke();    // topuz
-    ctx.beginPath(); ctx.arc(0, -55, 1.1, 0, TAU); ctx.fillStyle = ec(0.4 + 0.6 * clamp(glow, 0, 1)); ctx.fill();                                // topuz taşı
-
-    // sivri omuzluklar
-    [-1, 1].forEach(sd => {
-      po([[sd * 12, -65], [sd * 24, -80], [sd * 20, -60]], 0.7); po([[sd * 19, -58], [sd * 31, -62], [sd * 21, -51]], 0.7);
-      ctx.beginPath(); ctx.ellipse(sd * 14, -60, 7.5, 6, 0, 0, TAU); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.8; ctx.stroke();
-      ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(sd * 14, -60, 3.8, 3.6, 5.8); ctx.stroke();
-    });
-
-    // miğfer + karanlık yüz boşluğu
-    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(0, -74, 7, 8.2, 0, 0, TAU); ctx.fill();
-    po([[-6.2, -72], [6.2, -72], [4.6, -64.8], [0, -62], [-4.6, -64.8]], 0);
-    ctx.fillStyle = VOID; rr(-4.8, -77.5, 9.6, 7.6, 3); ctx.fill();
-    // parlayan, çekik gözler (hale ile)
-    [-1, 1].forEach(sd => {
-      ctx.fillStyle = ec(0.07 * glow); ctx.beginPath(); ctx.ellipse(sd * 2.5, -74, 7, 5, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = ec(0.12 * glow); ctx.beginPath(); ctx.ellipse(sd * 2.5, -74, 4.8, 3.4, 0, 0, TAU); ctx.fill();
-      poly([[sd * 0.8, -73.2], [sd * 4.2, -75.6], [sd * 3.6, -72.6]]); ctx.fillStyle = ec(glow); ctx.fill();
-    });
-    if (L >= 3 || dy > 0) {   // çok öfkelenince yüzünde pis bir sırıtış belirir
-      ctx.strokeStyle = ec(clamp(Math.max((L - 2) / 2, dy), 0, 1) * clamp(glow, 0, 1)); ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(-3.4, -71.4);
-      [[-2.2, -70.3], [-1.1, -71.5], [0, -70.3], [1.1, -71.5], [2.2, -70.3], [3.4, -71.4]].forEach(p => ctx.lineTo(p[0], p[1])); ctx.stroke();
+    const shk = dg >= 0 ? Math.sin(t * 95) * (0.4 + 2.4 * Math.max(0, 1 - dg / 0.3)) : 0;
+    ctx.translate(shk, 0); ctx.rotate(s.rot);
+    if (tipD < 1.5) evBody(P);
+    else {
+      const k = clamp(tipD / 66, 0, 1), th1 = 0.008 + 0.05 * k + (dg >= 0 ? 0.05 * sstep(0, 0.3, dg) : 0), q = dg >= 0 ? clamp((dg - 0.22) / 0.56, 0, 1) : 0;
+      const tp = dg >= 0 ? -60 : ty, tcx = crx(tp), cp = crackPts(ty), wa = dg >= 0 ? 1 - sstep(0.3, 0.6, dg) : 1;
+      // iki yüz arasında görünen karanlık iç boşluk + sızan ışık
+      if (wa > 0.02) {
+        const w = y => 0.7 + Math.max(0, y - tp) * Math.sin(th1) * 1.1;
+        ctx.globalAlpha = wa; pth(cp.map(([x, y]) => [x - w(y), Math.min(y, 3)]).concat(cp.slice().reverse().map(([x, y]) => [x + w(y), Math.min(y, 3)]))); ctx.fillStyle = '#000'; ctx.fill();
+        for (const [c, lw] of [[ec(0.16 + 0.3 * dy), 3.6], [ec(0.55 + 0.45 * Math.max(dy, glow * 0.6)), 1]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); cp.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+      }
+      // çatlağın üstündeki bütün parça (+ ucundan dallanan kıl çatlaklar)
+      if (ty > -118) {
+        ctx.save(); pth(abovePoly(ty)); ctx.clip(); evBody(P);
+        if (dg < 0) { ctx.strokeStyle = bg; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(tcx, ty); ctx.lineTo(tcx - 5, ty - 6); ctx.lineTo(tcx - 3, ty - 11); ctx.moveTo(tcx, ty); ctx.lineTo(tcx + 4.5, ty - 7); ctx.lineTo(tcx + 6.5, ty - 10); ctx.stroke(); }
+        ctx.restore();
+      }
+      // iki yarı: önce çatlak ucunda kama gibi aralanır; son vuruşta alt köşelerinden devrilerek ayrılır
+      [-1, 1].forEach(sd => {
+        const a2 = sd * 0.62 * q * q, u2 = Math.pow(q, 1.4);
+        ctx.save(); ctx.translate(sd * 15 * u2, 5 * q * q); ctx.translate(sd * 17, 2); ctx.rotate(a2); ctx.translate(-sd * 17, -2);
+        ctx.translate(tcx, tp); ctx.rotate(-sd * th1); ctx.translate(-tcx, -tp);
+        pth(bandPoly(sd, ty, 8)); ctx.clip(); evBody(P);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.6; ctx.beginPath(); cp.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+        ctx.restore();
+      });
     }
-    // sivri taç + kıvrık boynuzlar
-    po([[-7, -79], [-6.4, -88], [-3.2, -82], [0, -92], [3.2, -82], [6.4, -88], [7, -79]], 0.7);
-    ctx.beginPath(); ctx.arc(0, -80.6, 1.1, 0, TAU); ctx.fillStyle = ec(0.35 + 0.65 * clamp(glow, 0, 1)); ctx.fill();
-    [-1, 1].forEach(sd => {
-      ctx.beginPath(); ctx.moveTo(sd * 6.5, -79); ctx.bezierCurveTo(sd * 14, -80, sd * 19, -88, sd * 15.5, -101); ctx.bezierCurveTo(sd * 14.5, -91, sd * 10.5, -85, sd * 5, -83.5); ctx.closePath();
-      ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = bg; ctx.lineWidth = 0.7; ctx.stroke();
-      if (L >= 3 || dy > 0) { ctx.beginPath(); ctx.arc(sd * 15.3, -100, 1.3, 0, TAU); ctx.fillStyle = ec(clamp(Math.max((L - 2) / 2, dy), 0, 1) * clamp(glow, 0, 1)); ctx.fill(); }   // boynuz uçları kızarır
-    });
-
-    // çatlaklar: her darbede bir yenisi açılır, içlerinden ışık sızar
-    for (let i = 0; i < EV_CRACKS.length; i++) {
-      const p = clamp(s.crack - i, 0, 1); if (p <= 0) break;
-      crackPath(EV_CRACKS[i], p); ctx.strokeStyle = bg; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.strokeStyle = ec(0.25 + 0.6 * u + dy); ctx.lineWidth = 0.6; ctx.stroke();
-    }
-    // ölürken: göğsünden ışık huzmeleri fışkırır
-    if (dy > 0.3) { const k = (dy - 0.3) / 0.7; ctx.strokeStyle = ec(0.6 * k); ctx.lineWidth = 1.2;
-      for (let i = 0; i < 9; i++) { const a = i * 0.698 + t * 1.5; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 6, -48 + Math.sin(a) * 6); ctx.lineTo(Math.cos(a) * (14 + 46 * k), -48 + Math.sin(a) * (14 + 46 * k)); ctx.stroke(); } }
     ctx.restore();   // gövde
     ctx.restore();   // heykel
 
-    // can: 5 darbelik bölmeli çubuk (hasar alınca belirir)
-    if (s.hits > 0 && s.dying < 0) {
-      const bx = sx - 22, by = sy - 114 * gs, left = Math.ceil(s.hp / 20);
-      for (let i = 0; i < 5; i++) { ctx.fillStyle = i < left ? 'rgba(255,90,80,0.9)' : (light ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)'); ctx.fillRect(bx + i * 9, by, 7.4, 3); }
+    // can: tek, ince kapsül. Akıcı dolar/boşalır, gecikmeli bir iz bırakır; 8 darbeye karşılık 7 saç teli çizgi; hasarda belirir, sessizce silinir
+    if (s.barA > 0.01) {
+      const BW = 46, BH = 3.6, bx = sx - BW / 2, by = sy - 112 * gs, k = clamp((0.65 - s.bar) / 0.65, 0, 1), ink = light ? [20, 20, 20] : [245, 245, 245];
+      const c = [0, 1, 2].map(j => Math.round(lerp(ink[j], [255, 112, 84][j], k))).join(',');
+      ctx.save(); ctx.globalAlpha = s.barA; rr(bx, by, BW, BH, BH / 2); ctx.clip();
+      ctx.fillStyle = `rgba(${light ? '0,0,0' : '255,255,255'},0.14)`; ctx.fillRect(bx, by, BW, BH);
+      ctx.fillStyle = `rgba(${light ? '0,0,0' : '255,255,255'},0.3)`; ctx.fillRect(bx, by, BW * clamp(s.lag, 0, 1), BH);
+      ctx.fillStyle = `rgba(${c},0.95)`; ctx.fillRect(bx, by, BW * clamp(s.bar, 0, 1), BH);
+      ctx.strokeStyle = bg; ctx.globalAlpha = s.barA * 0.5; ctx.lineWidth = 0.7; ctx.beginPath();
+      for (let i = 1; i < EV_HITS; i++) { const x = bx + BW * i / EV_HITS; ctx.moveTo(x, by); ctx.lineTo(x, by + BH); } ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -1626,7 +1696,7 @@
     drawSlash(fg);
     drawSparks(fg);
     allO.filter(o => o.y >= player.y).forEach(o => o.f());
-    drawSmoke(light); drawDebris(light); drawRings();
+    drawSmoke(light); drawShards(light); drawDebris(light); drawRings();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     if (light) {
