@@ -1378,19 +1378,26 @@
 
   /* ---------- Kıyafetler: slot başına tek parça · buff'lar çarpan (gearM) ya da toplam (gearA) olarak okunur · seçim kaydedilir ----------
      Çizim ilkesi: yarı saydam çizgi yok. Her renk düz ve opak; derinlik ton farkıyla (açık / ana / koyu) verilir. */
-  const GEAR_SLOTS = [['head', 'BAŞ']];
+  // Slotlar birbirinden bağımsız: her biri OUTFIT'te kendi girdisi, bu yüzden hepsi aynı anda takılabilir (ör. gövde zırhı + tılsım). Çizim sırası = bu dizinin sırası; tılsım gövdeden sonra geldiği için zırhın üstünde görünür.
+  const GEAR_SLOTS = [['head', 'BAŞ'], ['body', 'GÖVDE'], ['charm', 'TILSIM'], ['hands', 'ELLER'], ['feet', 'AYAK']];
   const GEAR = {
-    band: { slot: 'head', name: 'Savaşçı Bandanası', short: 'BANDANA', desc: 'Kılıç hasarı +%5 · Tam isabet süresi +%25', buff: { sword: 1.05, perfect: 1.25 } }
+    band: { slot: 'head', name: 'Savaşçı Bandanası', short: 'BANDANA', desc: 'Kılıç hasarı +%5 · Tam isabet süresi +%25', buff: { sword: 1.05, perfect: 1.25 } },
+    hilalG: { slot: 'charm', name: 'Şifa Hilali', short: 'ŞİFA', desc: 'Her 2 saniyede canın %1\'i yenilenir', buff: { heal: 1 }, look: { c: 'green', star: false } },
+    hilalR: { slot: 'charm', name: 'Güç Hilali', short: 'GÜÇ', desc: 'Tüm silahların hasarı +%10', buff: { sword: 1.1, arrow: 1.1 }, look: { c: 'red', star: false } },
+    hilalY: { slot: 'charm', name: 'Koruma Hilali', short: 'KORUMA', desc: 'Alınan hasar −%8 · Dayanıklılık yenilenmesi +%5', buff: { dmgTaken: 0.92, stamRegen: 1.05 }, look: { c: 'gold', star: false } },
+    hilal: { slot: 'charm', name: 'Ay Yıldızlı Hilal', short: 'AY YILDIZ', desc: 'Sadece görünüm · Geliştirici', buff: {}, dev: true, look: { c: 'gold', star: true } }   // dev: yalnızca geliştirici modunda kıyafet sayfasında görünür · tek renk (sarı)
   };
-  const OUTFIT = { head: null };   // şimdilik açık; açma yöntemi sonra bağlanacak
-  try { const sv = JSON.parse(localStorage.getItem('hlk_outfit') || '{}'); for (const [sl] of GEAR_SLOTS) { const k = sv[sl]; if (k && GEAR[k] && GEAR[k].slot === sl) OUTFIT[sl] = k; } } catch (_) {}
+  const OUTFIT = { head: null, body: null, charm: null, hands: null, feet: null };   // şimdilik açık; açma yöntemi sonra bağlanacak
+  try { const sv = JSON.parse(localStorage.getItem('hlk_outfit') || '{}'); for (const [sl] of GEAR_SLOTS) { const k = sv[sl]; if (k && GEAR[k] && GEAR[k].slot === sl && !GEAR[k].dev) OUTFIT[sl] = k; } } catch (_) {}
   const saveOutfit = () => { try { localStorage.setItem('hlk_outfit', JSON.stringify(OUTFIT)); } catch (_) {} };
-  const gearOn = k => !!GEAR[k] && OUTFIT[GEAR[k].slot] === k;
+  const gearOn = k => !!GEAR[k] && OUTFIT[GEAR[k].slot] === k && (!GEAR[k].dev || DEV.on);
   const gearM = n => { let m = 1; for (const sl in OUTFIT) { const g = OUTFIT[sl] && GEAR[OUTFIT[sl]]; if (g && g.buff[n] !== undefined) m *= g.buff[n]; } return m; };   // çarpan buff'lar
   const gearA = n => { let m = 0; for (const sl in OUTFIT) { const g = OUTFIT[sl] && GEAR[OUTFIT[sl]]; if (g && g.buff[n] !== undefined) m += g.buff[n]; } return m; };   // toplam buff'lar
-  const GCOL = { red: '#c8372f', redD: '#8c1f24', redL: '#e4604f', gold: '#e8bb4c', goldD: '#b98a22' };
+  const GCOL = { red: '#c8372f', redD: '#8c1f24', redL: '#e4604f', gold: '#e8bb4c', goldD: '#b98a22', green: '#4fb06c', greenD: '#2f7d48' };
   const GD = { x: 0, y: 0, vx: 0, vy: 0, t: 0 };   // kumaş yayı: dünya pikseli cinsinden, hareketin tersine savrulur
   function updateGear(dt) {
+    const hl = gearA('heal');   // şifa tılsımı: her 2 saniyede toplam canın %1'i
+    if (hl > 0 && F.death < 0 && F.hp > 0 && F.hp < 100) { GD.h = (GD.h || 0) + dt; if (GD.h >= 2) { GD.h -= 2; F.hp = Math.min(100, F.hp + hl); } } else GD.h = 0;
     const tx = clamp(-player.vx * 0.05, -10, 10), ty = clamp(-player.vy * 0.05, -7, 7);
     GD.vx += (70 * (tx - GD.x) - 9 * GD.vx) * dt; GD.x += GD.vx * dt; GD.vy += (70 * (ty - GD.y) - 9 * GD.vy) * dt; GD.y += GD.vy * dt; GD.t += dt;
   }
@@ -1441,18 +1448,59 @@
     if (g.sf < -0.2) bandTails(g, B);
   }
 
+  // Ay yıldızlı hilal (tılsım): tasarım 5'ten. Dış daire R=8, iç daire r=5.77 (1.58 sola kayık), sol yan x=-6.27'de dik kesik; yıldız açıklığa oturur. Yıldızlı hâl yalnızca geliştirici modunda, tek renk (sarı); yıldızsız hâl yeşil / kırmızı / sarı.
+  const HLL = (() => { const R = 8, IR = 5.77, IC = -1.58, XC = -6.27, yo = Math.sqrt(R * R - XC * XC), yi = Math.sqrt(IR * IR - (XC - IC) ** 2);
+    let st = ''; for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, q = i % 2 ? 3.3 * 0.42 : 3.3; st += (i ? 'L' : 'M') + (q * Math.cos(a) - 7.9).toFixed(2) + ' ' + (q * Math.sin(a)).toFixed(2); }
+    return { moon: new Path2D(`M${XC} ${-yo}A${R} ${R} 0 1 1 ${XC} ${yo}L${XC} ${yi}A${IR} ${IR} 0 1 0 ${XC} ${-yi}Z`), star: new Path2D(st + 'Z') }; })();
+  function gearCharm(g) {   // boyundan sarkan ip + ay yıldızlı hilal: tek parça, gövdeyle birlikte dönen kalın bir madalyon
+    const key = OUTFIT.charm, it = key && GEAR[key];
+    if (!it || !it.look || (it.dev && !DEV.on)) return;
+    const v = g.v, sfp = Math.max(g.sf, 0), C = GCOL, cm = C[it.look.c], cd = C[it.look.c + 'D'];
+    // Göğüste duran düz madalyon: yüzü karakterin baktığı yöne bakar. Ön görünüşte tam yüz, yandan ince kenar (şerit), arkadan gövdenin arkasında kalır.
+    // Gözdeki gibi ani kesilme yok: profilden sonra madalyon göğüs kenarından gövdenin ARKASINA kayar (gövde siluetiyle kırpılır) ve geniş bir aralıkta solar.
+    const back = g.sf < 0, vis = sstep(-0.6, -0.08, g.sf);
+    if (vis < 0.01) return;
+    const k = 0.32, R = 8, sw = Math.max(Math.abs(g.sf), 0.16), yk = (g.th || 17.09) / 17.09, fl = g.fl || 1;   // sw: yüzün görünen genişliği (kenarda bile sıfırlanmaz)
+    const ox = g.still ? 0 : clamp(g.dx * 0.15, -0.5, 0.5), oy = g.still ? 0 : clamp(g.dy * 0.12, -0.3, 0.3);
+    const rx = g.bx + 4.8 * v + ox, ry = g.neckY + 4.6 * yk + oy;     // halka / ip ucu
+    const mx = rx, my = ry + 0.25;                                      // hilalin tepe noktası halkanın altında
+    const aY = g.neckY + 0.3, aL = g.bx - 3 * (1 - v) - 1.1 * v, aR = g.bx + 3 * (1 - v) - 1.1 * v;
+    ctx.save(); ctx.globalAlpha = vis; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.save(); ctx.beginPath(); ctx.rect(-400, -400, 800, 800); ctx.arc(g.hx, g.hy, 5.9, 0, TAU); ctx.clip('evenodd');   // ip kafanın içine girmez
+    if (back) { ctx.beginPath(); ctx.rect(-400, -400, 800, 800); heroTorsoSub(g.bx, g.neckY, g.th || 17.09, v); ctx.clip('evenodd'); }   // arkaya geçerken gövdenin içi kapalı: yalnızca kenardan taşan kısım görünür
+    ctx.save();
+    ctx.strokeStyle = '#2b2b33'; ctx.lineWidth = 0.55; ctx.beginPath(); ctx.moveTo(aL, aY); ctx.lineTo(rx, ry); ctx.lineTo(aR, aY); ctx.stroke();
+    ctx.restore();
+    ctx.beginPath(); ctx.ellipse(rx, ry + 0.35, 0.5 * Math.max(Math.abs(g.sf), 0.35), 0.5, 0, 0, TAU); ctx.strokeStyle = back ? cd : cm; ctx.lineWidth = 0.35; ctx.stroke();   // halka (madalyonla aynı düzlemde)
+    // kalınlık: arka katmanlardan ön yüze doğru; yandan bakınca katmanlar yan yana dizilip dolu bir kenar şeridi verir
+    const N = 5, T = 0.55 * v * fl;
+    for (let n = 0; n < N; n++) {
+      const i = back ? N - 1 - n : n, u = i / (N - 1), front = back ? i === 0 : i === N - 1;   // arkadan bakınca üstte arka yüz (koyu ton) durur
+      ctx.save(); ctx.translate(mx, my);
+      ctx.scale(fl, 1);                                                  // yansımayı iptal et: yıldız/ay yönü hiç değişmez
+      ctx.translate((u - 1) * T + (1 - u) * 0.29 * sw, (1 - u) * 0.29);  // kalınlık (derinlik) + hafif gölge kaydırması
+      ctx.scale(k * sw, k); ctx.translate(0, R);
+      ctx.fillStyle = front && !back ? cm : cd; ctx.fill(HLL.moon);
+      if (it.look.star && !back) ctx.fill(HLL.star);
+      ctx.restore();
+    }
+    ctx.restore();   // kırpma
+    ctx.restore();
+  }
+
   /* Gövde: omuzdan kalçaya tek akıcı eğri. Önden omuz:bel = 1.5, yandan neredeyse eşit kalınlık. */
-  function heroTorso(bx, neckY, th, v) {
+  function heroTorso(bx, neckY, th, v) { ctx.beginPath(); heroTorsoSub(bx, neckY, th, v); ctx.fill(); }
+  function heroTorsoSub(bx, neckY, th, v) {   // gövde silueti (yalnızca alt yol; doldurmaz): tılsımın gövde arkasında kalması için kırpmada da kullanılır
     const sh = lerp(7.3, 4.7, v), wa = lerp(4.85, 3.9, v), r = lerp(0.3, 3.0, v), yk = th / 17.09, B = 17.09;
     const X = a => bx + a, Y = a => neckY + a * yk;
-    ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    ctx.moveTo(X(0), Y(0));
     ctx.quadraticCurveTo(X(sh), Y(0), X(sh), Y(5.2));
     ctx.bezierCurveTo(X(sh), Y(8.4), X(wa), Y(8.0), X(wa), Y(11.6));
     ctx.lineTo(X(wa), Y(B - r)); ctx.quadraticCurveTo(X(wa), Y(B), X(wa - r), Y(B));
     ctx.lineTo(X(-wa + r), Y(B)); ctx.quadraticCurveTo(X(-wa), Y(B), X(-wa), Y(B - r));
     ctx.lineTo(X(-wa), Y(11.6));
     ctx.bezierCurveTo(X(-wa), Y(8.0), X(-sh), Y(8.4), X(-sh), Y(5.2));
-    ctx.quadraticCurveTo(X(-sh), Y(0), X(0), Y(0)); ctx.closePath(); ctx.fill();
+    ctx.quadraticCurveTo(X(-sh), Y(0), X(0), Y(0)); ctx.closePath();
   }
   function heroHeadRing(hx, hy, bg) {   // kafayı omuzdan ayıran ince halka (arka plan renginde)
     ctx.beginPath(); ctx.arc(hx, hy, 5.75, 0, TAU); ctx.lineWidth = 0.7; ctx.strokeStyle = bg; ctx.stroke();
@@ -1468,7 +1516,7 @@
     ctx.save(); ctx.translate(player.x, player.y); ctx.scale(S * fl, S); const rot = P.fall * 1.45 * F.fall * fl; if (rot) ctx.rotate(rot); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.fillStyle = col;
     const line = (x1, y1, x2, y2, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
     const tw = 8.8, th = P.th, cy = P.cy, bx = P.bx, hx = P.hx, hy = P.hy;
-    const gz = { bx, cy, th, tw, neckY: P.neckY, hx, hy, v, sf, dx: GD.x * fl / S, dy: GD.y / S, t: GD.t, bg, col, lxo: P.lx * 0.2 };   // kıyafet çizim bağlamı
+    const gz = { bx, cy, th, tw, neckY: P.neckY, hx, hy, v, sf, fl, dx: GD.x * fl / S, dy: GD.y / S, t: GD.t, bg, col, lxo: P.lx * 0.2 };   // kıyafet çizim bağlamı
 
     // bacaklar
     const lat = 3.0 * (1 - v), hipY = cy + th / 2 - 0.3, legY = hipY - 4.2;   // legY: bacak çizgisi gövdenin içinden başlar (kın/kıyafet hipY'yi kullanır)
@@ -1586,10 +1634,11 @@
       if (mo > 0.3) { ctx.globalAlpha = ea; ctx.beginPath(); ctx.ellipse(hx + 2.6 * v + exl * 0.5, hy + 3.1, 1, 1.15 * mo, 0, 0, TAU); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
-    gearBand(gz);
+    gearBand(gz); if (gz.sf < 0) gearCharm(gz);   // sırtımız dönükse tılsım gövdenin arkasında kalır (kollardan önce)
     ctx.strokeStyle = col;
     ctx.fillStyle = col;
     arm(1); if (v <= 0.5) arm(-1);
+    if (gz.sf >= 0) gearCharm(gz);   // yüzümüz bize dönükken tılsım göğüste durur: kollar onun ÜSTÜNE binmesin
     ctx.restore();
 
     if (gp) {   // elde tutulan kılıç (ekran uzayında)
@@ -2490,7 +2539,7 @@
       for (const e of E.slice()) {   // düşmanlar (delme: a.pen)
         if (a.pen <= 0) break;
         if (e.em < 1 || e.ghost || a.hit.includes(e) || !inEll(x0, y0, a.x, a.y, e.x, e.y, 25, 17)) continue;
-        a.hit.push(e); hitEnemy(e, a.dmg, a.a, true);
+        a.hit.push(e); hitEnemy(e, a.dmg * gearM('arrow'), a.a, true);
         if (a.perf && a.hit.length === 1) ftext(e.x, e.y - 78, 'Tam isabet!', GOLD);
         if (--a.pen <= 0) { stop = true; rec = 0.3; }
       }
@@ -2937,7 +2986,7 @@
   function wdChar(cx, gy, sc, f, t, fg, mini, P) {   // önizleme karakteri: oyundaki eski çizgi-uzuv gövdeyle aynı
     const cf = Math.cos(f), sf = Math.sin(f), v = Math.abs(cf), fl = cf < 0 ? -1 : 1, ea = sstep(-0.45, -0.05, sf);
     const col = `rgb(${fg})`, bg = P.bg, tw = 8.8, th = 17.09, cy = -22, neckY = cy - th / 2, hy = neckY - 5.4, br = Math.sin(t * 1.5) * 0.25;
-    const g = { bx: 0, cy, th, tw, neckY, hx: 0, hy, v, sf, dx: Math.sin(t * 1.6) * 1.3, dy: Math.sin(t * 2.3) * 0.6 + br, t, bg, col, lxo: 0 };
+    const g = { bx: 0, cy, th, tw, neckY, hx: 0, hy, v, sf, fl, still: mini, dx: Math.sin(t * 1.6) * 1.3, dy: Math.sin(t * 2.3) * 0.6 + br, t, bg, col, lxo: 0 };
     const line = (x1, y1, x2, y2, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
     ctx.save(); ctx.translate(cx, gy); ctx.scale(sc * fl, sc); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = col; ctx.fillStyle = col;
     const lat = 3.0 * (1 - v); [-1, 1].forEach(sd => line(sd * lat * 0.9, cy + th / 2 - 0.3 - 4.2, sd * lat, -2.2, 4.2));
@@ -2945,13 +2994,14 @@
     gearBandBack(g); ctx.fillStyle = col;
     ctx.beginPath(); ctx.arc(0, hy, 5.4, 0, TAU); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.arc(0, hy, 5.4, 0, TAU); ctx.clip(); ctx.fillStyle = bg; [-1, 1].forEach(sd => { const ep = eyeProj(v, sf, sd); if (ep.a > 0.01) { ctx.beginPath(); ctx.ellipse(ep.x, hy + 0.4, 0.85, 0.85, 0, 0, TAU); ctx.fill(); } }); ctx.restore();
-    gearBand(g); ctx.strokeStyle = col;
+    gearBand(g); if (g.sf < 0) gearCharm(g); ctx.strokeStyle = col;
     [-1, 1].forEach(sd => { const sx = sd * (tw / 2 + 1) * (1 - v), sy = neckY + 5.1; ctx.lineWidth = 3.8; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + sd * 0.9 * (1 - v), sy + 5.5); ctx.lineTo(sx + sd * 2.0 * (1 - v) + 1.2 * v, sy + 10.7); ctx.stroke(); });
+    if (g.sf >= 0) gearCharm(g);   // önden bakışta tılsım kolların üstünde
     ctx.restore(); return v;
   }
   // seçenek kartı kırpması (kart = 27 birim kare): gy = zemin çizgisinin karttaki yeri, z = yakınlık çarpanı. Yeni slot eklerken buraya satır ekle; tanımsızsa head kullanılır.
-  const WDC = { head: { gy: 50, z: 1 }, chest: { gy: 36, z: 1 } };
-  const WDA = { head: [8.8, -40.15] };   // slot bağlantı noktası (karakter uzayında): seçili slotun işaretçisi buraya konur
+  const WDC = { head: { gy: 50, z: 1, f: 0.5 }, body: { gy: 30.2, z: 1.55, f: 0.3 }, charm: { gy: 33.9, z: 1.5, f: 0 }, hands: { gy: 26.6, z: 1.4, f: 0.25 }, feet: { gy: 12.1, z: 1.9, f: 0.25 } };   // gy: zemin çizgisinin karttaki yeri · z: yakınlık · f: karakterin ön görünüşten dönüş açısı (rad). Noktanın karttaki yeri = (gy + y) * z
+  const WDA = { head: [9.8, -36.6], body: [9, -24], charm: [0, -23.5], hands: [6.6, -15], feet: [3, -3] };   // slot bağlantı noktası (karakter uzayında): seçili slotun işaretçisi buraya konur
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs;
@@ -2959,7 +3009,7 @@
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
     if (!WDR.drag) { WDR.yaw += WDR.vel * dt; WDR.vel *= Math.exp(-3.2 * dt); if (Math.abs(WDR.vel) < 0.02) WDR.vel = 0; WDR.idle += dt; if (WDR.idle > 4 && WDR.vel === 0) { const tg = Math.round(WDR.yaw / TAU) * TAU; WDR.yaw += (tg - WDR.yaw) * (1 - Math.exp(-4 * dt)); if (Math.abs(tg - WDR.yaw) < 0.002) WDR.yaw = tg; } }
     // --- yerleşim ---
-    const opts = [null, ...Object.keys(GEAR).filter(k => GEAR[k].slot === WDR.sel)], nO = opts.length;
+    const opts = [null, ...Object.keys(GEAR).filter(k => GEAR[k].slot === WDR.sel && (!GEAR[k].dev || DEV.on))], nO = opts.length;
     let pr, st, cw;
     if (!land) { cw = H < 700 ? 68 : 84; const ph = padT + 28 + 16 + 26 + chipsH + 12 + cw + 26 + 22; pr = { x: 0, y: H - ph, w: W, h: ph }; st = { x: 0, y: hdr, w: W, h: pr.y - hdr }; }
     else { cw = 62; const pw = clamp(W * 0.44, 280, 380); pr = { x: W - pw - 12, y: hdr, w: pw, h: H - hdr - 12 }; st = { x: 0, y: hdr, w: pr.x, h: H - hdr }; }
@@ -2974,7 +3024,7 @@
     const an = WDA[WDR.sel];
     if (an) {
       const ax = scx + an[0] * sc, ay = gy + an[1] * sc, lab = (GEAR_SLOTS.find(q => q[0] === WDR.sel) || ['', ''])[1];
-      ctx.font = `600 9px ${UIF}`; const lw = wdW(lab, 2.4) + 20, lx = ax + 30;
+      ctx.font = `600 9px ${UIF}`; const lw = wdW(lab, 2.4) + 20, lx = Math.max(ax + 30, scx + 12 * sc);
       ctx.lineWidth = 1.25; ctx.strokeStyle = P.gold; ctx.beginPath(); ctx.moveTo(ax + 4.5, ay); ctx.lineTo(lx, ay); ctx.stroke();
       ctx.beginPath(); ctx.arc(ax, ay, 4.5, 0, TAU); ctx.fillStyle = P.bg; ctx.fill(); ctx.lineWidth = 1.5; ctx.stroke(); ctx.beginPath(); ctx.arc(ax, ay, 1.7, 0, TAU); ctx.fillStyle = P.gold; ctx.fill();
       rr(lx, ay - 11, lw, 22, 11); ctx.fillStyle = P.bg; ctx.fill(); ctx.lineWidth = 1.25; ctx.stroke();
@@ -2996,8 +3046,8 @@
     ctx.save(); if (land) rr(pr.x, pr.y, pr.w, pr.h, 22); else rr(-2, pr.y, W + 4, pr.h + 40, 26); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = P.ln; ctx.stroke(); ctx.restore();
     const pcx = pr.x + pr.w / 2; let y = pr.y + padT;
     ctx.textBaseline = 'middle'; ctx.font = `600 10px ${UIF}`;
-    { const tabs = GEAR_SLOTS.map(([sl, lb]) => ({ sl, lb, w: wdW(lb, 2.4) + 34 })), th = 28; let x = pcx - tabs.reduce((q, o) => q + o.w + 8, -8) / 2;
-      for (const o of tabs) { const sel = o.sl === WDR.sel; rr(x, y, o.w, th, th / 2); ctx.fillStyle = sel ? P.goldBg : P.p2; ctx.fill(); ctx.lineWidth = sel ? 1.5 : 1.25; ctx.strokeStyle = sel ? P.gold : P.ln; ctx.stroke(); ctx.fillStyle = sel ? P.gold : P.dim; wdLetters(o.lb, x + o.w / 2, y + th / 2 + 0.5, 2.4, 'c'); const sl = o.sl; PAUSE.btns.push({ x: x - 4, y: y - 6, w: o.w + 8, h: th + 12, fn: () => { WDR.sel = sl; try { AU.sfx('sheath'); } catch (_) {} } }); x += o.w + 8; } }
+    { const w0 = GEAR_SLOTS.map(([, lb]) => wdW(lb, 2.4)), tg = 6, tpad = clamp((pr.w - 20 - tg * (w0.length - 1) - w0.reduce((q, v) => q + v, 0)) / w0.length, 14, 34), tabs = GEAR_SLOTS.map(([sl, lb], i) => ({ sl, lb, w: w0[i] + tpad })), th = 28; let x = pcx - tabs.reduce((q, o) => q + o.w + tg, -tg) / 2;
+      for (const o of tabs) { const sel = o.sl === WDR.sel; rr(x, y, o.w, th, th / 2); ctx.fillStyle = sel ? P.goldBg : P.p2; ctx.fill(); ctx.lineWidth = sel ? 1.5 : 1.25; ctx.strokeStyle = sel ? P.gold : P.ln; ctx.stroke(); ctx.fillStyle = sel ? P.gold : P.dim; wdLetters(o.lb, x + o.w / 2, y + th / 2 + 0.5, 2.4, 'c'); const sl = o.sl; PAUSE.btns.push({ x: x - 4, y: y - 6, w: o.w + 8, h: th + 12, fn: () => { WDR.sel = sl; try { AU.sfx('sheath'); } catch (_) {} } }); x += o.w + tg; } }
     y += 28 + 16;
     const cur = OUTFIT[WDR.sel];
     ctx.font = `600 14px ${UIF}`; ctx.fillStyle = cur ? P.tx : P.dim; wdLetters(cur ? GEAR[cur].name.toLocaleUpperCase('tr') : 'BOŞ', pcx, y + 10, 2.4, 'c'); y += 26;
@@ -3005,7 +3055,7 @@
       ctx.font = `500 10.5px ${UIF}`; const items = GEAR[cur].desc.split(' · '), wI = items.map(s => ctx.measureText(s).width + 26), maxW = pr.w - 28, lines = [[]]; let lw = 0;
       items.forEach((s, i) => { if (lines[lines.length - 1].length && lw + 8 + wI[i] > maxW) { lines.push([]); lw = 0; } lines[lines.length - 1].push(i); lw += (lw ? 8 : 0) + wI[i]; });
       let cyy = y + 2; for (const ln of lines.slice(0, chipsH > 40 ? 2 : 1)) { let x = pcx - ln.reduce((q, i) => q + wI[i] + 8, -8) / 2; for (const i of ln) { rr(x, cyy, wI[i], 24, 12); ctx.fillStyle = P.p2; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = P.ln; ctx.stroke(); ctx.fillStyle = P.mid; ctx.textAlign = 'center'; ctx.fillText(items[i], x + wI[i] / 2, cyy + 12.5); x += wI[i] + 8; } cyy += 30; }
-    } else { ctx.font = `400 11px ${UIF}`; ctx.fillStyle = P.dim; ctx.textAlign = 'center'; ctx.fillText('Bu slot boş  ·  bir parça seç', pcx, y + 12); }
+    } else { ctx.font = `400 11px ${UIF}`; ctx.fillStyle = P.dim; ctx.textAlign = 'center'; ctx.fillText((nO > 1 ? 'Bu slot boş  ·  bir parça seç' : 'Bu slot için henüz parça yok'), pcx, y + 12); }
     y += chipsH + 12;
     // --- seçenek kartları: yakın çekim kafa ---
     const scC = cw / 27, tot = nO * cw + (nO - 1) * gC; let x = pcx - tot / 2;
@@ -3014,7 +3064,7 @@
       ctx.save(); rr(x, y, cw, cw, 16); ctx.clip();
       const gr = ctx.createLinearGradient(0, y, 0, y + cw); gr.addColorStop(0, on ? P.goldBg : P.p3); gr.addColorStop(1, on ? P.goldBg : P.p2); ctx.fillStyle = gr; ctx.fillRect(x, y, cw, cw);
       const sv = {}; for (const q in OUTFIT) { sv[q] = OUTFIT[q]; OUTFIT[q] = null; } OUTFIT[WDR.sel] = k;   // yalnızca bu parça takılıyken çiz
-      { const cr = WDC[WDR.sel] || WDC.head, zz = scC * cr.z; wdChar(x + cw / 2, y + cr.gy * zz, zz, PI / 2 - 0.5, t, fg, true, P); }   // kırpma: üst boşlukta uzun şapka sığar, altında yalnızca boyun + göğüs üstü (ileride tılsım/kolye için yer)
+      { const cr = WDC[WDR.sel] || WDC.head, zz = scC * cr.z; wdChar(x + cw / 2, y + cr.gy * zz, zz, PI / 2 - cr.f, t, fg, true, P); }   // kırpma: üst boşlukta uzun şapka sığar, altında yalnızca boyun + göğüs üstü (ileride tılsım/kolye için yer)
       for (const q in sv) OUTFIT[q] = sv[q];
       ctx.restore();
       rr(x, y, cw, cw, 16); ctx.lineWidth = on ? 2 : 1.25; ctx.strokeStyle = on ? P.gold : P.ln; ctx.stroke();
