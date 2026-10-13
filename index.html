@@ -2768,6 +2768,7 @@
   for (let i = 0; i < 48; i++) MENU.mote.push({ x: Math.random(), y: Math.random(), r: rnd(0.6, 1.9), v: rnd(0.012, 0.035), ph: rnd(0, 6), a: rnd(0.15, 0.5) });
   const UIF = '-apple-system, "Segoe UI", Roboto, sans-serif';
   addEventListener('pointermove', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });
+  addEventListener('pointerdown', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });   // dokunma/tıklama da bakış hedefi olsun: sürüklemeden de gözler dokunulan yere yönelir
   function menuStart() { if (!MENU.on || MENU.st !== 'idle') return; MENU.st = 'go'; try { AU.intro(); } catch (_) {} MENU.mode = Math.random() < 0.1 ? 'stab' : 'zoom'; MENU.sT = 0; MENU.snd = 0; MENU.fl = 1; if (MENU.mode === 'zoom') { try { AU.sfx('pickup'); } catch (_) {} } }   // çoğunlukla yakınlaşma; %10 ihtimalle kılıç saplanması (gizli)
   function menuTap(px, py) { if (MENU.st !== 'idle') return false; for (const b of MENU.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return true; } return false; }
   function menuPill(x, y, w, h, label, a, strong, t) {
