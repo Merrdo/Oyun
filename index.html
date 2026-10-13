@@ -101,7 +101,8 @@
   function joyStart(e) {
     AU.unlock();
     if (MENU.on) { if (MENU.t > 0.6) menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
-    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 14) { AU.toggleMute(); return; }   // ses aç/kapa düğmesi
+    if (PAUSE.on) { pauseDown(e); return; }   // duraklatılmışken dokunuşlar yalnızca menüye gider
+    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 14) { togglePause(); return; }   // duraklatma düğmesi
     if (atk.id === null && atkActive() && Math.hypot(e.clientX - atk.x, e.clientY - atk.y) < atk.r + 14) {   // buton joystick'ten önceliklidir
       atk.id = e.pointerId; atk.down = true; pressAtk();
       try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
@@ -141,9 +142,9 @@
 
   /* ---------- Klavye (masaüstü testi) ---------- */
   const keys = {};
-  addEventListener('keydown', e => { if (MENU.on) { if ((e.key === 'Enter' || e.key === ' ' || e.key === 'j') && MENU.t > 0.6) menuStart(); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
+  addEventListener('keydown', e => { if (MENU.on) { if ((e.key === 'Enter' || e.key === ' ' || e.key === 'j') && MENU.t > 0.6) menuStart(); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } if ((e.key.toLowerCase() === 'p' || e.key === 'Escape') && !e.repeat) { togglePause(); return; } if (PAUSE.on) { if (e.key === 'Enter' && !e.repeat) resumeGame(); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
   addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if ((e.key === 'j' || e.key === ' ') && atk.kb) { atk.kb = false; relAtk(); } });
-  addEventListener('keydown', e => { if (!MENU.on && (e.key === 'j' || e.key === ' ') && !e.repeat && !atk.kb) { atk.kb = true; pressAtk(); } });
+  addEventListener('keydown', e => { if (!MENU.on && !PAUSE.on && (e.key === 'j' || e.key === ' ') && !e.repeat && !atk.kb) { atk.kb = true; pressAtk(); } });
 
   /* ---------- Karakter: animasyonlu, sade, karşıdan görünüm ---------- */
   const HS = 1.6;                 // karakterin görsel ölçeği
@@ -159,10 +160,13 @@
   /* ---------- SES: tamamen sentezlenir (ses dosyası yok) · müzik, efektler, Doppler'lı heykel sesleri, fısıltılar ---------- */
   const AU = (() => {
     let ac = null, master, sfxBus, musBus, padBus, padLP, melBus, revIn, noiseBuf, muted = false, acc = 0;
+    let gameGate, menuGate, menuBus, menuPad, menuMel, menuRev, mode = 'menu';   // müzik modu: 'menu' (ana menü + duraklatma) · 'game' · 'none'
     const LS = { x: 0, y: 0 }, btn = { x: 0, y: 0, r: 20, mt: 1, pop: 0, ring: 0 }, voices = new Map(), bad = new Set();
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const C_SND = 800;            // oyun içi 'ses hızı' (px/sn): Doppler kayması net duyulsun diye düşük tutuldu
     const MV = 0.55, SVL = 0.85;  // müzik / efekt seviyesi
+    const VOL = { mus: 1, sfx: 1 }; let musRev = null;   // oyuncunun duraklatma menüsünden ayarladığı çarpanlar (0–1)
+    try { const j = JSON.parse(localStorage.getItem('hlk_vol') || 'null'); if (j) for (const k of ['mus', 'sfx']) { const v = parseFloat(j[k]); if (isFinite(v)) VOL[k] = Math.min(1, Math.max(0, v)); } } catch (_) {}
 
     /* ----- temel yapı taşları ----- */
     function tone(d, type, f0, f1, t, dur, vol, o) {
@@ -185,7 +189,7 @@
       if (x !== undefined) { const dx = x - LS.x, dy = y - LS.y, dd = Math.hypot(dx, dy); if (dd > 950) return null; g = 1 / (1 + (dd / 230) * (dd / 230)); pan = clamp(dx / 330, -1, 1) * 0.85; cut = Math.min(16000, 700 + 15000 / Math.pow(1 + dd / 110, 1.5)); }
       const gn = ac.createGain(), lp = ac.createBiquadFilter(); gn.gain.value = g; lp.type = 'lowpass'; lp.frequency.value = cut; gn.connect(lp);
       let tail = lp; if (ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = pan; lp.connect(p); tail = p; }
-      tail.connect(sfxBus); if (rev > 0) { const r = ac.createGain(); r.gain.value = rev; tail.connect(r); r.connect(revIn); }
+      tail.connect(sfxBus); if (rev > 0) { const r = ac.createGain(); r.gain.value = rev * VOL.sfx; tail.connect(r); r.connect(revIn); }
       return gn;
     }
 
@@ -319,7 +323,7 @@
     function mkVoice(key, sx, sy, evil, kind) {
       const out = ac.createGain(); out.gain.value = 0; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800; out.connect(lp);
       let pn = null, tail = lp; if (ac.createStereoPanner) { pn = ac.createStereoPanner(); lp.connect(pn); tail = pn; }
-      tail.connect(sfxBus); const rs = ac.createGain(); rs.gain.value = evil ? 0.7 : 0.5; tail.connect(rs); rs.connect(revIn);
+      tail.connect(sfxBus); const rs = ac.createGain(); rs.gain.value = (evil ? 0.7 : 0.5) * VOL.sfx; tail.connect(rs); rs.connect(revIn);
       const V = { key, out, lp, pn, oscs: [], stops: [], d0: -1, vr: 0, whT: rnd(1, 4), R: evil ? 560 : 400, vol: evil ? 1.0 : 0.6, evil, scream: null };
       const osc = (type, f, vol, dest, det) => { const o = ac.createOscillator(); o.type = type; o.frequency.value = f; if (det) o.detune.value = det; const g = ac.createGain(); g.gain.value = vol; o.connect(g); g.connect(dest); o.start(); V.oscs.push({ o, f }); V.stops.push(o); return o; };
       const lfo = (rate, depth, param) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = rate; g.gain.value = depth; o.connect(g); g.connect(param.frequency && !param.setValueAtTime ? param.frequency : param); o.start(); V.stops.push(o); };   // düğüm verilirse onun frekansına bağlanır
@@ -348,7 +352,7 @@
       }
       return V;
     }
-    function stopVoice(V) { const t = ac.currentTime; V.out.gain.setTargetAtTime(0, t, 0.12); setTimeout(() => { V.stops.forEach(s => { try { s.stop(); } catch (_) {} }); try { V.out.disconnect(); } catch (_) {} }, 800); }
+    function stopVoice(V, fast) { const t = ac.currentTime; V.out.gain.cancelScheduledValues(t); V.out.gain.setTargetAtTime(0, t, fast ? 0.03 : 0.12); setTimeout(() => { V.stops.forEach(s => { try { s.stop(); } catch (_) {} }); try { V.out.disconnect(); } catch (_) {} }, 800); }
     function updVoice(V, d, dx, dt, es) {
       const t = ac.currentTime, k = clamp(1 - d / V.R, 0, 1); let g = Math.pow(k, 1.5) * V.vol, pm = 1;
       const rr = V.d0 < 0 ? 0 : (V.d0 - d) / Math.max(dt, 0.001); V.d0 = d; V.vr += (rr - V.vr) * (1 - Math.exp(-12 * dt));   // yaklaşma hızı (+ = yaklaşıyoruz)
@@ -365,15 +369,15 @@
     function updStatues(dt) {
       const R = 580, near = [];
       for (const [sx, sy, id, ev] of statuesIn(LS.x - R, LS.y - R, LS.x + R, LS.y + R)) {
-        let es = null; if (ev) { es = evState(id); if (es.dead) continue; }
+        let es = null; if (ev) { es = evState(id); if (es.dead) continue; }   // yıkılan heykel sessizdir (yıkılırken acı çeker, yıkılınca susar)
         const d = Math.hypot(sx - LS.x, sy - 24 - LS.y);
         if (d < (ev ? 560 : 400)) near.push({ key: ev ? 'e' + id : Math.round(sx) + ',' + Math.round(sy), sx, sy, ev, es, d, dx: sx - LS.x });
       }
       near.sort((a, b) => a.d - b.d); const use = near.slice(0, 4), keep = new Set(use.map(n => n.key));
-      for (const [k, V] of voices) if (!keep.has(k)) { stopVoice(V); voices.delete(k); }
+      for (const [k, V] of voices) if (!keep.has(k)) { stopVoice(V, !!(V.es && V.es.dead)); voices.delete(k); }
       for (const n of use) {
         let V = voices.get(n.key);
-        if (!V) { if (bad.has(n.key)) continue; try { V = mkVoice(n.key, n.sx, n.sy, n.ev, Math.floor(hashN(n.sx * 0.01, n.sy * 0.01, 5) * 4)); } catch (_) { bad.add(n.key); continue; } voices.set(n.key, V); }
+        if (!V) { if (bad.has(n.key)) continue; try { V = mkVoice(n.key, n.sx, n.sy, n.ev, Math.floor(hashN(n.sx * 0.01, n.sy * 0.01, 5) * 4)); } catch (_) { bad.add(n.key); continue; } V.es = n.es; voices.set(n.key, V); }
         updVoice(V, n.d, n.dx, dt, n.es);
         if (n.d < (n.ev ? 330 : 210) && !muted && (V.whT -= dt) <= 0) { V.whT = whisper(n.sx + rnd(-30, 30), n.sy - 40, n.ev) ? (n.ev ? rnd(5, 11) : rnd(8, 16)) : rnd(0.6, 1.5); }
       }
@@ -385,9 +389,33 @@
     const mus = { next: 0, step: 0, bar: -1, blk: -1, last: -1, prog: PROG[0], ko: 0, inten: 0.12, alert: 0, mi: 14, rest: false, cpc: [], SC: [] };
     const beat = 60 / 66, e8 = beat / 2;
     const mkScale = () => { const pcs = [2, 5, 7, 9, 0].map(p => (p + mus.ko + 12) % 12), o = []; for (let m = 60; m <= 90; m++) if (pcs.includes(m % 12)) o.push(m); mus.SC = o; };
-    function pad(m, t, dur, vol) {
+    function pad(m, t, dur, vol, dest) {
       const f = mtof(m), g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 1.5); g.gain.setValueAtTime(vol, t + dur - 0.2); g.gain.linearRampToValueAtTime(0.0001, t + dur + 2.2);
-      [-7, 6].forEach((c, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = c; o.connect(g); o.start(t); o.stop(t + dur + 2.4); }); g.connect(padBus);
+      [-7, 6].forEach((c, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = c; o.connect(g); o.start(t); o.stop(t + dur + 2.4); }); g.connect(dest || padBus);
+    }
+    /* ----- piyano: tokmak vuruşu + hafif uyumsuz (inharmonic) tonlar, alt notalar uzun, üst notalar kısa çınlar ----- */
+    function piano(m, t, vel, dest, len, lv) {
+      if (!isFinite(m) || !ac) return; vel = clamp(vel, 0.05, 1.2);
+      const f = mtof(m), B = 0.00032 * Math.pow(2, (m - 60) / 18), np = m > 88 ? 3 : m > 74 ? 4 : 5, base = clamp(7.4 - (m - 36) * 0.07, 1.5, 7.4) * (len || 1);
+      const AMP = [1, 0.58, 0.32, 0.19, 0.1], pk = (lv || 0.1) * 3.4 * Math.pow(vel, 1.3);
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = clamp(700 + f * 2.2 + vel * 4200, 1100, 9000); lp.Q.value = 0.25;
+      let out = lp; if (ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = clamp((m - 62) / 34, -0.55, 0.55); lp.connect(p); out = p; }
+      out.connect(dest);
+      for (let n = 1; n <= np; n++) {
+        const dets = n === 1 && m < 84 ? [-2.5, 3] : [0], fr = f * n * Math.sqrt(1 + B * n * n), d = base / Math.pow(n, 0.6);
+        for (const dt of dets) {
+          const o = ac.createOscillator(), g = ac.createGain(), a = pk * AMP[n - 1] * (n === 1 ? 1 : 0.55 + 0.45 * vel) / dets.length;
+          o.type = 'sine'; o.frequency.value = fr; if (dt) o.detune.value = dt;
+          g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(a, t + 0.004); g.gain.exponentialRampToValueAtTime(a * 0.32, t + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+          o.connect(g); g.connect(lp); o.start(t); o.stop(t + d + 0.05);
+        }
+      }
+      nz(lp, t, 0.045, pk * 0.55, 'bandpass', 1500 + f * 1.4, 900, 0.9, 0.002);   // tokmak
+    }
+    function boom(t, vel, dest) {   // derin tümtek: yumuşak, uzaktan gelen
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(82, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.9);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.14 * vel, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8); o.connect(g); g.connect(dest); o.start(t); o.stop(t + 1.9);
+      nz(dest, t, 0.25, 0.05 * vel, 'lowpass', 260, 90, 0.7, 0.004);
     }
     function bassN(m, t, dur, vol) {
       const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.35); g.gain.setValueAtTime(vol, t + dur - 0.3); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.6);
@@ -415,25 +443,71 @@
       mus.cpc = QUAL[q].map(i => (root + i) % 12); mus.rest = inten < 0.4 && Math.random() < 0.3;
       padLP.frequency.setTargetAtTime(650 + 1900 * inten, t, 1.2);
       const used = []; QUAL[q].forEach(i => { let n = root + i; while (n < 57) n += 12; while (n > 76) n -= 12; used.push(n); });
-      used.forEach(n => pad(n, t, dur, 0.05 * (0.75 + 0.5 * inten)));
-      if (inten > 0.55) pad(used[2] + 12, t + 0.1, dur, 0.02);
+      used.forEach(n => pad(n, t, dur, 0.034 * (0.75 + 0.5 * inten)));
+      if (inten > 0.55) pad(used[2] + 12, t + 0.1, dur, 0.014);
+      if (!mus.rest) {   // piyano: bas nota + yayılan akor (sol el), ara sıra ikinci kez aşağı doğru
+        piano(root - 12, t + 0.01, 0.55 + 0.3 * inten, musBus, 1.3, 0.12);
+        used.forEach((n, i) => piano(n, t + 0.28 + i * 0.1, 0.3 + 0.25 * inten + 0.05 * i, musBus, 1.1, 0.1));
+        if (Math.random() < 0.5) used.slice().reverse().forEach((n, i) => piano(n + (inten > 0.5 ? 12 : 0), t + beat * 2 + i * 0.12, 0.26 + 0.2 * inten, melBus, 0.9, 0.09));
+      }
       if (inten > 0.3) bassN(root, t, beat * 4, 0.11 + 0.05 * inten);
     }
     function musStep(t) {
       const s = mus.step % 8; if (s === 0) newBar(t);
-      const inten = mus.inten; let p = s % 2 === 0 ? 0.22 + 0.5 * inten : 0.08 + 0.34 * inten; if (mus.rest) p *= 0.12; else if (s === 0) p = Math.max(p, 0.5);
+      const inten = mus.inten; let p = s % 2 === 0 ? 0.32 + 0.5 * inten : 0.12 + 0.36 * inten; if (mus.rest) p *= 0.12; else if (s === 0) p = Math.max(p, 0.5);
       if (Math.random() < p) {
         const SC = mus.SC, cand = []; let tot = 0;
         mus.mi = clamp(mus.mi, 4, SC.length - 3);   // ton değişince nota listesi kısalır: sıra listenin dışında kalmasın
         for (let k = -3; k <= 3; k++) { if (!k) continue; const i = mus.mi + k; if (i < 4 || i >= SC.length - 2) continue; const m = SC[i], w = (mus.cpc.includes(m % 12) ? 3 : 1) * (Math.abs(k) === 1 ? 1.6 : 1) * Math.max(0.1, 1 - Math.abs(m - 78) / 40); cand.push([i, w]); tot += w; }
         let r = Math.random() * tot, idx = mus.mi; for (const [i, w] of cand) { r -= w; if (r <= 0) { idx = i; break; } }
-        mus.mi = idx; bell(SC[idx], t + (Math.random() - 0.5) * 0.03, 0.5 + 0.5 * Math.random());
+        mus.mi = idx; piano(SC[idx], t + (Math.random() - 0.5) * 0.03, 0.5 + 0.5 * Math.random(), melBus, 1.2, 0.15);
       }
       if (inten > 0.6 && (s === 0 || s === 4)) heart(t, s === 0 ? 1 : 0.6);
     }
     function musTick() {
-      if (!ac || ac.state !== 'running') return; if (mus.next < ac.currentTime) mus.next = ac.currentTime + 0.1;
+      if (!ac || ac.state !== 'running' || mode !== 'game') return; if (mus.next < ac.currentTime) mus.next = ac.currentTime + 0.1;
       while (mus.next < ac.currentTime + 0.6) { musStep(mus.next); mus.next += e8; mus.step++; }
+    }
+
+
+    /* ----- menü müziği: sakin ama epik piyano · Re minör · 32 ölçülük döngü (giriş · tema · dolgun tema · doruk · veda) ----- */
+    const CHD = {   // [bas, ve dört akor sesi]
+      Dm: [38, 50, 57, 62, 65], Bb: [34, 53, 58, 62, 65], F: [41, 53, 57, 60, 65], C: [36, 52, 55, 60, 64], Gm: [43, 50, 55, 58, 62], A: [45, 52, 57, 61, 64] };
+    const MSEQ = ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'A', 'Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'A', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'Gm', 'A', 'Dm', 'Bb', 'Gm', 'A'];
+    // melodi: [8'lik adım, nota, süre (8'lik), güç] · ölçü başına
+    const MEL_A = [[[0, 69, 4, 0.6], [4, 74, 4, 0.55]], [[0, 74, 4, 0.55], [4, 77, 4, 0.6]], [[0, 77, 3, 0.6], [4, 76, 2, 0.5], [6, 72, 2, 0.5]], [[0, 76, 4, 0.55], [4, 72, 4, 0.5]],
+      [[0, 74, 4, 0.6], [4, 77, 4, 0.6]], [[0, 77, 4, 0.6], [4, 74, 4, 0.55]], [[0, 74, 4, 0.6], [4, 70, 2, 0.5], [6, 74, 2, 0.5]], [[0, 73, 4, 0.6], [4, 76, 2, 0.55], [6, 73, 2, 0.5]]];
+    const MEL_B = [[[0, 77, 3, 0.7], [3, 79, 1, 0.55], [4, 81, 4, 0.75]], [[0, 81, 3, 0.7], [3, 79, 1, 0.55], [4, 77, 4, 0.7]], [[0, 76, 2, 0.65], [2, 79, 2, 0.7], [4, 84, 4, 0.8]], [[0, 81, 4, 0.75], [4, 77, 2, 0.65], [6, 74, 2, 0.6]],
+      [[0, 77, 3, 0.7], [3, 79, 1, 0.55], [4, 82, 4, 0.8]], [[0, 81, 3, 0.7], [3, 84, 1, 0.6], [4, 81, 2, 0.7], [6, 77, 2, 0.6]], [[0, 82, 3, 0.7], [3, 79, 1, 0.55], [4, 74, 4, 0.65]], [[0, 81, 4, 0.75], [4, 76, 2, 0.6], [6, 73, 2, 0.55]]];
+    const SEQ8 = [0, 1, 2, 3, 2, 1, 3, 2], SEQ16 = [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 3, 2, 1];
+    const mm = { next: 0, step: 0 }, bm = 60 / 58, e16 = bm / 4, MV2 = 0.9;
+    function menuStep(t) {
+      const s = mm.step % 16, bar = Math.floor(mm.step / 16) % 32, sec = bar < 4 ? 0 : bar < 12 ? 1 : bar < 20 ? 2 : bar < 28 ? 3 : 4, ch = CHD[MSEQ[bar]], bi = sec === 1 || sec === 2 ? bar - 4 - (sec === 2 ? 8 : 0) : sec === 3 ? bar - 20 : sec === 4 ? bar - 28 + 4 : 0;
+      const fade = sec === 4 ? 1 - 0.55 * (bar - 28) / 4 : sec === 0 ? 0.85 + 0.05 * bar : 1, hv = () => 0.92 + 0.16 * Math.random(), ht = () => (Math.random() - 0.3) * 0.02;
+      if (s === 0) {   // ölçü başı: bas, pad, tümtek
+        piano(ch[0], t + 0.005, (sec >= 2 ? 0.85 : 0.6) * fade, menuBus, 1.6, 0.13);
+        if (sec >= 2) piano(ch[0] + 12, t + 0.012, 0.6 * fade, menuBus, 1.2, 0.1);
+        const pv = [0.0, 0.014, 0.03, 0.046, 0.014][sec]; if (pv > 0) [ch[1], ch[2], ch[3]].forEach((n, i) => pad(n, t + 0.05 * i, bm * 4 + 0.6, pv * (1 - 0.1 * i), menuPad));
+        if (sec === 3 && bar === 20) pad(ch[4] + 12, t, bm * 8, 0.02, menuPad);
+        if ((sec === 2 && bar % 4 === 0) || (sec === 3 && bar % 2 === 0)) boom(t, sec === 3 ? 0.95 : 0.6, menuBus);
+        if (bar === 19) nz(menuPad, t, bm * 4, 0.05, 'bandpass', 350, 2800, 0.8, bm * 3.4);   // dorukta yükselen nefes
+      }
+      const ev16 = sec === 3, step = ev16 || s % 2 === 0;
+      if (step) {   // sol el: dalgalanan arpej
+        const seq = ev16 ? SEQ16 : SEQ8, idx = seq[ev16 ? s : s >> 1], n = ch[1 + idx], strong = s % 4 === 0, v = ((strong ? 0.5 : 0.34) + (ev16 ? 0.06 : 0)) * fade * (sec === 0 ? 0.85 : 1);
+        piano(n, t + ht(), v * hv(), menuBus, 0.9, 0.095);
+      }
+      if (sec >= 1) {   // sağ el: melodi
+        const tab = sec === 3 ? MEL_B : MEL_A, evs = tab[bi % 8] || []; const vg = sec === 1 ? 0.78 : sec === 4 ? 0.7 * fade : 1;
+        for (const [st, n, dur, vel] of evs) if (st * 2 === s) {
+          piano(n, t + 0.01 + ht(), Math.min(1.1, vel * vg * hv()), menuMel, Math.max(1, dur / 3), 0.14);
+          if (sec >= 2) piano(n - 12, t + 0.016, vel * 0.55 * vg, menuMel, Math.max(1, dur / 3), 0.1);   // oktav dolgunluk
+        }
+      }
+    }
+    function menuTick() {
+      if (!ac || ac.state !== 'running' || mode !== 'menu') return; if (mm.next < ac.currentTime) mm.next = ac.currentTime + 0.12;
+      while (mm.next < ac.currentTime + 0.5) { menuStep(mm.next); mm.next += e16; mm.step++; }
     }
 
     /* ----- kurulum ----- */
@@ -443,8 +517,10 @@
       try { ac = new AC(); } catch (_) { ac = null; return; }
       master = ac.createGain(); master.gain.value = muted ? 0 : 0.9;
       const cp = ac.createDynamicsCompressor(); cp.threshold.value = -16; cp.knee.value = 18; cp.ratio.value = 4; cp.attack.value = 0.005; cp.release.value = 0.25; master.connect(cp); cp.connect(ac.destination);
-      sfxBus = ac.createGain(); sfxBus.gain.value = SVL; sfxBus.connect(master);
-      musBus = ac.createGain(); musBus.gain.value = 0; musBus.gain.setValueAtTime(0, 0); musBus.gain.linearRampToValueAtTime(MV, ac.currentTime + 5); musBus.connect(master);
+      sfxBus = ac.createGain(); sfxBus.gain.value = SVL * VOL.sfx; sfxBus.connect(master);
+      gameGate = ac.createGain(); gameGate.gain.value = mode === 'game' ? 1 : 0; gameGate.connect(master);
+      menuGate = ac.createGain(); menuGate.gain.value = mode === 'menu' ? 1 : 0; menuGate.connect(master);
+      musBus = ac.createGain(); musBus.gain.value = 0; musBus.gain.setValueAtTime(0, 0); musBus.gain.linearRampToValueAtTime(MV * VOL.mus, ac.currentTime + 2); musBus.connect(gameGate);
       const len = Math.floor(ac.sampleRate * 2.6), ir = ac.createBuffer(2, len, ac.sampleRate);
       for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < len; i++) { const k = i / len; lp += (Math.random() * 2 - 1 - lp) * (0.55 - 0.4 * k); d[i] = lp * 1.8 * Math.pow(1 - k, 2.6); } }
       const cv2 = ac.createConvolver(); cv2.buffer = ir; revIn = ac.createGain(); const ro = ac.createGain(); ro.gain.value = 0.55; revIn.connect(cv2); cv2.connect(ro); ro.connect(master);
@@ -455,8 +531,14 @@
       const dly = ac.createDelay(2), fb = ac.createGain(), dl = ac.createBiquadFilter(), ds = ac.createGain(), dOut = ac.createGain();
       dly.delayTime.value = beat * 0.75; fb.gain.value = 0.36; dl.type = 'lowpass'; dl.frequency.value = 1800; ds.gain.value = 0.5; dOut.gain.value = 0.55;
       melBus.connect(ds); ds.connect(dly); dly.connect(dl); dl.connect(fb); fb.connect(dly); dl.connect(dOut); dOut.connect(musBus);
-      const mr = ac.createGain(); mr.gain.value = 0.38; musBus.connect(mr); mr.connect(revIn);
-      mkScale(); mus.next = ac.currentTime + 0.3; setInterval(musTick, 100);
+      const mr = ac.createGain(); musRev = mr; mr.gain.value = 0.38 * VOL.mus; gameGate.connect(mr); mr.connect(revIn);
+      // menü müziği hatları: piyano + yumuşak pad + hafif yankı, kendi kapısı ve yankısıyla
+      menuBus = ac.createGain(); menuBus.gain.value = MV2 * VOL.mus; menuBus.connect(menuGate);
+      menuPad = ac.createGain(); const mpl = ac.createBiquadFilter(); mpl.type = 'lowpass'; mpl.frequency.value = 1500; mpl.Q.value = 0.3; menuPad.connect(mpl); mpl.connect(menuBus);
+      menuMel = ac.createGain(); menuMel.connect(menuBus); const md = ac.createDelay(2), mf = ac.createGain(), mdl = ac.createBiquadFilter(), mds = ac.createGain(); md.delayTime.value = bm * 0.75; mf.gain.value = 0.3; mdl.type = 'lowpass'; mdl.frequency.value = 2200; mds.gain.value = 0.26;
+      menuMel.connect(mds); mds.connect(md); md.connect(mdl); mdl.connect(mf); mf.connect(md); mdl.connect(menuBus);
+      menuRev = ac.createGain(); menuRev.gain.value = 0.5 * VOL.mus; menuGate.connect(menuRev); menuRev.connect(revIn);
+      mkScale(); mus.next = ac.currentTime + 0.3; setInterval(musTick, 100); setInterval(menuTick, 100);
     }
     function unlock() { if (!ac) build(); if (ac && ac.state !== 'running') { try { ac.resume().catch(() => {}); } catch (_) {} } }
     ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(ev => addEventListener(ev, unlock, { passive: true }));
@@ -465,13 +547,27 @@
       muted = !muted; btn.pop = 1; btn.ring = 1;   // düğme animasyonunu tetikle
       if (ac) { const t = ac.currentTime, g = master.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.setTargetAtTime(muted ? 0 : 0.9, t, muted ? 0.07 : 0.12); }   // sesi yumuşakça kıs / aç
     }
+    function setMode(m, fast) {   // 'menu' | 'game' | 'none' · yumuşak geçiş (fast: sert kesme)
+      if (m === mode) return; const prev = mode; mode = m; if (!ac) return; const t = ac.currentTime;
+      if (m === 'game' && prev !== 'game') mus.step = Math.ceil(mus.step / 8) * 8;   // oyun müziği ölçü başından devam eder
+      if (m === 'menu' && prev !== 'menu') mm.step = Math.ceil(mm.step / 16) * 16;   // menü müziği bir sonraki ölçüden devam eder
+      gameGate.gain.cancelScheduledValues(t); gameGate.gain.setValueAtTime(gameGate.gain.value, t); gameGate.gain.setTargetAtTime(m === 'game' ? 1 : 0, t, fast ? 0.02 : m === 'game' ? 0.9 : 0.5);
+      menuGate.gain.cancelScheduledValues(t); menuGate.gain.setValueAtTime(menuGate.gain.value, t); menuGate.gain.setTargetAtTime(m === 'menu' ? 1 : 0, t, fast ? 0.02 : m === 'menu' ? 0.8 : 0.5);
+    }
     function update(dt, alert) {
       if (!ac || ac.state !== 'running') return;
+      if (mode !== 'game') { const t = ac.currentTime; for (const [, V] of voices) V.out.gain.setTargetAtTime(0, t, 0.12); return; }   // menülerde dünya sesleri susar
       mus.alert += (alert - mus.alert) * (1 - Math.exp(-2 * dt));
       mus.inten += (clamp(BLK[Math.max(0, mus.blk) % 8] + mus.alert * 0.3, 0, 1) - mus.inten) * (1 - Math.exp(-0.3 * dt));
       acc += dt; if (acc >= 0.04) { updStatues(acc); acc = 0; }
     }
-    return { unlock, sfx, update, toggleMute, btn, setListener(x, y) { LS.x = x; LS.y = y; }, get muted() { return muted; } };
+    function setVol(k, v) {
+      VOL[k] = Math.min(1, Math.max(0, v)); try { localStorage.setItem('hlk_vol', JSON.stringify(VOL)); } catch (_) {}
+      if (!ac) return; const t = ac.currentTime;
+      if (k === 'sfx') sfxBus.gain.setTargetAtTime(SVL * VOL.sfx, t, 0.03);
+      else { if (menuBus) menuBus.gain.setTargetAtTime(MV2 * VOL.mus, t, 0.05); if (menuRev) menuRev.gain.setTargetAtTime(0.5 * VOL.mus, t, 0.05); musBus.gain.cancelScheduledValues(t); musBus.gain.setValueAtTime(musBus.gain.value, t); musBus.gain.setTargetAtTime(MV * VOL.mus, t, 0.05); if (musRev) musRev.gain.setTargetAtTime(0.38 * VOL.mus, t, 0.05); }
+    }
+    return { unlock, sfx, update, toggleMute, setVol, setMode, vol: VOL, btn, setListener(x, y) { LS.x = x; LS.y = y; }, get muted() { return muted; }, get running() { return !!ac && ac.state === 'running'; } };
   })();
 
   // kumaş / saç zinciri: gövdeye bağlı, hıza göre uzar, rüzgârla dalgalanır
@@ -979,6 +1075,7 @@
       if (k !== 'hit') { for (let i = 0; i < 6; i++) { const a = i * 1.047 + 0.4, r0 = 6 + 14 * u, r1 = r0 + 7; ctx.beginPath(); ctx.moveTo(F.fx.x + Math.cos(a) * r0, F.fx.y + Math.sin(a) * r0); ctx.lineTo(F.fx.x + Math.cos(a) * r1, F.fx.y + Math.sin(a) * r1); ctx.stroke(); } }
     }
   }
+  const HUD_Y = 66;   // sol üst profil paneli ile sağ üst düğme aynı yatay hizada
   const HB = { hp: 1, lag: 1, du: 1, low: 0 };   // karakter barı: yumuşak akan can/dayanıklılık, gecikmeli iz
   function hudHeart(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + 3.2 * s); ctx.bezierCurveTo(x - 6 * s, y - 1.5 * s, x - 3 * s, y - 5.5 * s, x, y - 2 * s); ctx.bezierCurveTo(x + 3 * s, y - 5.5 * s, x + 6 * s, y - 1.5 * s, x, y + 3.2 * s); ctx.fill(); }
   function hudShield(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y + 0.5 * s); ctx.quadraticCurveTo(x + 4 * s, y + 4 * s, x, y + 5.5 * s); ctx.quadraticCurveTo(x - 4 * s, y + 4 * s, x - 4 * s, y + 0.5 * s); ctx.closePath(); ctx.fill(); }
@@ -1008,7 +1105,7 @@
     const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0';
     HB.hp += (clamp(F.hp / 100, 0, 1) - HB.hp) * 0.25; HB.lag += (HB.hp - HB.lag) * 0.05; if (HB.lag < HB.hp) HB.lag = HB.hp; HB.du += (clamp(F.dur / 100, 0, 1) - HB.du) * 0.25;
     const low = F.hp > 0 && F.hp < 30 ? 1 : 0; HB.low += (low - HB.low) * 0.1; const pulse = 0.5 + 0.5 * Math.sin(F.time * 7) ;
-    const X = 10, Y = 10, R = 22, cx = X + R + 2, cy = Y + R + 2, bx = cx + R + 9, bw = 104;
+    const X = 10, R = 22, Y = HUD_Y - R - 2, cx = X + R + 2, cy = Y + R + 2, bx = cx + R + 9, bw = 104;
     ctx.save();
     // panel
     ctx.fillStyle = `rgba(${bgc},0.42)`; rr(X - 4, Y - 4, bx + bw - X + 12, R * 2 + 12, 12); ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.14)`; ctx.stroke();
@@ -1041,21 +1138,17 @@
     ctx.restore();
     if (G.has && (F.guarding || F.dur < 100)) { const sx = player.x - cam.x, sy = player.y - cam.y + 13; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
   }
-  function drawMute(fg, dt) {
-    const b = AU.btn, m = AU.muted; b.x = W - 34; b.y = 66;
-    const tgt = m ? 0 : 1; b.mt += (tgt - b.mt) * dmp(9, dt); if (Math.abs(b.mt - tgt) < 0.003) b.mt = tgt;   // 1 = ses açık, 0 = kapalı
+  function drawPauseBtn(fg, dt) {   // sağ üst: duraklatma düğmesi; çevresindeki ince yay saniyeleri süpürür
+    const b = AU.btn; b.x = W - 34; b.y = HUD_Y;
     b.pop = Math.max(0, b.pop - dt * 2.2); b.ring = Math.max(0, b.ring - dt * 2.2);
-    const on = b.mt, off = 1 - on, u = 1 - b.pop, sc = 1 + 0.24 * b.pop * Math.sin(u * 10);   // basınca yaylanır
-    const w1 = sstep(0, 0.6, on), w2 = sstep(0.35, 1, on), x1 = sstep(0, 0.55, off), x2 = sstep(0.3, 0.85, off);
+    const u = 1 - b.pop, sc = 1 + 0.2 * b.pop * Math.sin(u * 10);
     ctx.save(); ctx.translate(b.x, b.y);
-    if (b.ring > 0.01) { const k = 1 - b.ring; ctx.globalAlpha = 0.5 * b.ring; ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6 * b.ring + 0.4; ctx.beginPath(); ctx.arc(0, 0, b.r + 26 * k, 0, TAU); ctx.stroke(); }   // dalga halkası
-    ctx.scale(sc, sc); ctx.globalAlpha = 0.55 + 0.35 * b.pop;
-    ctx.fillStyle = `rgba(${fg},${0.06 + 0.05 * on})`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = `rgba(${fg},${0.25 + 0.15 * on})`; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.fillStyle = `rgba(${fg},0.9)`; ctx.beginPath(); ctx.moveTo(-8, -3); ctx.lineTo(-4.5, -3); ctx.lineTo(0, -7.5); ctx.lineTo(0, 7.5); ctx.lineTo(-4.5, 3); ctx.lineTo(-8, 3); ctx.closePath(); ctx.fill();
-    ctx.lineCap = 'round'; ctx.lineWidth = 1.6;
-    [[w1, 5], [w2, 9.5]].forEach(([p, r]) => { if (p < 0.02) return; ctx.strokeStyle = `rgba(${fg},${0.9 * p})`; ctx.beginPath(); ctx.arc(0, 0, r * (0.7 + 0.3 * p), -0.9 * p, 0.9 * p); ctx.stroke(); });   // dalgalar açılır / kapanır
-    [[x1, 3.5, -4, 9.5, 4], [x2, 9.5, -4, 3.5, 4]].forEach(([p, ax, ay, bx, by]) => { if (p < 0.02) return; ctx.strokeStyle = `rgba(${fg},${0.9 * p})`; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + (bx - ax) * p, ay + (by - ay) * p); ctx.stroke(); });   // çarpı çizilir
+    if (b.ring > 0.01) { const k = 1 - b.ring; ctx.globalAlpha = 0.5 * b.ring; ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6 * b.ring + 0.4; ctx.beginPath(); ctx.arc(0, 0, b.r + 26 * k, 0, TAU); ctx.stroke(); }
+    ctx.scale(sc, sc); ctx.globalAlpha = 0.6 + 0.35 * b.pop;
+    ctx.fillStyle = `rgba(${fg},0.07)`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(${fg},0.2)`; ctx.lineWidth = 1.2; ctx.stroke();
+    const sw = (TM.t % 60) / 60; if (sw > 0.002) { ctx.strokeStyle = `rgba(${fg},0.6)`; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, 0, b.r, -PI / 2, -PI / 2 + TAU * sw); ctx.stroke(); }
+    ctx.fillStyle = `rgba(${fg},0.92)`; rr(-6.2, -7, 4, 14, 1.6); ctx.fill(); rr(2.2, -7, 4, 14, 1.6); ctx.fill();   // iki çubuk
     ctx.restore();
   }
   /* ---------- Saldırı butonu: elimizdeki silaha göre değişir. Silah yoksa buton da yoktur. ---------- */
@@ -2200,6 +2293,7 @@
     const t = MENU.t, fg = light ? '0,0,0' : '255,255,255', bgCol = light ? '#f2f2f2' : '#0a0a0a', bgRGB = light ? '242,242,242' : '10,10,10';
     const u = clamp(Math.min(W / 390, H / 760), 0.62, 1.35), cx = W / 2, ease = v => 1 - Math.pow(1 - clamp(v, 0, 1), 3), act = MENU.st === 'go', stab = act && MENU.mode === 'stab', zoom = act && MENU.mode === 'zoom';
     if (act) MENU.sT += dt; const sT = MENU.sT;
+    try { AU.setMode(!act ? 'menu' : zoom ? (sT > 0.5 ? 'game' : 'menu') : (sT >= 0.47 ? (sT >= 1.3 ? 'game' : 'none') : 'menu'), stab && sT >= 0.47 && sT < 0.6); } catch (_) {}   // yakınlaşmada müzik kararırken değişir · saplanmada müzik sert kesilir
     // ---- sahne bitti: ani karartma, sonra oyun ----
     const endT = stab ? 1.3 : 1.0;
     if (act && sT >= endT) {
@@ -2278,6 +2372,7 @@
       menuPill(cx - ow - og / 2, oy, ow, oh, AU.muted ? 'SES  KAPALI' : 'SES  AÇIK', be, false, t); MENU.btns.push({ x: cx - ow - og / 2, y: oy - 4, w: ow, h: oh + 8, fn: () => AU.toggleMute() });
       menuPill(cx + og / 2, oy, ow, oh, light ? 'TEMA  AÇIK' : 'TEMA  KOYU', be, false, t); MENU.btns.push({ x: cx + og / 2, y: oy - 4, w: ow, h: oh + 8, fn: toggleBg });
       if (oy + oh + 14 < H - 40) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', cx, H - 26); }
+      if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', cx, Math.min(H - 52, oy + oh + 34)); }
       ctx.restore();
     } else MENU.btns.length = 0;
     ctx.restore();
@@ -2285,11 +2380,83 @@
     if (hitOn && sT < HIT + 0.06) { ctx.fillStyle = `rgba(${fg},${0.55 * (1 - (sT - HIT) / 0.06)})`; ctx.fillRect(0, 0, W, H); }   // çarpma anı: tek karelik parlama
   }
 
+  /* ---------- Kronometre + duraklatma ---------- */
+  const TM = { t: 0, str: '', rc: [], old: [] };
+  const pad2 = n => (n < 10 ? '0' : '') + n;
+  function fmtTime(t) { const q = Math.floor(t), h = Math.floor(q / 3600), m = Math.floor(q / 60) % 60, ss = q % 60; return h ? h + ':' + pad2(m) + ':' + pad2(ss) : pad2(m) + ':' + pad2(ss); }
+  function drawTimer(fg, dt) {   // her rakam değişirken yukarı kayarak yenilenir, iki nokta saniyede bir nabız atar
+    const str = fmtTime(TM.t), prev = TM.str;
+    if (str !== prev) { for (let i = 1; i <= str.length; i++) { const c = str[str.length - i], o = prev ? prev[prev.length - i] : ''; if (c !== o) { TM.old[i] = o || ''; TM.rc[i] = 1; } } TM.str = str; }
+    ctx.save(); ctx.font = `500 17px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = AU.btn.x - AU.btn.r - 16; const y = HUD_Y + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
+    ctx.shadowColor = `rgba(${bgc},0.9)`; ctx.shadowBlur = 5;
+    for (let i = 1; i <= str.length; i++) {
+      const c = str[str.length - i], col = c === ':', w = col ? cw : dw, cx = x - w / 2; x -= w;
+      const rc = TM.rc[i] = Math.max(0, (TM.rc[i] || 0) - dt * 4.5), p = 1 - rc;
+      if (col) { const fr = TM.t % 1, al = 0.35 + 0.55 * (1 - sstep(0, 0.9, fr)); ctx.fillStyle = `rgba(${fg},${al})`; ctx.fillText(':', cx, y - 1); continue; }
+      if (rc > 0.001 && TM.old[i]) { ctx.fillStyle = `rgba(${fg},${0.9 * (1 - p)})`; ctx.fillText(TM.old[i], cx, y - p * 8); ctx.fillStyle = `rgba(${fg},${0.9 * p})`; ctx.fillText(c, cx, y + (1 - p) * 8); }
+      else { ctx.fillStyle = `rgba(${fg},${0.9 * (rc > 0.001 ? p : 1)})`; ctx.fillText(c, cx, y + rc * 8); }
+    }
+    ctx.restore();
+  }
+  const PAUSE = { on: false, a: 0, snap: null, btns: [], sl: [], drag: null };
+  function pauseGame() {
+    if (PAUSE.on || MENU.on) return;
+    joy.id = null; joy.active = false; joy.dx = joy.dy = 0; if (atk.down || atk.kb) { atk.down = false; atk.kb = false; relAtk(); } atk.id = null; for (const k in keys) keys[k] = false;
+    try { const sc = document.createElement('canvas'); sc.width = cv.width; sc.height = cv.height; sc.getContext('2d').drawImage(cv, 0, 0); PAUSE.snap = sc; } catch (_) { PAUSE.snap = null; }
+    PAUSE.on = true; PAUSE.a = 0; PAUSE.drag = null; AU.btn.pop = 1; AU.btn.ring = 1;
+  }
+  function resumeGame() { if (!PAUSE.on) return; PAUSE.on = false; PAUSE.drag = null; PAUSE.snap = null; last = performance.now(); }
+  const togglePause = () => PAUSE.on ? resumeGame() : pauseGame();
+  function pauseSet(sl, px) { AU.setVol(sl.k, clamp((px - sl.x) / sl.w, 0, 1)); }
+  function pauseDown(e) {
+    if (PAUSE.a < 0.6) return; const px = e.clientX, py = e.clientY;
+    for (const b of PAUSE.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return; }
+    for (const sl of PAUSE.sl) if (px >= sl.x - 14 && px <= sl.x + sl.w + 14 && py >= sl.y - 18 && py <= sl.y + 18) { PAUSE.drag = sl; pauseSet(sl, px); return; }
+  }
+  addEventListener('pointermove', e => { if (PAUSE.on && PAUSE.drag) pauseSet(PAUSE.drag, e.clientX); });
+  addEventListener('pointerup', () => { PAUSE.drag = null; }); addEventListener('pointercancel', () => { PAUSE.drag = null; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });   // uygulamadan çıkınca oyun kendiliğinden durur
+  function pauseSlider(x, y, w, label, k, a, fg) {
+    const v = AU.vol[k], dim = AU.muted ? 0.4 : 1;
+    ctx.save(); ctx.globalAlpha *= a * dim; ctx.textBaseline = 'middle'; ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.7)`;
+    let lx = x - 88; for (const c of [...label]) { ctx.fillText(c, lx, y); lx += ctx.measureText(c).width + 2; }
+    ctx.lineCap = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.stroke();
+    ctx.strokeStyle = `rgba(${fg},0.85)`; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * v, y); ctx.stroke();
+    const act = PAUSE.drag && PAUSE.drag.k === k; ctx.fillStyle = `rgb(${fg})`; ctx.beginPath(); ctx.arc(x + w * v, y, act ? 8.5 : 6.5, 0, TAU); ctx.fill();
+    ctx.textAlign = 'right'; ctx.fillStyle = `rgba(${fg},0.6)`; ctx.fillText(Math.round(v * 100), x + w + 38, y);
+    ctx.restore();
+  }
+  function drawPause(dt, over) {
+    MENU.fl = Math.max(0, MENU.fl - dt * 2.4);
+    PAUSE.a = over ? Math.max(0, PAUSE.a - dt / 0.2) : Math.min(1, PAUSE.a + dt / 0.22);
+    const A = PAUSE.a, e = 1 - Math.pow(1 - A, 3), fg = light ? '0,0,0' : '255,255,255', bgRGB = light ? '242,242,242' : '10,10,10', u = clamp(Math.min(W / 390, H / 760), 0.62, 1.35), cx = W / 2;
+    if (!over) { ctx.fillStyle = light ? '#f2f2f2' : '#0a0a0a'; ctx.fillRect(0, 0, W, H); if (PAUSE.snap) ctx.drawImage(PAUSE.snap, 0, 0, W, H); }
+    ctx.fillStyle = `rgba(${bgRGB},${0.82 * A})`; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.globalAlpha = e; ctx.translate(0, (1 - e) * 10);
+    const total = 340 * u; let y = Math.max(24, (H - total) / 2 - H * 0.03);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
+    const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cx - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
+    y += 18 * u + 14 * u; ctx.textAlign = 'center'; ctx.font = `200 ${54 * u}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(TM.t), cx, y + 44 * u);
+    y += 54 * u + 4 * u; ctx.font = `400 ${11 * u + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('geçen süre', cx, y + 12 * u);
+    y += 12 * u + 28 * u; PAUSE.btns.length = 0; PAUSE.sl.length = 0;
+    const bw = Math.min(W * 0.64, 250), bh = 52; menuPill(cx - bw / 2, y, bw, bh, 'DEVAM ET', 1, true, performance.now() / 1000); PAUSE.btns.push({ x: cx - bw / 2, y: y - 4, w: bw, h: bh + 8, fn: resumeGame });
+    y += bh + 30 * u; const sw = Math.min(W * 0.78, 300), sx = cx - sw / 2 + 88, slw = sw - 88 - 38;
+    pauseSlider(sx, y + 4, slw, 'MÜZİK', 'mus', 1, fg); PAUSE.sl.push({ k: 'mus', x: sx, y: y + 4, w: slw });
+    y += 34 * u; pauseSlider(sx, y + 4, slw, 'EFEKT', 'sfx', 1, fg); PAUSE.sl.push({ k: 'sfx', x: sx, y: y + 4, w: slw });
+    y += 34 * u + 8 * u; const ow = Math.min(W * 0.4, 128), oh = 38, og = 10;
+    menuPill(cx - ow - og / 2, y, ow, oh, AU.muted ? 'SES  KAPALI' : 'SES  AÇIK', 1, false, 0); PAUSE.btns.push({ x: cx - ow - og / 2, y: y - 4, w: ow, h: oh + 8, fn: () => AU.toggleMute() });
+    menuPill(cx + og / 2, y, ow, oh, light ? 'TEMA  AÇIK' : 'TEMA  KOYU', 1, false, 0); PAUSE.btns.push({ x: cx + og / 2, y: y - 4, w: ow, h: oh + 8, fn: toggleBg });
+    ctx.restore();
+  }
+
   /* ---------- Döngü ---------- */
   let last = performance.now();
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05); last = now;
-    if (MENU.on) { try { AU.update(dt, 0); } catch (_) {} drawMenu(dt); requestAnimationFrame(frame); return; }
+    if (MENU.on) { drawMenu(dt); try { AU.update(dt, 0); } catch (_) {} requestAnimationFrame(frame); return; }
+    if (PAUSE.on) { try { AU.setMode('menu'); AU.update(dt, 0); } catch (_) {} drawPause(dt, false); requestAnimationFrame(frame); return; }
+    TM.t += dt;
     const stopped = FX.stop > 0; if (stopped) FX.stop -= dt;
     const sdt = stopped ? dt * 0.04 : dt;   // vuruş duraklaması: oyun neredeyse donar
 
@@ -2319,7 +2486,7 @@
     updateEvil(sdt); updateChests(sdt);
     updateFx(dt, sdt);
     let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
-    try { AU.setListener(player.x, player.y); AU.update(dt, clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
+    try { AU.setMode('game'); AU.setListener(player.x, player.y); AU.update(dt, clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
 
     joy.alpha += ((joy.active ? 1 : 0) - joy.alpha) * (1 - Math.exp(-16 * dt));
 
@@ -2374,8 +2541,9 @@
       ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.stroke();
       ctx.restore();
     }
-    drawHud(fg);
-    drawAtk(fg, dt); drawMute(fg, dt);
+    drawHud(fg); drawTimer(fg, dt);
+    drawAtk(fg, dt); drawPauseBtn(fg, dt);
+    if (PAUSE.a > 0) drawPause(dt, true);
     if (MENU.blk > 0) { MENU.blk = Math.max(0, MENU.blk - dt / 0.7); ctx.fillStyle = `rgba(0,0,0,${MENU.blk})`; ctx.fillRect(0, 0, W, H); }   // karartmadan açılış
     cam.x -= FX.ox; cam.y -= FX.oy;
     requestAnimationFrame(frame);
