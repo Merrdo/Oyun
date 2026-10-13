@@ -619,7 +619,7 @@
     lx: 0, lxv: 0, ly: 0, lyv: 0, accF: 0, turn: 0, hunch: 0, knee: 0, yaw: 0, yawV: 0, yawT: 0, glT: 2,
     cough: -1, coughT: 1.5, cSide: 1, cw: 0, jolt: 0, gasp: 0, fired: 0, pvx: 0, pvy: 0, time: 0, reT: 3,
     foot: [{ x: 0, y: 0, tx: 0, ty: 0 }, { x: 0, y: 0, tx: 0, ty: 0 }], puffs: [], rd: [0, 1],
-    P: { v: 0, sg: 1, up: 0, drop: 0, lx: 0, sway: 0, tw: 15, th: 16, cy: -26, neckY: -34, bx: 0, hx: 0, hy: -40, sw: 0, Bn: 0, h: 0, sc: 1, fall: 0 },
+    P: { v: 0, sg: 1, up: 0, drop: 0, lx: 0, sway: 0, tw: 15, th: 17.1, cy: -22, neckY: -30.55, bx: 0, hx: 0, hy: -36, sw: 0, Bn: 0, h: 0, sc: 1, fall: 0 },
     ch: {
     }
   };
@@ -1362,9 +1362,9 @@
     P.drop = H.hunch * 3.4 + H.jolt * 1.6 + H.knee * 2 + G.bump * 2.6 + F.drop + F.wind * 1.4 + Math.sin(PI * G.sh) * 1.2 + Math.sin(PI * G.hw) * 1.4 + flin * 2 + kneel * 8;
     P.lx = lean * 0.8 * v;
     P.sway = (H.ly + sw * 0.9 + 0.55 * Math.sin(ph) * mv * (1 + rn)) * (1 - v) * P.sg;
-    P.tw = lerp(15, 9.5, v) * (1 + 0.03 * Bn); P.th = 16 * (1 + 0.04 * Bn) - P.drop * 0.6;
-    P.cy = -26 - P.up + P.drop * 0.4; P.neckY = P.cy - P.th / 2; P.bx = P.sway + P.lx * 0.5;
-    P.hx = P.sway + P.lx + (H.hunch * 2.2 + H.jolt * 1.4 + H.cw * 0.6 + kneel * 1.8 - flin * 0.9) * v + F.tx * 0.6; P.hy = P.neckY - 6.2 + P.drop * 0.6 - 0.4 * Bn * idle + kneel * 2.2;
+    P.tw = lerp(15, 9.5, v) * (1 + 0.03 * Bn); P.th = 17.1 * (1 + 0.04 * Bn) - P.drop * 0.6;
+    P.cy = -22 - P.up + P.drop * 0.4; P.neckY = P.cy - P.th / 2; P.bx = P.sway + P.lx * 0.5;
+    P.hx = P.sway + P.lx + (H.hunch * 2.2 + H.jolt * 1.4 + H.cw * 0.6 + kneel * 1.8 - flin * 0.9) * v + F.tx * 0.6; P.hy = P.neckY - 5.4 + P.drop * 0.6 - 0.4 * Bn * idle + kneel * 2.2;
     const wy = P.cy + P.th / 2 - 2;
     for (const k in H.ch) { const q = H.ch[k], bxx = q.at === 'h' ? P.hx : P.bx, byy = q.at === 'h' ? P.hy : q.at === 't' ? P.neckY : wy;
       stepChain(q, bxx + q.ax * cf + q.az, byy + q.ay, sp01, dt); }
@@ -1441,6 +1441,22 @@
     if (g.sf < -0.2) bandTails(g, B);
   }
 
+  /* Gövde: omuzdan kalçaya tek akıcı eğri. Önden omuz:bel = 1.5, yandan neredeyse eşit kalınlık. */
+  function heroTorso(bx, neckY, th, v) {
+    const sh = lerp(7.3, 4.7, v), wa = lerp(4.85, 3.9, v), r = lerp(0.3, 1.8, v), yk = th / 17.09, B = 17.09;
+    const X = a => bx + a, Y = a => neckY + a * yk;
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+    ctx.quadraticCurveTo(X(sh), Y(0), X(sh), Y(5.2));
+    ctx.bezierCurveTo(X(sh), Y(8.4), X(wa), Y(8.0), X(wa), Y(11.6));
+    ctx.lineTo(X(wa), Y(B - r)); ctx.quadraticCurveTo(X(wa), Y(B), X(wa - r), Y(B));
+    ctx.lineTo(X(-wa + r), Y(B)); ctx.quadraticCurveTo(X(-wa), Y(B), X(-wa), Y(B - r));
+    ctx.lineTo(X(-wa), Y(11.6));
+    ctx.bezierCurveTo(X(-wa), Y(8.0), X(-sh), Y(8.4), X(-sh), Y(5.2));
+    ctx.quadraticCurveTo(X(-sh), Y(0), X(0), Y(0)); ctx.closePath(); ctx.fill();
+  }
+  function heroHeadRing(hx, hy, bg) {   // kafayı omuzdan ayıran ince halka (arka plan renginde)
+    ctx.beginPath(); ctx.arc(hx, hy, 5.75, 0, TAU); ctx.lineWidth = 0.7; ctx.strokeStyle = bg; ctx.stroke();
+  }
   function drawHero(fg, light) {
     const H = hero, P = H.P, f = H.face, sf = Math.sin(f), v = P.v, ch = H.ch, S = HS * P.sc, cw = H.cw, mv = H.move, rn = H.run, idle = 1 - mv, ph = H.phase, Bn = P.Bn;
     const sp01 = clamp(H.sp / SPEED, 0, 1), view = sf > 0.5 ? 0 : sf < -0.5 ? 2 : 1, fl = P.sg, fr = sf >= 0 ? 1 : -1;
@@ -1451,21 +1467,21 @@
 
     ctx.save(); ctx.translate(player.x, player.y); ctx.scale(S * fl, S); const rot = P.fall * 1.45 * F.fall * fl; if (rot) ctx.rotate(rot); ctx.lineCap = 'round'; ctx.strokeStyle = col; ctx.fillStyle = col;
     const line = (x1, y1, x2, y2, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
-    const tw = P.tw * 0.7, th = P.th, cy = P.cy, bx = P.bx, hx = P.hx, hy = P.hy;
+    const tw = 8.8, th = P.th, cy = P.cy, bx = P.bx, hx = P.hx, hy = P.hy;
     const gz = { bx, cy, th, tw, neckY: P.neckY, hx, hy, v, sf, dx: GD.x * fl / S, dy: GD.y / S, t: GD.t, bg, col, lxo: P.lx * 0.2 };   // kıyafet çizim bağlamı
 
     // bacaklar
-    const lat = 3 * (1 - v), hipY = -17 - P.up + P.drop * 0.3;
-    const st = lerp(lerp(3.5, 9, clamp(H.sp / 115, 0, 1)), lerp(11, 14, clamp((H.sp - 130) / 100, 0, 1)), rn) * mv;
+    const lat = 3.0 * (1 - v), hipY = cy + th / 2 - 0.3;
+    const st = lerp(lerp(3.5, 9, clamp(H.sp / 115, 0, 1)), lerp(11, 14, clamp((H.sp - 130) / 100, 0, 1)), rn) * mv * 0.8;
     const drawLegs = () => [-1, 1].forEach((sd, i) => {
       const lp = ph + (sd > 0 ? 0 : PI), s = Math.sin(lp), o = H.foot[i], lift = Math.max(0, Math.cos(lp)) * mv;
-      line(bx * 0.6 + sd * lat * 0.8, hipY, bx * 0.3 + sd * lat + (s * st + o.x * idle) * v,
-           -lift * (2 + 2.5 * rn) + s * st * 0.3 * (1 - v) * fr + o.y * idle * 0.5 - 1.6, 3.8);
+      line(bx + sd * lat * 0.9, hipY, bx * 0.3 + sd * lat + (s * st + o.x * idle) * v,
+           -lift * (2 + 2.5 * rn) + s * st * 0.3 * (1 - v) * fr + o.y * idle * 0.5 - 2.2, 4.2);
     });
 
     // kılıç pozu: taşıma (bıçak yukarı) · koşu (bıçak geride) · siper · kırık siper · savurma
     const gOn = G.has, gw = gOn ? sstep(0, 0.22, G.eq) : 0, cfv = Math.cos(f);
-    const msx = bx + (tw / 2 + 1) * (1 - v) + P.lx * 0.2, msy = P.neckY + 4;
+    const msx = bx + (tw / 2 + 1) * (1 - v) + P.lx * 0.2, msy = P.neckY + 5.1;
     let gp = null, shE = 0;
     if (gOn) {
       const sd = G.sds, mix = (a, b, w) => a.map((q, i) => q + (b[i] - q) * w), tp = G.tw >= 0 ? Math.sin(PI * G.tw) : 0;
@@ -1495,7 +1511,7 @@
     if (behind) drawSword(player.x + fl * S * gp.tx, player.y + S * gp.ty, gp.ang, S * gp.gf, bg, col);
     drawLegs();
     const ik = (sx, sy, tx, ty, bend) => {
-      const dx = tx - sx, dy = ty - sy, d = Math.hypot(dx, dy) || 1e-3, L1 = 6.2, L2 = 5.8, dc = Math.min(d, L1 + L2 - 0.08), ux = dx / d, uy = dy / d;
+      const dx = tx - sx, dy = ty - sy, d = Math.hypot(dx, dy) || 1e-3, L1 = 5.5, L2 = 5.2, dc = Math.min(d, L1 + L2 - 0.08), ux = dx / d, uy = dy / d;
       const a = (L1 * L1 - L2 * L2 + dc * dc) / (2 * dc), h = Math.sqrt(Math.max(L1 * L1 - a * a, 0));
       let px = -uy, py = ux;
       if (Math.abs(py) < 0.25) { if (px * bend < 0) { px = -px; py = -py; } } else if (py < 0) { px = -px; py = -py; }
@@ -1507,11 +1523,11 @@
       const ap = ph + (sd > 0 ? PI : 0), sn = Math.sin(ap), aw = lerp(lerp(0.12, 0.5, clamp(H.sp / 115, 0, 1)), 0.85, rn) * mv, kn = Math.max(H.knee, sstep(0, 0.45, F.dp));
       const t1 = lerp(0.05 + 0.04 * Math.sin(H.swPh + sd) + 0.02 * Bn, aw * sn - 0.05 * rn, mv);
       const fx = lerp(0.2 + 0.03 * Bn, lerp(0.2 + 0.2 * (0.5 + 0.5 * sn), 1.4 + 0.2 * Math.sin(ap - 0.6), rn), mv);
-      const sx = bx + sd * (tw / 2 + 1) * (1 - v) + P.lx * 0.2, sy = P.neckY + 4;
-      let ex = sx + 6.2 * Math.sin(t1) * v + sd * 1.2 * (1 - v), ey = sy + 6.2 * Math.cos(t1);
-      let x = ex + 5.8 * Math.sin(t1 + fx) * v + sd * 0.8 * (1 - v), y = ey + 5.8 * Math.cos(t1 + fx);
+      const sx = bx + sd * (tw / 2 + 1) * (1 - v) + P.lx * 0.2, sy = P.neckY + 5.1;
+      let ex = sx + 5.5 * Math.sin(t1) * v + sd * 0.9 * (1 - v), ey = sy + 5.5 * Math.cos(t1);
+      let x = ex + 5.2 * Math.sin(t1 + fx) * v + sd * 1.1 * (1 - v), y = ey + 5.2 * Math.cos(t1 + fx);
       ex = lerp(ex, sx + sd * 3 * (1 - v) + 2.5 * v, kn); ey = lerp(ey, sy + 5.5, kn);       // yorgun: eller dizde
-      x = lerp(x, bx + sd * 5 * (1 - v) + 5 * v, kn); y = lerp(y, -12 - P.up, kn);
+      x = lerp(x, bx + sd * 5 * (1 - v) + 5 * v, kn); y = lerp(y, -10.5 - P.up, kn);
       if (gp && gw > 0.002) {   // kılıçlı kol (sağ); siperde destek eli (sol) kabzaya gelir
         let tgt, wgt;
         if (sd === 1) { tgt = [gp.tx, gp.ty]; wgt = gw * Math.max(1 - sstep(0.55, 1, shE), Math.sin(PI * G.hw)); }
@@ -1538,12 +1554,12 @@
       }
       if (sd === 1) H.hl = [x, y];
       if (sd === -1) H.hl2 = [x, y];
-      ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(x, y); ctx.stroke();
+      ctx.lineJoin = 'round'; ctx.lineWidth = 3.8; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(x, y); ctx.stroke();
     };
     if (v > 0.5) arm(-1);
 
     // gövde (nefesle şişer) ve kafa
-    line(bx, cy - th / 2 + tw / 2, bx, cy + th / 2 - tw / 2, tw);
+    ctx.fillStyle = col; heroTorso(bx, P.neckY, th, v); heroHeadRing(hx, hy, bg); ctx.strokeStyle = col; ctx.fillStyle = col;
     gearBandBack(gz);
     const hr = F.dp > 0.25 ? 0 : sstep(0, 0.22, F.wince);   // hasarda kafa anlık kızarır
     if (hr > 0.01) { const a0 = light ? [0, 0, 0] : [255, 255, 255], r0 = light ? [214, 40, 40] : [255, 64, 56]; ctx.fillStyle = `rgb(${Math.round(lerp(a0[0], r0[0], hr))},${Math.round(lerp(a0[1], r0[1], hr))},${Math.round(lerp(a0[2], r0[2], hr))})`; }
@@ -2920,20 +2936,20 @@
   }
   function wdChar(cx, gy, sc, f, t, fg, mini, P) {   // önizleme karakteri: oyundaki eski çizgi-uzuv gövdeyle aynı
     const cf = Math.cos(f), sf = Math.sin(f), v = Math.abs(cf), fl = cf < 0 ? -1 : 1, ea = sstep(-0.45, -0.05, sf);
-    const col = `rgb(${fg})`, bg = P.bg, tw = lerp(15, 9.5, v) * 0.7, th = 16, cy = -26, neckY = cy - th / 2, hy = neckY - 6.2, br = Math.sin(t * 1.5) * 0.25;
+    const col = `rgb(${fg})`, bg = P.bg, tw = 8.8, th = 17.09, cy = -22, neckY = cy - th / 2, hy = neckY - 5.4, br = Math.sin(t * 1.5) * 0.25;
     const g = { bx: 0, cy, th, tw, neckY, hx: 0, hy, v, sf, dx: Math.sin(t * 1.6) * 1.3, dy: Math.sin(t * 2.3) * 0.6 + br, t, bg, col, lxo: 0 };
     const line = (x1, y1, x2, y2, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
     ctx.save(); ctx.translate(cx, gy); ctx.scale(sc * fl, sc); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = col; ctx.fillStyle = col;
-    const lat = 3 * (1 - v); [-1, 1].forEach(sd => line(sd * lat * 0.8, -17, sd * lat, -1.6, 3.8));
-    line(0, cy - th / 2 + tw / 2, 0, cy + th / 2 - tw / 2, tw);
+    const lat = 3.0 * (1 - v); [-1, 1].forEach(sd => line(sd * lat * 0.9, cy + th / 2 - 0.3, sd * lat, -2.2, 4.2));
+    ctx.fillStyle = col; heroTorso(0, neckY, th, v); heroHeadRing(0, hy, bg); ctx.strokeStyle = col;
     gearBandBack(g); ctx.fillStyle = col;
     ctx.beginPath(); ctx.arc(0, hy, 5.4, 0, TAU); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.arc(0, hy, 5.4, 0, TAU); ctx.clip(); ctx.fillStyle = bg; [-1, 1].forEach(sd => { const ep = eyeProj(v, sf, sd); if (ep.a > 0.01) { ctx.beginPath(); ctx.ellipse(ep.x, hy + 0.4, 0.85, 0.85, 0, 0, TAU); ctx.fill(); } }); ctx.restore();
     gearBand(g); ctx.strokeStyle = col;
-    [-1, 1].forEach(sd => { const sx = sd * (tw / 2 + 1) * (1 - v), sy = neckY + 4; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + sd * 1.2 * (1 - v), sy + 6.2); ctx.lineTo(sx + sd * 0.8 * (1 - v) + 1.2 * v, sy + 12); ctx.stroke(); });
+    [-1, 1].forEach(sd => { const sx = sd * (tw / 2 + 1) * (1 - v), sy = neckY + 5.1; ctx.lineWidth = 3.8; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + sd * 0.9 * (1 - v), sy + 5.5); ctx.lineTo(sx + sd * 2.0 * (1 - v) + 1.2 * v, sy + 10.7); ctx.stroke(); });
     ctx.restore(); return v;
   }
-  const WDA = { head: [8.8, -44.2] };   // slot bağlantı noktası (karakter uzayında): seçili slotun işaretçisi buraya konur
+  const WDA = { head: [8.8, -40.15] };   // slot bağlantı noktası (karakter uzayında): seçili slotun işaretçisi buraya konur
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs;
