@@ -1122,11 +1122,6 @@
     }
   }
   const HUD_Y = 66;   // sol üst profil paneli ile sağ üst düğme aynı yatay hizada
-  /* NOT (arayüz kuralı): Safe area KULLANMIYORUZ, kullanmayacağız. Bunun yerine cihazın saat/pil/çentik şeridinin altında
-     kalacak şekilde UI_TOP kadar boşluk bırakılır. Yeni arayüzlerde (menü, sayfa, panel, açılır pencere) üst kenara yakın
-     hiçbir düğme/başlık y < UI_TOP içine konmaz; butonlar bu çizginin altından başlayıp HUD_Y ile hizalanır.
-     Dikey (portre) ekranda geçerlidir; yatayda üstte durum çubuğu olmadığı için 0 sayılır. */
-  const UI_TOP = 44;
   const HB = { hp: 1, lag: 1, du: 1, low: 0 };   // karakter barı: yumuşak akan can/dayanıklılık, gecikmeli iz
   function hudHeart(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + 3.2 * s); ctx.bezierCurveTo(x - 6 * s, y - 1.5 * s, x - 3 * s, y - 5.5 * s, x, y - 2 * s); ctx.bezierCurveTo(x + 3 * s, y - 5.5 * s, x + 6 * s, y - 1.5 * s, x, y + 3.2 * s); ctx.fill(); }
   function hudShield(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y + 0.5 * s); ctx.quadraticCurveTo(x + 4 * s, y + 4 * s, x, y + 5.5 * s); ctx.quadraticCurveTo(x - 4 * s, y + 4 * s, x - 4 * s, y + 0.5 * s); ctx.closePath(); ctx.fill(); }
@@ -2772,11 +2767,7 @@
   const MENU = { on: true, st: 'idle', mode: 'zoom', sT: 0, blk: 0, t: 0, btns: [], mote: [], fl: 0, gx: 0, gy: 0, tgx: 0, tgy: 0, gT: 2.5, px: 0, py: 0, pt: -99, egg: 0, eggD: 0, eggT: rnd(14, 22), bT: rnd(3.5, 5.5), bP: -1, snd: 0 };
   for (let i = 0; i < 48; i++) MENU.mote.push({ x: Math.random(), y: Math.random(), r: rnd(0.6, 1.9), v: rnd(0.012, 0.035), ph: rnd(0, 6), a: rnd(0.15, 0.5) });
   const UIF = '-apple-system, "Segoe UI", Roboto, sans-serif';
-  /* İlk dokunuşta göz takibi yok: ilk dokunuş sesleri serbest bırakıp çaldırıyor, göz hareketi de aynı anda
-     çizilince takılma yapıyordu. İlk dokunuştan sonra kısa bir süre (GAZE_DELAY sn) göz imleci izlemez, sonra normale döner. */
-  const GAZE_DELAY = 0.9;
-  addEventListener('pointerdown', () => { if (MENU.blkT === undefined) MENU.blkT = MENU.t + GAZE_DELAY; }, { capture: true, passive: true });
-  addEventListener('pointermove', e => { if (MENU.blkT !== undefined && MENU.t < MENU.blkT) return; MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });
+  addEventListener('pointermove', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });
   function menuStart() { if (!MENU.on || MENU.st !== 'idle') return; MENU.st = 'go'; try { AU.intro(); } catch (_) {} MENU.mode = Math.random() < 0.1 ? 'stab' : 'zoom'; MENU.sT = 0; MENU.snd = 0; MENU.fl = 1; if (MENU.mode === 'zoom') { try { AU.sfx('pickup'); } catch (_) {} } }   // çoğunlukla yakınlaşma; %10 ihtimalle kılıç saplanması (gizli)
   function menuTap(px, py) { if (MENU.st !== 'idle') return false; for (const b of MENU.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return true; } return false; }
   function menuPill(x, y, w, h, label, a, strong, t) {
@@ -2894,7 +2885,7 @@
       menuPill(cx - bw / 2, by, bw, bh, 'BAŞLA', be, true, t); MENU.btns.push({ x: cx - bw / 2, y: by - 6, w: bw, h: bh + 12, fn: menuStart });
       menuPill(cx - ow - og / 2, oy, ow, oh, AU.muted ? 'SES  KAPALI' : 'SES  AÇIK', be, false, t); MENU.btns.push({ x: cx - ow - og / 2, y: oy - 4, w: ow, h: oh + 8, fn: () => AU.toggleMute() });
       menuPill(cx + og / 2, oy, ow, oh, 'KIYAFET', be, false, t); MENU.btns.push({ x: cx + og / 2, y: oy - 4, w: ow, h: oh + 8, fn: wdEnterFromMenu });
-      { const dw = 124, dh = 30, dx = W - dw - 14, dy = HUD_Y - dh / 2; menuPill(dx, dy, dw, dh, 'GELİŞTİRİCİ', be, false, t); MENU.btns.push({ x: dx - 6, y: dy - 6, w: dw + 12, h: dh + 12, fn: () => { DEV.on = DEV.peace = DEV.gold = DEV.keys = DEV.arrows = true; menuStart(); } }); }   // sağ üst: geliştirici modu (barışçıl başlar)
+      { const dw = 124, dh = 30, dx = W - dw - 14, dy = 16; menuPill(dx, dy, dw, dh, 'GELİŞTİRİCİ', be, false, t); MENU.btns.push({ x: dx - 6, y: dy - 6, w: dw + 12, h: dh + 12, fn: () => { DEV.on = DEV.peace = DEV.gold = DEV.keys = DEV.arrows = true; menuStart(); } }); }   // sağ üst: geliştirici modu (barışçıl başlar)
       if (oy + oh + 14 < H - 40) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', cx, H - 26); }
       if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', cx, Math.min(H - 52, oy + oh + 34)); }
       ctx.restore();
@@ -2963,7 +2954,7 @@
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const bw = Math.min(W * 0.64, 250), oh = 38, gap = 12, n = DEV_OPTS.length;
     const total = 46 * u + n * (oh + gap) + 20 + oh;
-    let y = Math.max(UI_TOP + 12, (H - total) / 2 - H * 0.03);
+    let y = Math.max(24, (H - total) / 2 - H * 0.03);
     ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = 'rgba(240,194,74,0.9)';
     const T = 'GELİŞTİRİCİ AYARLARI', ch = [...T], sp = 4, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cx - tw / 2; ctx.textAlign = 'left';
     for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
@@ -3014,7 +3005,7 @@
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs;
-    const P = wdPal(), land = W > H * 1.05 || H < 520, hTop = land ? 0 : UI_TOP, hdr = (land ? 56 : 64) + hTop, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
+    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 56 : 64, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
     if (!WDR.drag) { WDR.yaw += WDR.vel * dt; WDR.vel *= Math.exp(-3.2 * dt); if (Math.abs(WDR.vel) < 0.02) WDR.vel = 0; WDR.idle += dt; if (WDR.idle > 4 && WDR.vel === 0) { const tg = Math.round(WDR.yaw / TAU) * TAU; WDR.yaw += (tg - WDR.yaw) * (1 - Math.exp(-4 * dt)); if (Math.abs(tg - WDR.yaw) < 0.002) WDR.yaw = tg; } }
     // --- yerleşim ---
@@ -3041,10 +3032,10 @@
     }
     if (WDR.hint > 0.03) { ctx.font = `400 10px ${UIF}`; ctx.textBaseline = 'middle'; ctx.fillStyle = P.m(WDR.hint * (0.36 + 0.1 * Math.sin(t * 2))); wdLetters('sürükleyerek döndür', scx, gy + 4 * sc + 20, 1.8, 'c'); }
     // --- başlık + düğmeler ---
-    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, hTop + (hdr - hTop) / 2 + 1, 6, 'c');
+    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, hdr / 2 + 1, 6, 'c');
     const any = GEAR_SLOTS.some(([sl]) => OUTFIT[sl]);
     const round = (x, y, en, ico) => { ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = en ? P.ln2 : P.ln; ctx.stroke(); ctx.strokeStyle = en ? P.tx : P.ln2; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ico(x, y); };
-    const by = hTop + (hdr - hTop) / 2 + 1;
+    const by = hdr / 2 + 1;
     round(34, by, true, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 2.5, y - 6.5); ctx.lineTo(x - 3.5, y); ctx.lineTo(x + 2.5, y + 6.5); ctx.stroke(); });
     PAUSE.btns.push({ x: 8, y: by - 26, w: 52, h: 52, fn: wdBack });
     round(W - 34, by, any, (x, y) => { const r = 6.6, a0 = -PI / 2 + 0.55, a1 = -PI / 2 - 0.55 + TAU, px = x + r * Math.cos(a1), py = y + r * Math.sin(a1), tx = -Math.sin(a1), ty = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
@@ -3093,7 +3084,7 @@
     ctx.save(); ctx.globalAlpha = e; ctx.translate(0, (1 - e) * 10);
     if (PAUSE.page === 'wardrobe') { drawWardrobePage(u, cx, fg); ctx.restore(); return; }
     if (DEV.on && PAUSE.page === 'dev') { drawDevPage(u, cx); ctx.restore(); return; }
-    const total = (340 + 54 + (DEV.on ? 50 : 0)) * u; let y = Math.max(UI_TOP + 12, (H - total) / 2 - H * 0.03);
+    const total = (340 + 54 + (DEV.on ? 50 : 0)) * u; let y = Math.max(24, (H - total) / 2 - H * 0.03);
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
     const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cx - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
     y += 18 * u + 14 * u; ctx.textAlign = 'center'; ctx.font = `200 ${54 * u}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(TM.t), cx, y + 44 * u);
