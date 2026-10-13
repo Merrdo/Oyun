@@ -304,8 +304,63 @@
       eRage(d, t) { tone(d, 'sawtooth', 90, 40, t, 0.9, 0.55, { lp: 600, att: 0.05, vib: [16, 10] }); tone(d, 'sawtooth', 180, 70, t, 0.8, 0.25, { lp: 1200, vib: [12, 14] }); nz(d, t, 0.9, 0.4, 'bandpass', 500, 250, 1.5, 0.1); }
     };
     const REV = { bowShot: 0.3, bowGet: 0.35, evilHit: 0.45, evilShatter: 0.6, eIdle: 0.3, eSpawn: 0.4, eRage: 0.4, eDie: 0.3, playerDeath: 0.4, pickup: 0.35 }, GAP = { bowEmpty: 0.2, arrowGet: 0.05, arrowHit: 0.04, coin: 0.06, chainClank: 0.08, swing: 0.08, hit: 0.05, eIdle: 0.15, block: 0.05, boltHit: 0.05 }, last = {};
+    /* ----- KALKAN BEYİ sesleri: alçak, kalın, tok (zırh + kalkan + boğuk homurtu); perdesi hafif değişir ----- */
+    const knv = e => e && e.vp ? 0.9 + (e.vp - 0.8) * 0.3 : 1;
+    Object.assign(SFX, {
+      knGrunt(d, t, e) { const v = knv(e); tone(d, 'sawtooth', 96 * v, 64 * v, t, 0.32, 0.34, { lp: 360, att: 0.04, vib: [5.5, 4] }); tone(d, 'sine', 48 * v, 40 * v, t, 0.34, 0.4, { att: 0.05 }); nz(d, t, 0.28, 0.12, 'bandpass', 260 * v, 180 * v, 2.2, 0.05); },
+      knIdle(d, t, e) {   // arada çıkan alçak, yumuşak homurtu: 'hmmm... hm'
+        const v = knv(e), f = 70 * v; tone(d, 'sawtooth', f * 1.15, f * 0.9, t, 1.1, 0.2, { lp: 240, att: 0.35, vib: [3.6, 3] }); tone(d, 'sine', f * 0.5, f * 0.45, t, 1.1, 0.22, { att: 0.4 }); nz(d, t, 1.0, 0.07, 'bandpass', 200 * v, 150 * v, 2.5, 0.4);
+        if (Math.random() < 0.5) tone(d, 'sawtooth', f * 1.3, f * 1.0, t + 0.75, 0.55, 0.14, { lp: 230, att: 0.15, vib: [4, 3] });
+      },
+      knStep(d, t, e) { const r = e && e.sh <= 0; if (r) tone(d, 'sine', 70, 30, t, 0.18, 0.5); tone(d, 'sine', 95, 42, t, 0.13, r ? 0.75 : 0.5); nz(d, t, 0.07, 0.28, 'lowpass', 700, 200, 0.8); if (Math.random() < 0.6) nz(d, t + 0.01, 0.05, 0.07, 'bandpass', 1500, 1100, 3); },   // ağır adım + hafif zırh şıngırtısı
+      knWind(d, t, e) {   // savurma hazırlığı: yükselen homurtu, kayış / plaka gıcırtısı
+        const v = knv(e), w = e.wd || 0.5; tone(d, 'sawtooth', 64 * v, 118 * v, t, w, 0.3, { lp: 380, att: w * 0.7, vib: [7, 5] }); tone(d, 'sine', 44, 80, t, w, 0.45, { att: w * 0.8 });
+        nz(d, t, w, 0.2, 'bandpass', 320, 900, 2, w * 0.7); tone(d, 'square', 150, 120, t + w * 0.3, w * 0.5, 0.04, { lp: 500, vib: [22, 12] });
+      },
+      knSweep(d, t, e) {   // kalkan savruluyor: kalın hava yarılması + gürlemeli nefes
+        const v = knv(e), sw = e.atk === 'sweep'; nz(d, t, sw ? 0.42 : 0.26, 0.7, 'lowpass', 1800, 160, 0.9, 0.03); nz(d, t, 0.3, 0.3, 'bandpass', 520, 220, 1.4, 0.04);
+        tone(d, 'sawtooth', 120 * v, 56 * v, t, 0.36, 0.4, { lp: 420, vib: [8, 6] }); tone(d, 'sine', 70, 34, t, 0.4, 0.55);
+        if (sw) [180, 260, 340].forEach((f, i) => tone(d, 'square', f, f * 0.9, t + i * 0.03, 0.12, 0.05, { lp: 700 }));
+      },
+      knSmash(d, t) {   // kalkan vücuda çarptı: derin gümbürtü + donuk plaka çınlaması
+        tone(d, 'sine', 96, 28, t, 0.6, 1.0); nz(d, t, 0.45, 0.85, 'lowpass', 1400, 120, 0.8); tone(d, 'triangle', 260, 90, t, 0.3, 0.3, { lp: 800 });
+        [330, 495].forEach((f, i) => tone(d, 'sine', f, f * 0.97, t + i * 0.01, 0.35, 0.12)); nz(d, t, 0.05, 0.35, 'highpass', 1800, 1800, 0.7);
+      },
+      knBlock(d, t) {   // kılıç kalın kalkana çarptı: tiz 'tınk' değil, boğuk ve ağır 'dong'
+        tone(d, 'sine', 150, 95, t, 0.2, 0.8); tone(d, 'sine', 62, 38, t, 0.25, 0.6); tone(d, 'triangle', 320, 300, t, 0.45, 0.28);
+        [212, 318, 470].forEach((f, i) => tone(d, 'sine', f, f * 0.99, t, 0.5 - 0.1 * i, 0.2 / (i + 1) + 0.05)); nz(d, t, 0.08, 0.45, 'bandpass', 900, 500, 1.2); nz(d, t, 0.04, 0.3, 'highpass', 2500, 2500, 0.7);
+      },
+      knHurt(d, t, e) { const v = knv(e); tone(d, 'sawtooth', 150 * v, 66 * v, t, 0.42, 0.42, { lp: 520, att: 0.015, vib: [11, 9] }); tone(d, 'sine', 70, 36, t, 0.35, 0.5); nz(d, t, 0.2, 0.4, 'lowpass', 1100, 200, 0.9); tone(d, 'triangle', 230, 160, t, 0.2, 0.12, { lp: 900 }); },
+      knDie(d, t, e) {   // derin inleme, zırh yere saçılır
+        const v = knv(e); tone(d, 'sawtooth', 140 * v, 30, t, 1.5, 0.5, { lp: 520, att: 0.03, vib: [6, 10] }); tone(d, 'sine', 60, 24, t, 1.4, 0.7); nz(d, t, 1.2, 0.5, 'lowpass', 1100, 90, 0.8, 0.04);
+        for (let i = 0; i < 5; i++) nz(d, t + 0.35 + i * 0.09 + Math.random() * 0.05, 0.08, 0.3, 'bandpass', 500 + Math.random() * 900, 420, 2.5); tone(d, 'sine', 80, 28, t + 0.5, 0.5, 0.6);
+      },
+      knScream(d, t, e) {   // acı çığlığı: üç kırık nefeste çatlayan, alçalan bağırış
+        const v = knv(e);
+        [[0, 0.55, 250, 205], [0.5, 0.7, 330, 190], [1.2, 0.7, 260, 140], [1.85, 0.6, 190, 60]].forEach(([o, du, f0, f1]) => { tone(d, 'sawtooth', f0 * v, f1 * v, t + o, du, 0.42, { lp: 1100, att: 0.03, vib: [8, 14] }); tone(d, 'square', f0 * v * 0.5, f1 * v * 0.5, t + o, du, 0.14, { lp: 700, att: 0.04, vib: [7, 8] }); nz(d, t + o, du, 0.2, 'bandpass', 900 * v, 520 * v, 1.5, 0.04); });
+        tone(d, 'sine', 58, 36, t, 2.4, 0.5, { att: 0.2 }); nz(d, t, 2.4, 0.14, 'lowpass', 500, 200, 0.8, 0.3);
+      },
+      knShatter(d, t) {   // vazo parçalanması: tok çatırtı + dağılan seramik tıngırtısı
+        tone(d, 'sine', 100, 32, t, 0.5, 0.9); nz(d, t, 0.5, 0.8, 'lowpass', 3200, 200, 0.8); nz(d, t, 0.06, 0.7, 'highpass', 2800, 2800, 0.7); tone(d, 'triangle', 420, 120, t, 0.25, 0.25, { lp: 1200 });
+        for (let i = 0; i < 16; i++) nz(d, t + 0.02 + i * 0.04 + Math.random() * 0.03, 0.07, 0.38, 'bandpass', 1400 + Math.random() * 3200, 1500, 3.5);
+        for (let i = 0; i < 6; i++) tone(d, 'sine', 1800 + Math.random() * 2800, 1500, t + 0.03 + i * 0.05, 0.4, 0.06);
+      },
+      knBladeDraw(d, t, e) {   // kalkanın arkasından dev kılıç çekilir: uzun metal sürtünmesi + öfkeli homurtu
+        const v = knv(e); nz(d, t, 0.6, 0.45, 'bandpass', 900, 4200, 3, 0.12); tone(d, 'sawtooth', 700, 2200, t + 0.05, 0.5, 0.08, { lp: 3500, att: 0.15 }); tone(d, 'sawtooth', 60 * v, 95 * v, t, 0.9, 0.38, { lp: 320, att: 0.2, vib: [8, 6] }); tone(d, 'sine', 46, 70, t, 0.9, 0.5, { att: 0.25 });
+      },
+      knBladeSwing(d, t, e) {   // dev kılıç iner: derin hava yarılması + kükreme
+        const v = knv(e); nz(d, t, 0.6, 0.9, 'lowpass', 2600, 120, 0.9, 0.03); nz(d, t, 0.45, 0.35, 'bandpass', 400, 200, 1.4, 0.05); tone(d, 'sawtooth', 110 * v, 45 * v, t, 0.5, 0.5, { lp: 500, vib: [9, 8] }); tone(d, 'sine', 55, 28, t, 0.6, 0.7);
+      },
+      knBladeHit(d, t) {   // kılıç çarptı: ezici çelik gümbürtüsü
+        tone(d, 'sine', 80, 24, t, 0.8, 1.0); nz(d, t, 0.7, 0.9, 'lowpass', 2400, 100, 0.8); [440, 660, 990].forEach((f, i) => tone(d, 'sine', f, f * 0.98, t, 0.6 - i * 0.1, 0.12)); nz(d, t, 0.06, 0.6, 'highpass', 2500, 2500, 0.7); tone(d, 'triangle', 200, 70, t, 0.4, 0.35, { lp: 900 });
+      },
+      knRoar(d, t, e) { const v = knv(e); tone(d, 'sawtooth', 70 * v, 135 * v, t, 0.9, 0.5, { lp: 480, att: 0.12, vib: [9, 8] }); tone(d, 'sine', 46, 70, t, 0.9, 0.6, { att: 0.15 }); nz(d, t, 0.9, 0.3, 'bandpass', 260, 520, 1.6, 0.2); },   // kalkan kırılınca boğa gibi kükreme
+      bodyFall(d, t) { tone(d, 'sine', 110, 34, t, 0.4, 0.9); nz(d, t, 0.3, 0.6, 'lowpass', 900, 150, 0.8); nz(d, t, 0.05, 0.3, 'highpass', 2000, 2000, 0.7); }   // karakter yere çarptı
+    });
+    Object.assign(REV, { knIdle: 0.25, knDie: 0.3, knSmash: 0.3, knSweep: 0.15, knWind: 0.12, knGrunt: 0.2, bodyFall: 0.2, knRoar: 0.3, knScream: 0.3, knShatter: 0.3, knBladeDraw: 0.2, knBladeSwing: 0.2, knBladeHit: 0.35 });
+    Object.assign(GAP, { knIdle: 0.4, knStep: 0.18, knGrunt: 0.12, knRoar: 0.5, knScream: 0.5, knShatter: 0.2, knBladeDraw: 0.3, knBladeSwing: 0.3, knBladeHit: 0.2, knBlock: 0.05, knHurt: 0.08, knWind: 0.1, knSmash: 0.1, bodyFall: 0.2 });
     function sfx(name, x, y, a) {
-      if (!ac || ac.state !== 'running' || muted) return; const f = SFX[name]; if (!f) return; if (name[0] === 'e' && ac.currentTime < quietUntil) return;   // oyuna giriş: canavar sesleri müzik oturana kadar susar
+      if (!ac || ac.state !== 'running' || muted) return; const f = SFX[name]; if (!f) return; if ((name[0] === 'e' || name.startsWith('kn')) && ac.currentTime < quietUntil) return;   // oyuna giriş: canavar sesleri müzik oturana kadar susar
       const t = ac.currentTime; if (t - (last[name] || -9) < (GAP[name] || 0.03)) return; last[name] = t;
       try { const d = bus(x, y, REV[name] === undefined ? 0.18 : REV[name]); if (d) f(d, t + 0.005, a); } catch (_) {}
     }
@@ -677,8 +732,8 @@
     G.bump = Math.sin(PI * clamp(G.eq / 0.6, 0, 1));
     if (Math.abs(Math.cos(he.face)) > 0.35) G.sd = Math.cos(he.face) > 0 ? 1 : -1;
     G.sds += (G.sd - G.sds) * dmp(10, dt);
-    const busy = F.pt >= 0 || F.down || F.guarding || F.broken > 0 || F.death >= 0 || F.flash > 0 || G.eq < 1 || G.tw >= 0;
-    if (BOW.out > 0.05) { G.idleT = G.runT = 0; G.stow = true; }   // yay elde: kılıç kına girer
+    const busy = F.kd >= 0 || F.pt >= 0 || F.down || F.guarding || F.broken > 0 || F.death >= 0 || F.flash > 0 || G.eq < 1 || G.tw >= 0;
+    if (BOW.out > 0.05 || F.fin) { G.idleT = G.runT = 0; G.stow = true; }   // yay elde: kılıç kına girer
     else if (busy) { G.idleT = G.runT = 0; G.stow = false; }
     else {   // saldırısız 1,5 sn durunca ya da hızlı koşuya geçince kılıç kına girer; saldırı / siper / hasar onu hemen çeker
       G.idleT = he.move < 0.2 ? G.idleT + dt : 0; G.runT = he.run > 0.8 ? G.runT + dt : 0;
@@ -698,8 +753,8 @@
   const TIRED_LO = 15, TIRED_HI = 55, TIRED_DMG = 0.5;   // dayanıklılık LO'nun altına inerse yorulur; HI'ya çıkana kadar vuruşlar yarı hasar verir
   const wpnDmg = () => (F.tired ? TIRED_DMG : 1) * gearM('sword');
   const DEV = { on: false, peace: false, gold: false, keys: false, arrows: false };   // geliştirici modu: ana ekranın sağ üstünden girilir · hepsi açık başlar · düğmeleri duraklatma menüsünde
-  const E = []; E.spawnT = 1.5;
-  const F = { gt: 0, pt: -1, dir: 1, aim: 0, buf: false, down: false, hold: 0, guarding: false, gw: 0, dur: 100, broken: 0, bw: 0, regenT: 0, sw: 0, off: 0,
+  const E = []; E.spawnT = 1.5; E.kT = 6;
+  const F = { kd: -1, stag: 0, sgx: 0, sgy: 0, kp: 0, lx: 0, ly: 0, slow: 0, stomp: 0, fin: null, bstun: false, gt: 0, pt: -1, dir: 1, aim: 0, buf: false, down: false, hold: 0, guarding: false, gw: 0, dur: 100, broken: 0, bw: 0, regenT: 0, sw: 0, off: 0,
     hp: 100, tired: false, flash: 0, lunge: 0, drop: 0, tx: 0, ty: 0, squint: false, time: 0, fx: null, hit: [], stp: 0, wind: 0, wince: 0, death: -1, dp: 0, fall: 1, ds: null };
   /* ---------- Efektler: vuruş duraklaması, kamera sarsıntısı, kıvılcım, ayak izi ---------- */
   const FX = { stop: 0, shake: 0, ox: 0, oy: 0, t: 0 }, SPK = [], PR = [], DEB = [], SMK = [];   // DEB: taş parçaları · SMK: karanlık duman
@@ -769,7 +824,7 @@
     F.aim = n ? Math.atan2(n.y - player.y, n.x - player.x) : v ? Math.atan2(v.y - player.y, v.x - player.x) : hero.face;
     F.dir = -F.dir; F.pt = 0; F.buf = false; F.hold = 0; F.hit = []; F.stp = 0; AU.sfx('swing');
   }
-  function pressAtk() { if (!G.has || G.eq < 1 || F.death >= 0) return; if (BOW.st !== 'idle' || BOW.out > 0.02) bowCancel(); G.stow = false; G.idleT = G.runT = 0; G.sh = Math.min(G.sh, 0.3); F.down = true; F.hold = 0; if (F.pt < 0) startSwing(); else if (F.pt > ST * 0.5) F.buf = true; }
+  function pressAtk() { if (!G.has || G.eq < 1 || F.death >= 0 || F.fin || F.kd >= 0) return; if (BOW.st !== 'idle' || BOW.out > 0.02) bowCancel(); G.stow = false; G.idleT = G.runT = 0; G.sh = Math.min(G.sh, 0.3); F.down = true; F.hold = 0; if (F.pt < 0) startSwing(); else if (F.pt > ST * 0.5) F.buf = true; }
   function relAtk() { F.down = false; F.buf = false; F.hold = 0; F.guarding = false; }
   const burst = (x, y, n, sp) => { for (let i = 0; i < n; i++) { const a = rnd(0, TAU); hero.puffs.push({ x, y, vx: Math.cos(a) * sp * rnd(0.4, 1), vy: Math.sin(a) * sp * rnd(0.4, 1) - 8, t: 0, life: rnd(0.3, 0.55), r: rnd(1.6, 3) }); } };
   /* ---------- Hasar sayıları: küçük punto, yukarı süzülüp solar ---------- */
@@ -791,15 +846,18 @@
     ctx.restore();
   }
   function hitEnemy(e, dmg, ang, ranged) {
+    if (e.kind === 'knight' && !ranged && kguard(e, ang)) { knightBlock(e, ang, dmg); return; }
     const dealt = dmg * (e.st === 'rec' ? 1.5 : 1); e.hp -= dealt; e.flash = 0.12; dmgNum(e.x, e.y - 58, dealt, e.st === 'rec');   // soluklanırken vurulursa fazla hasar
     if (!e.armor) { e.stun = 0.35; e.st = 'chase'; e.t = 0; e.atk = ''; e.cd = Math.max(e.cd, 0.5); e.kx = Math.cos(ang) * 300 * (dmg < 20 ? 0.55 : 1); e.ky = Math.sin(ang) * 300 * (dmg < 20 ? 0.55 : 1); }
     else { e.x += Math.cos(ang) * 4; e.y += Math.sin(ang) * 4; }
     F.fx = { x: e.x, y: e.y - 24, t: 0, k: 'hit' };
     const kill = e.hp <= 0; sparks(e.x - Math.cos(ang) * 8, e.y - 24, kill ? 12 : 7, 200, ang, 0.9); hitFx(kill ? 0.12 : 0.07, kill ? 5 : 3);
     AU.sfx(ranged ? 'arrowHit' : 'hit', e.x, e.y, kill);
-    if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10); AU.sfx('eDie', e.x, e.y, e); E.splice(E.indexOf(e), 1); if (!e.src) E.spawnT = 2.5; }
+    if (kill && e.kind === 'knight') knightDeath(e, ang);
+    else if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10); AU.sfx(e.kind === 'knight' ? 'knDie' : 'eDie', e.x, e.y, e); E.splice(E.indexOf(e), 1); if (!e.src && e.kind === 'ghost') E.spawnT = 2.5; if (e.kind === 'knight') dropK(e.x, e.y); }
     else {
-      AU.sfx('eHurt', e.x, e.y, e);
+      AU.sfx(e.kind === 'knight' ? 'knHurt' : 'eHurt', e.x, e.y, e); if (e.kind === 'knight') e.mad = Math.min(1, (e.mad || 0) + 0.22);
+      if (e.kind === 'knight' && e.sh <= 0 && e.hp <= e.max * 0.2 && !ranged && !F.fin && e.st !== 'down' && Math.random() < K_FIN) startFin(e);
       if (!e.rg && e.hp <= e.max * 0.5) { e.rg = e.rage = true; AU.sfx('eRage', e.x, e.y); smoke(e.x, e.y - 20, 6, 60, 12); hitFx(0, 2); }   // yarı canda öfkelenir: daha hızlı, 3'lü küre
     }
   }
@@ -823,13 +881,14 @@
     }
   }
   function hurtPlayer(e, dmg, gc) {
-    if (F.death >= 0 || DEV.peace) return;
+    if (F.death >= 0 || DEV.peace || F.fin) return;
     dmg *= gearM('dmgTaken');
     const ang = Math.atan2(e.y - player.y, e.x - player.x), front = Math.abs(wrap(ang - hero.face)) < GUARD_ARC;
     if (F.guarding && F.gw > 0.5 && front) {   // siper: hasar yok ama dayanıklılık azalır
       const pry = F.gt < 0.22; F.dur -= pry ? 0 : (gc || 30) * 0.6 * gearM('stamCost'); if (F.dur > 0) AU.sfx('block'); if (pry) { ftext(player.x, player.y - 62, 'Savuşturma!', null); hitFx(0, 4); }   // siperi yeni kapatınca isabet = tam savuşturma (bedava, düşman uzun süre açık kalır)
       F.fx = { x: player.x + Math.cos(ang) * 26, y: player.y - 22 + Math.sin(ang) * 14, t: 0, k: 'block' };
       sparks(F.fx.x, F.fx.y, 9, 230, ang, 0.8); hitFx(0.05, 2.5);
+      if (pry && e.kind === 'knight' && e.sh > 0) shieldDmg(e, ang, 55);   // tam savuşturma kalkanı çatlatır (2 savuşturma = kırık)
       e.stun = pry ? 0.9 : 0.5; e.kx = Math.cos(ang) * 260; e.ky = Math.sin(ang) * 260; e.st = 'rec'; e.t = 0.2; e.rd = pry ? 1.5 : 1.0; e.atk = ''; e.cd = pry ? 1.8 : 1.2; e.did = true;   // siperle karşılanan düşman sendeler, açık kalır
       player.vx -= Math.cos(ang) * 80; player.vy -= Math.sin(ang) * 80;
       if (F.dur <= 0) { F.dur = 0; F.broken = 1.5; F.guarding = false; F.hp -= dmg * 0.5; F.flash = 0.25; F.fx.k = 'break'; F.wince = 0.6; AU.sfx('guardBreak'); sparks(F.fx.x, F.fx.y, 14, 260, 0, TAU); hitFx(0.13, 6); burst(F.fx.x, F.fx.y, 8, 60); }
@@ -841,10 +900,22 @@
     if (F.hp <= 0) { F.hp = 0; F.death = 0; AU.sfx('playerDeath'); F.fall = player.x >= e.x ? 1 : -1; F.guarding = false; F.pt = -1; F.buf = false; F.ds = null; hitFx(0.2, 9); sparks(player.x, player.y - 22, 14, 220, 0, TAU); }
   }
   function updateFight(dt) {
-    F.time += dt; F.flash = Math.max(0, F.flash - dt); F.wince = Math.max(0, F.wince - dt);
+    F.time += dt; F.slow = Math.max(0, F.slow - dt);
+    if (F.lx || F.ly) { player.x += F.lx * dt; player.y += F.ly * dt; const dk = Math.max(0, 1 - 5 * dt); F.lx *= dk; F.ly *= dk; if (Math.abs(F.lx) + Math.abs(F.ly) < 4) F.lx = F.ly = 0; }   // geri tepme / fırlatma kayması
+    if (F.stag > 0) { F.stag = Math.max(0, F.stag - dt); const sw2 = Math.sin(F.stag * 21) * 105 * (F.stag / 1.3); player.x += F.sgx * sw2 * dt; player.y += F.sgy * sw2 * dt * 0.6; }   // sendeleme yalpası
+    F.flash = Math.max(0, F.flash - dt); F.wince = Math.max(0, F.wince - dt);
     F.dp += ((F.death >= 0 ? 1 : 0) - F.dp) * dmp(F.death >= 0 ? 4 : 6, dt); if (F.dp < 0.002) F.dp = 0;
     if (F.fx && (F.fx.t += dt) > 0.3) F.fx = null;
     if (!(G.has && G.eq >= 1)) { F.pt = -1; F.guarding = false; F.gw = F.bw = F.sw = F.lunge = F.drop = F.tx = F.ty = 0; F.squint = false; return; }
+    if (F.kd >= 0) {   // düşüş: havada 0,3 sn · yerde 1,3 sn · diz çöküp kalkmaya çabalar (2,1 sn'ye kadar) · ayağa kalkar (2,6 sn)
+      if (F.death >= 0) { F.kd = -1; F.kp = 0; } else {
+        const k = (F.kd += dt), tg = k < 1.3 ? 1 : k < 2.1 ? lerp(1, 0.45, sstep(1.3, 2.1, k)) + Math.sin(k * 20) * 0.04 : lerp(0.45, 0, sstep(2.1, 2.6, k));
+        if (k - dt < 0.3 && k >= 0.3) { burst(player.x, player.y - 4, 8, 55); smoke(player.x, player.y - 4, 4, 40, 8); hitFx(0, 3); AU.sfx('bodyFall'); }   // yere çarpış
+        F.kp += (tg - F.kp) * dmp(k < 0.3 ? 14 : 10, dt); F.pt = -1; F.buf = false; F.guarding = false; F.down = false; F.hold = 0; F.gw = F.sw = F.lunge = 0;
+        if (k >= 2.6) { F.kd = -1; F.kp = 0; }
+      }
+    }
+    if (F.fin) { if (F.death >= 0) { F.fin = null; F.stomp = 0; } else { updateFin(dt); return; } }
     if (F.death >= 0) {   // ölüm: diz çök, yana yıkıl, kılıç elden düşer; sonra ayağa kalk
       const t0 = F.death; F.death += dt;
       F.pt = -1; F.buf = false; F.guarding = false; F.broken = 0; F.squint = true; F.off = 0; F.tx = F.ty = 0;
@@ -866,7 +937,7 @@
       if (p > 0.28 && p < 0.55) swingHit();
       if (F.pt >= ST) { F.pt = -1; if (F.buf) startSwing(); }
     }
-    if (F.broken > 0) { F.broken -= dt; F.guarding = false; if (F.broken <= 0) { F.broken = 0; F.dur = 55; } }
+    if (F.broken > 0) { F.broken -= dt; F.guarding = false; if (F.broken <= 0) { F.broken = 0; if (F.bstun) F.bstun = false; else F.dur = 55; } }
     else if (F.down && F.pt < 0 && !F.guarding && (F.hold += dt) > 0.12) F.guarding = true;
     if (!F.down) F.guarding = false;
     F.gt = F.guarding ? F.gt + dt : 0;
@@ -878,7 +949,7 @@
     F.wind = sp < 0 ? 0 : sstep(0, 0.12, sp) * (1 - sstep(0.14, 0.22, sp));   // vuruş öncesi geri çekilme
     F.gw += ((F.guarding ? 1 : 0) - F.gw) * dmp(16, dt);
     F.bw += ((F.broken > 0 ? 1 : 0) - F.bw) * dmp(10, dt);
-    const am = F.guarding && F.dur < 35 ? (35 - F.dur) / 35 * 1.3 : F.broken > 0 ? 0.5 : 0;   // dayanıklılık azalınca kılıç titrer
+    const am = F.guarding && F.dur < 35 ? (35 - F.dur) / 35 * 1.3 : F.broken > 0 ? (F.bstun ? 2.7 : 0.5) : 0;   // dayanıklılık azalınca kılıç titrer
     F.tx = Math.sin(F.time * 63) * am; F.ty = Math.cos(F.time * 77) * am;
     F.squint = F.broken > 0;
     F.drop = F.gw * 0.8 + F.bw * 1.8;
@@ -920,20 +991,25 @@
     for (let i = EDUST.length - 1; i >= 0; i--) { const p = EDUST[i]; if ((p.t += dt) >= p.life) { EDUST.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 1.5 * dt; p.vy *= 1 - 1.5 * dt; }
     if (DEV.peace) { E.length = 0; EP.length = 0; E.spawnT = 3; return; }   // barışçıl: yaratık yok, yeni yaratık gelmez
     for (let i = E.length - 1; i >= 0; i--) if (E[i].src && Math.hypot(E[i].x - player.x, E[i].y - player.y) > 1500) E.splice(i, 1);
-    let nat = 0; for (const e of E) if (!e.src) nat++;
+    let nat = 0; for (const e of E) if (!e.src && e.kind === 'ghost') nat++;
     if (on && nat < NAT_CAP && (E.spawnT -= dt) <= 0) {
       const a = rnd(0, TAU), r = rnd(430, 520);
       E.push(newEnemy(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r, undefined, -0.3)); E.spawnT = rnd(3.5, 6);
+    }
+    let kn = 0; for (const e of E) if (e.kind === 'knight') kn++;   // KALKAN BEYİ: 1. dakikadan sonra, ilk 2,5 dk'da 1, sonra 2 tane
+    if (on && TM.t >= K_START && kn < Math.min(K_CAP, 1 + Math.floor(Math.max(0, TM.t - K_START) / 150)) && (E.kT -= dt) <= 0) {
+      const a = rnd(0, TAU), r = rnd(430, 520); E.push(newKnight(player.x + Math.cos(a) * r, player.y + Math.sin(a) * r, -0.3)); E.kT = rnd(20, 32);
     }
     const wells = []; if (E.length) for (const [sx, sy, id, ev] of statuesIn(player.x - 900, player.y - 900, player.x + 900, player.y + 900)) if (ev) { const es = evState(id); if (!es.dead && es.dying < 0) wells.push([sx, sy]); }   // ayakta olan kötücül heykeller
     for (const e of E) {
       e.t += dt; e.flash = Math.max(0, e.flash - dt); if (F.death >= 0) continue;
       e.armor = (e.st === 'wind' || e.st === 'strike') && isSlam(e) ? 1 : 0;   // ağır ezmede süper zırh: sendelemez
-      e.ghost = e.st === 'bo' || e.st === 'iv' || e.st === 'bi';
+      e.ghost = e.st === 'bo' || e.st === 'iv' || e.st === 'bi' || e.st === 'die';
       if (e.em < 1) {   // doğuyor: dumanın içinden belirir, o sırada zararsızdır
         const pe = e.em; e.em += dt / 0.8; if (pe < 0 && e.em >= 0) { smoke(e.x, e.y - 4, 4, 40, 10); AU.sfx('eSpawn', e.x, e.y, e); }
         e.face = Math.atan2(player.y - e.y, player.x - e.x); continue;
       }
+      if (e.kind === 'knight') { updateKnight(e, dt, on); continue; }
       if (e.kind === 'ghost') {   // heykel ayaktayken çevresindeki hortlaklar canını yeniler
         let near = false; for (const w of wells) if (Math.hypot(e.x - w[0], (e.y - w[1]) * 1.25) < EV_HEAL_R) { near = true; break; }
         const heal = near && e.hp < e.max; e.heal += ((heal ? 1 : 0) - e.heal) * dmp(6, dt); if (heal) e.hp = Math.min(e.max, e.hp + e.max * EV_HEAL * dt);
@@ -1004,6 +1080,7 @@
         if (e.t >= 0.44) { e.al = 1; e.fast = true; enemyAttack(e, 'claw'); }
       }
     }
+    finBarrier(dt);
   }
   function updateBolts(dt) {
     for (let i = EP.length - 1; i >= 0; i--) {
@@ -1039,7 +1116,245 @@
     ctx.strokeStyle = 'rgba(160,115,255,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p.x, y, R, 0, TAU); ctx.stroke();
     ctx.strokeStyle = 'rgba(215,190,255,0.95)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(p.x, y, R, p.t * 4, p.t * 4 + 3.6); ctx.stroke();
   }
-  function drawEnemy(e, fg) {   // ÇIRAK KARA BÜYÜCÜ: kamburca, başlıklı, eğri bir değnekle; yumuşak, dumanlı hareket
+  /* ---------- Düşman 2: KALKAN BEYİ — iri, yavaş, kule kalkanlı. Önden kılıç sekiyor (sersemlersin), oklar sekiyor; arkadan ya da altın okla (kalkan koluna) vurulur ---------- */
+  const K_HP = 400, K_SPD = 104, K_TURN = 2.9, K_FA = 1.15, K_RUN = 205;   // K_RUN: kalkansız 'boğa koşusu' hızı (px/sn)   // can · yürüme hızı (px/sn) · dönüş hızı (rad/sn: oyuncu arkasına geçebilsin) · kalkanın koruduğu yarım açı (≈66°)
+  const K_FIN = 0, K_HEAD = 82, K_START = 45, K_CAP = 2;   // kalkansız vuruşta bitiriş şansı · yatan canavarın baş mesafesi · ilk doğuş (sn) · aynı anda en çok
+  const pickMt = () => { const r = Math.random(); return r < 0.15 ? 2 : r < 0.75 ? 3 : r < 0.9 ? 4 : 5; };   // kılıcı kaçıncı boşa savurmadan sonra çeker: çoğunlukla 3, bazen daha erken (2) ya da geç (4–5)
+  const K_BL_R = 205, K_BL_A = 1.55;   // gizli kılıç: menzil · yarım açı (≈150° toplam, savurmadan uzun menzilli)
+  const K_SW_R = 132, K_SW_A = 1.9;   // kalkan savurması: menzil (px) · yarım açı (rad ≈ 109° → toplam ≈ 218°)
+  const sq = a => Math.atan2(Math.sin(a) / 0.8, Math.cos(a));   // zemin elipsi (y×0,8) uzayına açı çevirimi: uyarı alanı ile isabet kontrolü aynı şekli kullanır
+  const kfront = (e, ang) => Math.abs(wrap(ang + PI - e.face)) < K_FA;   // ang: vuruşun gidiş yönü
+  const kguard = (e, ang) => e.sh > 0 && e.gd > 0.6 && e.st !== 'down' && e.st !== 'brk' && kfront(e, ang);
+  function newKnight(x, y, em) { const e = newEnemy(x, y, undefined, em); e.kind = 'knight'; e.hp = e.max = Math.round(K_HP * E_HP); e.sh = 1; e.shd = 100; e.miss = 0; e.mt = pickMt(); e.rn = 0; e.gd = 1; e.armor = 1; e.rg = true; e.cd = rnd(2.4, 3.4); e.fall = 0; e.dx = 1; e.sf = 0; return e; }
+  function shieldDmg(e, ang, n) {   // kalkan dayanıklılığı (100): 0'a inince parçalanır. true = kırıldı
+    if (e.sh <= 0) return false; const p0 = e.shd; e.shd = Math.max(0, e.shd - n);
+    if (e.shd <= 0) { breakShield(e, ang); return true; }
+    if ((p0 > 66 && e.shd <= 66) || (p0 > 33 && e.shd <= 33)) { ftext(e.x, e.y - 118, 'Kalkan çatladı', GOLD); chips(e.x, e.y - 34, 6, 170, ang + PI, 1.3, e.y + 8); }
+    return false;
+  }
+  function knightBlock(e, ang, dmg) {
+    e.mad = Math.min(1, (e.mad || 0) + 0.3);   // kılıcın kalkanda boşa gitmesi onu sinirlendirir   // kılıç kalkana çarptı: kılıç savrulur, oyuncu geri tepip sendeler, bir süre ağırlaşır
+    if (shieldDmg(e, ang, 18 + (dmg || 20) * 0.5)) return;   // 4 kılıç darbesi kalkanı kırar (kıran darbe sendeletmez)
+    sparks(e.x - Math.cos(ang) * 26, e.y - 32, 13, 270, ang + PI, 0.9); hitFx(0.16, 9); AU.sfx('knBlock', e.x, e.y - 20); AU.sfx('knGrunt', e.x, e.y, e); e.sf = 1;
+    ftext(player.x, player.y - 62, 'Kalkan!', null);
+    F.lx = -Math.cos(ang) * 760; F.ly = -Math.sin(ang) * 480; F.slow = 2.2;   // sert geri tepme + belirgin yavaşlama (hız ≈ %30'a düşer, 2 sn'de toparlanır)
+    F.stag = 1.3; F.sgx = -Math.sin(ang); F.sgy = Math.cos(ang);              // sendeleme: geri tepmeye dik doğrultuda sağa sola yalpalar
+    F.pt = -1; F.buf = false; F.hit = []; F.broken = 1.4; F.bstun = true; F.dur = Math.max(0, F.dur - 30); F.wince = 0.9; bowInterrupt();
+    e.cd = Math.min(e.cd, 1.5);
+  }
+  function breakShield(e, ang) {   // altın ok: kalkan kolu parçalanır, kalkan düşer
+    e.sh = 0; e.st = 'brk'; e.t = 0; e.atk = ''; e.stun = 0;
+    chips(e.x, e.y - 34, 26, 320, ang + PI, 2.4, e.y + 8); chips(e.x, e.y - 30, 10, 180, -PI / 2, 1.2, e.y + 8); sparks(e.x, e.y - 34, 22, 340, 0, TAU); smoke(e.x, e.y - 30, 7, 55, 14); hitFx(0.2, 11);
+    AU.sfx('guardBreak'); AU.sfx('chestBreak', e.x, e.y - 14); AU.sfx('knHurt', e.x, e.y, e); ftext(e.x, e.y - 118, 'Kalkan parçalandı!', GOLD);
+  }
+  function knightArrow(e, a) {   // true: ok sekti (hasar yok) · false: normal isabet
+    if (e.sh <= 0 || e.st === 'down' || !kfront(e, a.a)) return false;
+    if (a.perf) { breakShield(e, a.a); return false; }
+    if (e.gd < 0.6) return false;
+    sparks(a.x, a.y - 26, 7, 190, a.a + PI, 0.8); AU.sfx('arrowTink', a.x, a.y); e.sf = 1; a.x -= Math.cos(a.a) * 16; a.y -= Math.sin(a.a) * 9; if (shieldDmg(e, a.a, 7)) return true;   // normal ok sekerken kalkanı az yıpratır
+    if (!e.bnc || e.bnc < 0.4) { e.bnc = 1; ftext(e.x, e.y - 118, 'Sekti', null); }
+    return true;
+  }
+  function knockdown(e) {   // kalkan savurması: karakter fırlar, yere düşer, ayağa kalkmaya çalışır; bu sırada yaratıklar gelmeye devam eder
+    if (F.kd >= 0 || F.death >= 0 || F.fin) return; const a = Math.atan2(player.y - e.y, player.x - e.x);
+    F.kd = 0; F.stag = 0; F.lx = Math.cos(a) * 960; F.ly = Math.sin(a) * 600; F.fall = Math.cos(a) >= 0 ? 1 : -1; F.pt = -1; F.buf = false; F.guarding = false; F.down = false; F.hold = 0; F.broken = 0; F.hit = [];
+    if (BOW.has) bowCancel(); hitFx(0.22, 14); sparks(player.x, player.y - 22, 16, 280, a, 1); AU.sfx('knSmash', player.x, player.y); ftext(player.x, player.y - 70, 'Fırlatıldın!', null);
+  }
+  function dropK(x, y) { const n = 5 + (Math.random() * 4 | 0); for (let i = 0; i < n; i++) LOOT.push({ k: 'coin', x, y: y + 4, z: 14, vx: rnd(-150, 150), vy: rnd(-70, 70), vz: rnd(230, 420), t: 0, ph: rnd(0, 6), b: 0, rest: false }); }
+  const FIN_R = 175, FR = { cx: 0, cy: 0, r: 0, a: 0, imp: -1, hx: 0, hy: 0 };   // bitiriş alanı: yarıçap · halka durumu
+  const finScale = () => { const f = F.fin; if (!f) return 1; const t = f.t; return t >= 3.0 && t < 3.3 ? 0.25 : t > 2.0 && t < 3.0 ? 0.5 : 1; };   // ayak kalkarken ve ezme anında zaman yavaşlar
+  function startFin(e) {   // bitiriş: altın halka açılır, içindeki herkes dışarı itilir; sonra canavar devrilir, kılıç sırta, kafasına basılır
+    F.fin = { e, t: 0, dir: player.x < e.x ? 1 : -1, x0: player.x, y0: player.y, hit: false, cx: e.x, cy: e.y }; e.st = 'down'; e.t = 0; e.fall = 0; e.dx = F.fin.dir; e.atk = '';
+    FR.cx = e.x; FR.cy = e.y; FR.r = 0; FR.imp = -1; F.pt = -1; F.buf = false; F.guarding = false; F.down = false; F.hold = 0;
+    hitFx(0.2, 8); AU.sfx('guardBreak'); sparks(e.x, e.y - 20, 18, 300, 0, TAU); ftext(player.x, player.y - 70, 'Bitiriş!', GOLD);
+  }
+  function finBarrier(dt) {   // her karede: halkanın içine kimse giremez, iten dalga içindekileri dışarı süpürür
+    const f = F.fin; FR.a += ((f ? 1 : 0) - FR.a) * dmp(f ? 10 : 3, dt); if (FR.imp >= 0) FR.imp += dt; if (!f) return;
+    for (const o of E) { if (o === f.e) continue; const dx = o.x - FR.cx, dy = o.y - FR.cy, d = Math.hypot(dx, dy / 0.8) || 1, lim = FR.r + 26; if (d < lim) { const k = lim / d, kk = Math.min(1, dt * 14); o.x += (FR.cx + dx * k - o.x) * kk; o.y += (FR.cy + dy * k - o.y) * kk; } }
+    for (let i = EP.length - 1; i >= 0; i--) { const b = EP[i]; if (Math.hypot(b.x - FR.cx, (b.y - FR.cy) / 0.8) < FR.r) { smoke(b.x, b.y - 20, 2, 30, 5); EP.splice(i, 1); } }
+  }
+  function drawFinRing(fg) {
+    if (FR.a < 0.01) return; const a = FR.a, r = FR.r; if (r < 1) return; ctx.save();
+    const g = ctx.createRadialGradient(FR.cx, FR.cy, r * 0.25, FR.cx, FR.cy, r); g.addColorStop(0, 'rgba(240,194,74,0)'); g.addColorStop(1, `rgba(240,194,74,${0.1 * a})`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(FR.cx, FR.cy, r, r * 0.8, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(240,194,74,${0.9 * a})`; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.ellipse(FR.cx, FR.cy, r, r * 0.8, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([10, 8]); ctx.lineDashOffset = -FX.t * 14; ctx.strokeStyle = `rgba(255,236,190,${0.4 * a})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(FR.cx, FR.cy, r * 0.95, r * 0.95 * 0.8, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    if (FR.imp >= 0 && FR.imp < 0.8) { const u = FR.imp / 0.8; ctx.strokeStyle = `rgba(255,240,200,${0.9 * (1 - u)})`; ctx.lineWidth = 1 + 3 * (1 - u); ctx.beginPath(); ctx.ellipse(FR.hx, FR.hy, 12 + 100 * u, (12 + 100 * u) * 0.8, 0, 0, TAU); ctx.stroke(); }
+    ctx.restore();
+  }
+  function updateFin(dt) {
+    const f = F.fin, e = f.e; f.t += dt; const t = f.t;
+    if (E.indexOf(e) < 0 && !f.hit) { F.fin = null; F.stomp = 0; return; }
+    F.pt = -1; F.buf = false; F.guarding = false; F.down = false; F.gw = F.sw = F.lunge = F.drop = 0;
+    F.stomp = t < 1.9 ? 0 : t < 2.6 ? sstep(1.9, 2.6, t) : t < 2.9 ? 1 : t < 3.0 ? 1 - sstep(2.9, 3.0, t) : 0;   // ayak yavaşça kalkar, bekler, iner
+    FR.r = FIN_R * sstep(0, 0.55, t);
+    if (!f.hit) {
+      e.fall = sstep(0.15, 1.15, t); const tx = e.x + f.dir * (K_HEAD + 20), ty = e.y + 4, k = sstep(0.7, 1.9, t);
+      player.x = lerp(f.x0, tx, k); player.y = lerp(f.y0, ty, k); player.vx = player.vy = 0;
+      if (t >= 3.0) { f.hit = true; const hx = e.x + f.dir * K_HEAD; FR.imp = 0; FR.hx = hx; FR.hy = e.y - 8; burst(hx, e.y - 8, 18, 90); smoke(hx, e.y - 10, 8, 60, 12); sparks(hx, e.y - 10, 24, 300, -PI / 2, 1.3); chips(hx, e.y - 8, 10, 220, -PI / 2, 1.4, e.y + 6); hitFx(0.3, 15); AU.sfx('knDie', e.x, e.y, e); AU.sfx('hit', hx, e.y, true); AU.sfx('chestBreak', hx, e.y); E.splice(E.indexOf(e), 1); dropK(hx, e.y); }
+    }
+    hero.face += wrap((f.dir > 0 ? PI : 0) - hero.face) * dmp(14, dt);
+    if (t >= 4.2) { F.fin = null; F.stomp = 0; }
+  }
+  function knightDeath(e, ang) {   // öldü: dizüstü çöker, acıyla bağırır, çatlar, vazo gibi dağılır (oyun normal akar)
+    e.st = 'die'; e.t = 0; e.hp = 0; e.sh = 0; e.atk = ''; e.stun = 0; e.ghost = true; e.shat = false; e.kx = Math.cos(ang) * 150; e.ky = Math.sin(ang) * 90;
+    AU.sfx('knScream', e.x, e.y, e); sparks(e.x, e.y - 30, 12, 230, ang, 1); chips(e.x, e.y - 34, 8, 200, ang + PI, 1.6, e.y + 8);
+  }
+  function knightDying(e, dt) {
+    e.x += e.kx * dt; e.y += e.ky * dt; const k = Math.max(0, 1 - 6 * dt); e.kx *= k; e.ky *= k;
+    if (e.t > 0.8 && (e.sm = (e.sm || 0) - dt) <= 0) { e.sm = rnd(0.12, 0.22); chips(e.x + rnd(-10, 10), e.y - rnd(14, 50), 1, 70, -PI / 2, 1.5, e.y + 8); }   // çatlaktan ufak kıymıklar dökülür
+    if (e.t >= 2.5 && !e.shat) {
+      e.shat = true; const x = e.x, y = e.y;
+      for (let i = 0; i < 40; i++) { const a = rnd(0, TAU), v = rnd(120, 430); chip(x + rnd(-14, 14), y - rnd(8, 62), Math.cos(a) * v, Math.sin(a) * v * 0.7 - rnd(120, 320), y + rnd(2, 10), rnd(3, 8)); }
+      sparks(x, y - 30, 22, 330, 0, TAU); smoke(x, y - 14, 9, 60, 16); burst(x, y - 24, 18, 95); hitFx(0, 10);
+      AU.sfx('knShatter', x, y); dropK(x, y); const i = E.indexOf(e); if (i >= 0) E.splice(i, 1);
+    }
+  }
+  function updateKnight(e, dt, on) {
+    e.armor = 1; e.sf = Math.max(0, e.sf - dt * 4); e.mad = Math.max(0, (e.mad || 0) - dt * 0.1); e.bnc = Math.max(0, (e.bnc || 0) - dt);   // mad: öfke (0–1)
+    const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, ap = Math.atan2(dy, dx), st = e.st;
+    const turn = r => { e.face += clamp(wrap(ap - e.face), -r * dt, r * dt); };
+    e.gd += ((e.sh > 0 && st === 'chase' ? 1 : 0) - e.gd) * dmp(12, dt);
+    if (st === 'die') { knightDying(e, dt); return; }
+    if (st === 'down') return;
+    if (e.stun > 0) { e.stun -= dt; e.x += e.kx * dt * 0.5; e.y += e.ky * dt * 0.5; const k = Math.max(0, 1 - 7 * dt); e.kx *= k; e.ky *= k; turn(1); return; }
+    if (st === 'chase') {
+      e.cd -= dt; turn(e.sh > 0 ? K_TURN * (Math.abs(wrap(ap - e.face)) > 1.6 ? 1.7 : 1) : 2.1);   // arkasına geçilirse hızla döner
+      const run = e.sh <= 0, mv = run ? (d > 46 ? 1 : 0) : d > 78 ? 1 : d < 54 ? -0.5 : 0, sp = run ? K_RUN * E_SPD : K_SPD * E_SPD * (d > 230 ? 1.6 : 1);   // kalkansız: geri çekilmez, doğrudan üstüne koşar (dönüşü yavaş: yana kaçılabilir)
+      e.rn = (e.rn || 0) + ((run && mv ? 1 : 0) - (e.rn || 0)) * dmp(6, dt);
+      e.x += ux * mv * sp * dt; e.y += uy * mv * sp * dt; e.ph += dt * TAU * (run ? 1.7 : 0.95) * Math.abs(mv);
+      const sg = Math.sin(e.ph * 2); if (mv && e.lsg !== undefined && (e.lsg < 0) !== (sg < 0)) { AU.sfx('knStep', e.x, e.y, e); if (run) smoke(e.x - Math.cos(e.face) * 8, e.y, 2, 36, 7); } e.lsg = sg;   // ağır adım sesi
+      if ((e.sT -= dt) <= 0) { e.sT = rnd(4.5, 8.5); if (d < 520) AU.sfx('knIdle', e.x, e.y, e); }   // ara sıra kalın, rahatsız etmeyen homurtu
+      if (on && e.cd <= 0 && atkCount(e) < E_ATKS) {
+        const ch = e.sh <= 0 && d >= 120 && d < 340;   // kalkansız: uzaktan boğa atılışı · yakından omuz vuruşu
+        if (e.sh > 0 ? d < 112 : (ch || d < 92)) {
+          const bl = e.sh > 0 && (e.miss >= e.mt || ((e.mad || 0) > 0.6 && Math.random() < 0.2));   // boşa giden kalkan savurmaları öfke biriktirir; sayı dolunca (çoğunlukla 3) gizli kılıç çıkar
+          if (bl) ftext(e.x, e.y - 118, 'Gizli kılıç!', GOLD);
+          e.st = 'wind'; e.t = 0; e.did = false; e.atk = e.sh > 0 ? (bl ? 'blade' : 'sweep') : ch ? 'charge' : 'punch'; e.wd = (e.sh > 0 ? (bl ? 0.7 : 0.52) : ch ? 0.5 : 0.28) * E_WIND; AU.sfx('knWind', e.x, e.y, e); if (bl) AU.sfx('knBladeDraw', e.x, e.y, e); if (ch) AU.sfx('knGrunt', e.x, e.y, e);
+        }
+      }
+    } else if (st === 'wind') {
+      if (e.t < e.wd - 0.15) turn(e.atk === 'blade' ? 4.2 : 2.6);   // kılıç hazırlığında oyuncuyu daha sıkı takip eder
+      if (e.t >= e.wd) { e.st = 'strike'; e.t = 0; e.did = false; e.lk = e.face; e.sd = e.atk === 'sweep' ? 0.3 : e.atk === 'charge' ? 0.5 : e.atk === 'blade' ? 0.28 : 0.16; AU.sfx(e.atk === 'charge' ? 'knRoar' : e.atk === 'blade' ? 'knBladeSwing' : 'knSweep', e.x, e.y, e); }
+    } else if (st === 'strike') {
+      const cx = Math.cos(e.lk), cy = Math.sin(e.lk); if (e.atk === 'punch') { e.x += cx * 240 * dt; e.y += cy * 240 * dt; }
+      if (e.atk === 'blade') { e.x += cx * 160 * dt; e.y += cy * 160 * dt; }   // kılıç inerken öne adım atar: mesafe kapanır, kaçmak zor
+      if (e.atk === 'charge') {   // BOĞA ATILIŞI: kilitlenen doğrultuda hızla fırlar. Yana kaçarsan boşa gider ve açık kalır
+        const u = e.t / e.sd; e.x += cx * 560 * (1 - 0.35 * u) * dt; e.y += cy * 560 * (1 - 0.35 * u) * dt; e.ph += dt * TAU * 1.9; e.rn = 1;
+        if ((e.cdu = (e.cdu || 0) - dt) <= 0) { e.cdu = 0.05; smoke(e.x - cx * 10, e.y, 2, 40, 8); }
+        if (!e.did && Math.hypot(player.x - (e.x + cx * 16), (player.y - (e.y + cy * 16)) / 0.85) < 52 * E_AIM) {
+          e.did = true; const h0 = F.hp; hurtPlayer(e, Math.round(20 * E_DMG), 60);
+          if (F.hp < h0 && F.death < 0) { F.lx = cx * 680; F.ly = cy * 420; F.stag = 0.9; F.sgx = -cy; F.sgy = cx; F.slow = 1.2; F.wince = 0.8; hitFx(0, 10); sparks(player.x, player.y - 22, 12, 260, e.lk, 0.9); AU.sfx('knSmash', player.x, player.y); }
+        }
+      }
+      if (e.atk === 'blade' && !e.did && e.t >= 0.09) {   // dev kılıç inişi: baya hasar, geriye fırlatma
+        e.did = true; hitFx(0, 13); chips(e.x + cx * 70, e.y + cy * 40 - 6, 14, 280, -PI / 2, 1.6, e.y + 8); smoke(e.x + cx * 60, e.y + cy * 30, 5, 50, 14); sparks(e.x + cx * 90, e.y - 24, 16, 320, e.lk, 1.3);
+        const ddy = dy / 0.8, dd = Math.hypot(dx, ddy);
+        if (dd < K_BL_R * E_AIM && Math.abs(wrap(Math.atan2(ddy, dx) - sq(e.lk))) < K_BL_A) { const h0 = F.hp, b0 = F.broken; hurtPlayer(e, Math.round(42 * E_DMG), 220); if (F.death < 0 && (F.hp < h0 || F.broken > b0)) { knockdown(e); F.lx = Math.cos(e.lk) * 1250; F.ly = Math.sin(e.lk) * 760; AU.sfx('knBladeHit', player.x, player.y); } }
+      }
+      if (e.atk !== 'charge' && e.atk !== 'blade' && !e.did && e.t >= (e.atk === 'sweep' ? 0.1 : 0.07)) {
+        e.did = true; const sw = e.atk === 'sweep'; chips(e.x + cx * 46, e.y + cy * 26 - 6, 7, 190, -PI / 2, 1.4, e.y + 8); smoke(e.x + cx * 40, e.y + cy * 20, 3, 40, 12); hitFx(0, 5);
+        if (sw) { const ddy = dy / 0.8, dd = Math.hypot(dx, ddy); if (dd < K_SW_R * E_AIM && Math.abs(wrap(Math.atan2(ddy, dx) - sq(e.lk))) < K_SW_A) { const h0 = F.hp, b0 = F.broken; hurtPlayer(e, Math.round(26 * E_DMG), 60); if (F.hp < h0 || F.broken > b0) e.miss = 0; else e.miss++; if (F.death < 0 && (F.hp < h0 || F.broken > b0)) knockdown(e); } else e.miss++; }   // isabet etmeyen / siperle karşılanan savurma 'boşa' sayılır   // geniş kalkan savurması: isabet = fırlatma
+        else if (Math.hypot(player.x - (e.x + cx * 34), (player.y - (e.y + cy * 34)) / 0.85) < 54 * E_AIM) hurtPlayer(e, Math.round(14 * E_DMG), 40);
+      }
+      if (e.t >= e.sd) { e.st = 'rec'; e.t = 0; e.rd = e.atk === 'sweep' ? 1.0 : e.atk === 'charge' ? 1.5 : e.atk === 'blade' ? 1.7 : 0.5; e.cd = e.atk === 'sweep' ? rnd(2.6, 3.8) : e.atk === 'charge' ? rnd(2.2, 3.2) : e.atk === 'blade' ? rnd(3.5, 5) : rnd(0.6, 1.1); if (e.atk === 'blade') { e.miss = 0; e.mt = pickMt(); } }   // savurmalar arası uzun boşluk: yaklaşıp vurma fırsatı
+    } else if (st === 'rec') { e.cd -= dt; turn(1); if (e.t >= e.rd) { e.st = 'chase'; e.t = 0; } }
+    else if (st === 'brk') { if (e.t >= 1.8) { e.st = 'chase'; e.t = 0; e.cd = 0.8; AU.sfx('knRoar', e.x, e.y, e); } }
+    for (const o of E) if (o !== e && o.em >= 1) { const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy); if (od > 0 && od < 56) { e.x += ox / od * 40 * dt; e.y += oy / od * 40 * dt; } }
+  }
+  function drawKnight(e, fg) {   // KALKAN BEYİ: dolu şekil + ince kenar, iki katmanlı uzuvlar, karanlık miğfer, parlak göz (çırakla aynı dil)
+    if (e.em <= 0) return; const em = e.em < 1 ? e.em : 1, al = em * e.al; if (al < 0.02) return;
+    const st = e.st, wind = st === 'wind', strike = st === 'strike', rec = st === 'rec', brk = st === 'brk', down = st === 'down', B = e.sh <= 0, hu = e.flash > 0;
+    const wp = wind ? sstep(0, e.wd, e.t) : 0, spr = strike ? clamp(e.t / e.sd, 0, 1) : 0, cs = Math.cos(e.face), sn = Math.sin(e.face), mir = down ? 1 : cs > 0 ? -1 : 1;
+    const w = 21, L = 18, T = 34, hy = -T - 8, aw = 8, K = 1.35, T0 = FX.t, bash = e.atk === 'bash';
+    const F0 = hu ? '#fff' : null, C = { body: F0 || '#52161d', dark: F0 || '#2a1010', metal: F0 || '#3a342f', metalL: F0 || '#8a8178', rim: F0 || '#e0584a', cape: F0 || '#340f14', skin: F0 || '#c9a27c', gold: F0 || '#e8b04a', ink: '#0a0504' };
+    const mx = (a, b, k) => a.map((q, i) => q + (b[i] - q) * k), sxk = 0.15 + 0.37 * Math.abs(cs);
+    const gP = [-w * sxk, -11, 0, 1, 0, w * 1.05, -13], wP = [-w * (sxk + 0.1), -27, -14, 1, -6, w * 1.1, -42], sP = [-w * sxk * 0.2, -10, 5, 1.2, 9, w * 0.95, -20], lP = [-w * sxk, -3, -9, 1, 3, w * 1.0, -8];
+    let p = mx(lP, gP, e.gd);
+    if (wind) p = mx(gP, wP, wp); else if (strike) p = mx(wP, sP, sstep(0, 1, spr)); else if (rec) p = mx(e.atk === 'sweep' ? [-w * 1.65, -24, -70, 1.25, -12, w * 0.9, -14] : sP, lP, sstep(0, 0.3, e.t)); else if (brk) p = [0, 0, 0, 1, 12 + Math.sin(T0 * 2) * 1.2, w, -3]; else if (down) p = [0, 0, 0, 1, 0, w * 0.8, -4];
+    const mvg0 = st === 'chase' || (strike && e.atk === 'charge');
+    if (!B && e.atk === 'sweep' && (wind || strike)) { const u = sstep(0, 1, spr); p = wind ? mx(gP, [w * 0.95, -26, 38, 1, 8, w * 0.9, -14], wp) : [lerp(w * 0.95, -w * 1.65, u), -24 + 8 * Math.sin(PI * u), lerp(38, -70, u), 1.25, lerp(8, -12, u), w * 0.9, -14]; }   // geniş kalkan savurması: arkadan öne süpürür
+    if (B && mvg0 && (e.rn || 0) > 0.01) p = mx(p, [-w * 0.2, -10, 0, 1, 22, w * 0.5 + 10 * Math.sin(e.ph * 2), -18 + 5 * Math.cos(e.ph * 2)], clamp(e.rn, 0, 1));   // koşu duruşu: öne eğik gövde, kollar bacakla birlikte pompalar
+        if (st === 'die') { const du = sstep(0.1, 0.7, e.t); p = [0, 0, 0, 1, 4 + 26 * sstep(0.2, 1.9, e.t) + 8 * sstep(1.9, 2.5, e.t), lerp(w * 0.95, w * 0.35, du), lerp(-18, -37, du)]; }   // önce ayakta sendeler, sonra yavaşça öne kapaklanır
+    let BL = null;
+    if (!B && e.atk === 'blade' && (wind || strike || rec)) {   // GİZLİ DEV KILIÇ: kalkanın arkasından çekilir, yukarı kalkar, geniş keskin bir kavisle iner
+      const u = strike ? sstep(0, 1, spr) : 0, k = wind ? sstep(0, 1, wp) : 1, sb = wind ? sstep(0, 0.3, wp) : 1; let hx, hy2, a, len, lnb;
+      if (wind) { hx = lerp(w * 0.55, -w * 0.55, k); hy2 = lerp(-12, -58, k); a = lerp(100, 240, k); len = 86 * sstep(0, 0.45, wp); lnb = lerp(0, -12, k); }
+      else if (strike) { hx = lerp(-w * 0.55, w * 1.1, u); hy2 = lerp(-58, -24, u); a = lerp(240, 385, u); len = 86; lnb = lerp(-12, 22, u); }
+      else { hx = w * 1.1; hy2 = -24; a = 385; len = 86 * (1 - sstep(e.rd - 0.5, e.rd, e.t)); lnb = lerp(22, 6, sstep(0, 0.6, e.t)); }
+      p = mx(p, [-w * 0.95, -8, -8, 1, lnb, hx, hy2], sb); BL = { a, len, strike, u };
+    }
+    const [sx, sy, sr, ss, ln, rhx, rhy] = p, hot = wind && wp > 0.4 || strike, eye = hu ? '#fff' : strike ? '#ff5a3c' : wind ? '#ffd98a' : rec || brk || down ? '#8a7a70' : (e.mad || 0) > 0.55 || e.miss >= e.mt ? '#ff6a40' : '#e0a070';
+    const mvg = st === 'chase' || (strike && e.atk === 'charge'), isD = st === 'die', kz = isD ? sstep(0.25, 1.75, e.t) : 0, crk = isD ? sstep(0.3, 2.3, e.t) : 0;
+    const rn = B && mvg ? clamp(e.rn || 0, 0, 1) : 0, walk = mvg ? Math.sin(e.ph * 2) : 0, bob = isD ? 11 * kz : -Math.abs(walk) * (1.2 + 3.4 * rn), behind = sn < -0.35 && !B, eyeA = sstep(-0.45, -0.1, sn);
+    ctx.save(); ctx.globalAlpha = al; ctx.fillStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.ellipse(e.x, e.y, w * 1.3 * K, 4.6, 0, 0, TAU); ctx.fill();
+    if (B && e.atk === 'charge' && (wind || strike)) { const th = sq(strike ? e.lk : e.face), a0 = strike ? 0.3 * (1 - spr) : 0.1 + 0.24 * wp; ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1, 0.8); ctx.rotate(th); ctx.beginPath(); ctx.rect(0, -48, 250, 96); ctx.globalAlpha = al * a0; ctx.fillStyle = '#e0584a'; ctx.fill(); ctx.globalAlpha = al * Math.min(1, a0 * 2.2); ctx.strokeStyle = '#ff8a6a'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore(); }   // atılış koridoru
+    if (!B && (e.atk === 'sweep' || e.atk === 'blade') && (wind || strike)) { const bl = e.atk === 'blade', th = sq(strike ? e.lk : e.face), a0 = (strike ? 0.34 * (1 - spr) : 0.1 + 0.26 * wp) * (bl ? 1.35 : 1); ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1, 0.8); ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, (bl ? K_BL_R : K_SW_R) * E_AIM, th - (bl ? K_BL_A : K_SW_A), th + (bl ? K_BL_A : K_SW_A)); ctx.closePath(); ctx.globalAlpha = al * a0; ctx.fillStyle = '#e0584a'; ctx.fill(); ctx.globalAlpha = al * Math.min(1, a0 * 2.2); ctx.strokeStyle = '#ff8a6a'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore(); }   // geniş savurma alanı: kaçmak için işaret
+    ctx.translate(e.x, e.y); if (down) ctx.rotate(e.dx * e.fall * PI / 2); ctx.scale(mir * K, K); if (isD) ctx.translate(Math.sin(T0 * 52) * sstep(0.3, 0.9, e.t) * (0.4 + 1.8 * crk), 0);   // acıyla titrer ctx.lineJoin = ctx.lineCap = 'round';
+    const rim = C.rim, fp = (d, fill, rm, lw) => { const q = new Path2D(d); ctx.fillStyle = fill; ctx.fill(q); ctx.strokeStyle = rm; ctx.globalAlpha = al * 0.85; ctx.lineWidth = lw || 0.9; ctx.stroke(q); ctx.globalAlpha = al; };
+    const dot = (x, y, r, c, a) => { ctx.globalAlpha = al * (a == null ? 1 : a); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.globalAlpha = al; };
+    const seg = (a, b, c2, d2, wd, col) => { for (const [lw, cl] of [[wd + 1.8, rim], [wd, col]]) { ctx.strokeStyle = cl; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c2, d2); ctx.stroke(); } };
+    const ln1 = (d2, a, wd, col) => { ctx.globalAlpha = al * a; ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.stroke(new Path2D(d2)); ctx.globalAlpha = al; };
+    const shield = () => { ctx.save(); ctx.scale(1.1, 1); fp('M-16,-26Q0,-35 16,-26V10Q16,26 0,32Q-16,26 -16,10Z', C.metal, rim, 1.3); ln1('M0,-30V30M-14,-10H14', 0.5, 2.2, C.metalL); dot(0, -10, 5.6, C.gold); dot(0, -10, 2, C.ink); ln1('M-12,-18Q-8,-15 -10,-9', 0.6, 1.6, C.ink); ln1('M8,13Q11,16 7,21', 0.6, 1.6, C.ink);
+      ctx.save(); ctx.translate(8, 10); ctx.rotate(-0.61); ctx.strokeStyle = '#9a7a52'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(15, 0); ctx.stroke(); ctx.strokeStyle = '#e2d6bd'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(16, -2.4); ctx.moveTo(12, 0); ctx.lineTo(16, 2.4); ctx.stroke(); ctx.restore();
+      if (e.shd < 66) ln1('M-3,-24L2,-14L-4,-6L1,2', 0.9, 1.5, C.ink); if (e.shd < 33) { ln1('M10,-20L6,-8L12,2L7,12', 0.9, 1.5, C.ink); ln1('M-12,8L-4,14L-8,24', 0.9, 1.5, C.ink); }   // çatlaklar
+      if (e.sf > 0) { ctx.globalAlpha = al * e.sf * 0.5; ctx.fillStyle = '#fff'; ctx.fill(new Path2D('M-16,-26Q0,-35 16,-26V10Q16,26 0,32Q-16,26 -16,10Z')); ctx.globalAlpha = al; } ctx.restore(); };
+    const arm = (a, b, hx, hy2, d, plate) => {   // üst kol · dirsek koruması · önkol (zırh ya da bandaj) · bilek manşeti · eldiven yumruk
+      const ex = (a + hx) / 2 + d * 4, ey = (b + hy2) / 2 + 6; seg(a, b, ex, ey, aw, C.body); seg(ex, ey, hx, hy2, aw * 0.9, plate ? C.metal : C.body);
+      const px = ex + (hx - ex) * 0.62, py = ey + (hy2 - ey) * 0.62;
+      if (plate) { ln1(`M${ex + (hx - ex) * 0.25 - 4},${ey + (hy2 - ey) * 0.25}l8,2`, 0.8, 1.4, C.gold); }
+      else { ctx.strokeStyle = '#d8cdb4'; ctx.lineWidth = 1.3; for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(px - aw * 0.5, py + k * 2.6 - 1); ctx.lineTo(px + aw * 0.5, py + k * 2.6 + 1); ctx.stroke(); } }
+      dot(ex, ey, aw * 0.58, C.metal); ctx.strokeStyle = rim; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex, ey, aw * 0.58, 0, TAU); ctx.stroke(); dot(ex, ey, 1.4, C.metalL);
+      const wx = ex + (hx - ex) * 0.84, wy = ey + (hy2 - ey) * 0.84; seg(wx, wy, hx, hy2, aw + 1.2, C.dark); ln1(`M${wx - 3},${wy}l6,0`, 0.9, 1.1, C.gold);
+      dot(hx, hy2, 4.4, C.metal); ctx.strokeStyle = rim; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(hx, hy2, 4.4, 0, TAU); ctx.stroke(); for (let k = -1; k <= 1; k++) dot(hx + k * 2.1, hy2 + 3.2, 0.9, C.metalL); };
+    const pad = (d, r, spk, gold, fur) => { const x = d * w * 0.88, y = -31;
+      if (spk) for (let i = -1; i <= 1; i++) { const a = (-90 + i * 38 + d * 8) * PI / 180, bx = x + Math.cos(a) * r * 0.7, by = y + Math.sin(a) * r * 0.7; fp(`M${bx - 3},${by + 2}L${x + Math.cos(a) * (r + 7)},${y + Math.sin(a) * (r + 7)}L${bx + 3},${by + 2}Z`, C.metalL, rim, 0.7); }
+      fp(`M${x - r},${y}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0Z`, fur ? '#2e2019' : C.metal, gold ? C.gold : rim, gold ? 1.3 : 1);
+      if (!fur) { ctx.globalAlpha = al * 0.5; ctx.strokeStyle = C.metalL; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y, r - 3, 3.6, 5.2); ctx.stroke(); ctx.globalAlpha = al; } };
+    const lg = Math.sin(e.ph * 2), up = Math.max(0, Math.cos(e.ph * 2));
+    ctx.save(); ctx.translate(0, -L + bob); ctx.rotate(ln * PI / 180); const cx0 = w * 1.1, cstp = cx0 / 3, tr = [0, 5, 1, 7, 2, 6]; let hm = '';
+    for (let i = 0; i < 6; i++) hm += `L${cx0 - cstp * (i + 0.5)},${L - 12 - tr[i] * 0.6} L${cx0 - cstp * (i + 1)},${L - 6 - tr[i]}`;
+    fp(`M${-w},-34L${w},-34L${cx0},${L - 6}${hm}Z`, C.cape, C.gold, 0.8); ctx.save(); ctx.translate(w * 0.62, 7); ctx.rotate(-0.2); fp('M-4,-4H4V4H-4Z', '#6b5a3e', rim, 0.6); ctx.restore(); ctx.restore();
+    for (const d of [-1, 1]) { const o = mvg ? lg * d * (3 + 9 * rn) : 0, lf = mvg ? (d > 0 ? up : Math.max(0, -Math.cos(e.ph * 2))) * (3 + 6 * rn) : 0; ctx.strokeStyle = rim; ctx.lineWidth = 11.8; ctx.beginPath(); ctx.moveTo(d * w * 0.55, -L - 3 + 11 * kz); ctx.lineTo(d * w * 0.62 + o - 13 * kz, -4 - lf); ctx.stroke(); ctx.strokeStyle = C.dark; ctx.lineWidth = 10; ctx.stroke(); ctx.fillStyle = C.ink; ctx.beginPath(); ctx.ellipse(d * w * 0.64 + o - 13 * kz, -2 - lf, 7, 3.2, 0, 0, TAU); ctx.fill(); }
+    ctx.save(); ctx.translate(0, -L + bob); ctx.rotate(ln * PI / 180);
+    if (behind) { ctx.save(); ctx.translate(sx, sy); ctx.rotate(sr * PI / 180); ctx.scale(ss, ss); shield(); ctx.restore(); }
+    fp(`M${-w * 0.85},-2C${-w * 1.15},-10 ${-w * 1.1},-24 ${-w * 0.75},-31Q${-w * 0.4},-37 0,-37Q${w * 0.4},-37 ${w * 0.75},-31C${w * 1.1},-24 ${w * 1.15},-10 ${w * 0.85},-2Q0,4 ${-w * 0.85},-2Z`, C.body, rim, 1);
+    fp(`M${-w * 0.5},-31H${w * 0.5}L${w * 0.42},-12H${-w * 0.42}Z`, C.metal, rim, 0.8);
+    ctx.globalAlpha = al * 0.85; ctx.fillStyle = C.ink; ctx.fillRect(-w * 0.82, -5, w * 1.64, 4); ctx.globalAlpha = al; ctx.fillStyle = rim; ctx.fillRect(-3, -5.5, 6, 5);
+    for (let i = 0; i < 3; i++) dot(-w * 0.55 + i * 6.5, 3.5 - (i % 2), 1.9, '#d9cdb4');
+    if (isD) { const CR = [['M-14,-4L-9,-12L-12,-20L-6,-28', 0.05], ['M6,-34L10,-24L5,-16L11,-6', 0.2], ['M-2,-36L-4,-24L2,-14L-3,-4', 0.35], ['M14,-18L6,-14L8,-6', 0.5], ['M-18,-24L-8,-20L-10,-12', 0.65]]; for (const [d2, th] of CR) if (crk > th) { const a = sstep(th, th + 0.15, crk); ln1(d2, a, 2.2, C.ink); ln1(d2, a * 0.85, 0.8, '#ffd98a'); } }   // vazo çatlakları
+    arm(w * 0.82, -29, rhx, rhy, 1, false);
+    if (B) { const ex = -w * 0.82 - 6, ey = -20; seg(-w * 0.82, -29, ex, ey, aw, C.body); dot(ex, ey, aw * 0.58, C.metal); ctx.strokeStyle = rim; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex, ey, aw * 0.58, 0, TAU); ctx.stroke(); ln1(`M${ex - 3},${ey - 2}l2,4l2,-3`, 0.9, 1, C.ink);
+      fp(`M${ex - 5},${ey + 2}l3,7l2,-4l3,6l2,-8Z`, C.ink, rim, 0.7); ln1(`M${ex + 2},${ey + 6}q-2,6 1,10`, 0.8, 1.2, C.gold); }
+    else arm(-w * 0.82, -29, sx, sy, -1, true);
+    if (BL && BL.len > 2) {
+      const a1 = BL.a, Lb = BL.len;
+      if (BL.strike && BL.u > 0.05) for (const [wd, col, aa] of [[9, eye, 0.3], [2, '#ffe9d6', 0.85]]) { ctx.globalAlpha = al * aa * (1 - BL.u * 0.4); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath(); ctx.arc(rhx, rhy, 14 + Lb * 0.88, (a1 - 75) * PI / 180, a1 * PI / 180); ctx.stroke(); ctx.globalAlpha = al; }
+      ctx.save(); ctx.translate(rhx, rhy); ctx.rotate(a1 * PI / 180);
+      fp('M-12,-2.4H11V2.4H-12Z', F0 || '#5a4630', rim, 0.8); fp('M10,-8.5V8.5H14.5V-8.5Z', C.gold, rim, 0.8);
+      fp(`M14.5,-7H${14.5 + Lb * 0.9}L${14.5 + Lb},0L${14.5 + Lb * 0.9},7H14.5Z`, F0 || '#c9c1b4', rim, 1.1); ln1(`M17,0H${12 + Lb * 0.93}`, 0.8, 1.5, '#fff'); ln1(`M17,-4.2H${14 + Lb * 0.78}`, 0.4, 1, C.metal);
+      ctx.restore();
+    }
+    pad(-1, 10, 1, 1, 0); pad(1, 7.5, 0, 0, 1);
+    fp(`M-2,${hy - 8}Q-1,${hy - 28} 12,${hy - 20}Q4,${hy - 17} 3,${hy - 8}Z`, rim, rim, 0.6);
+    fp(`M-8.5,${hy}a8.5,8.5 0 1,0 17,0a8.5,8.5 0 1,0 -17,0Z`, C.metal, rim, 1);
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.ellipse(0, hy + 0.5, 6, 2.7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = C.metal; ctx.beginPath(); ctx.moveTo(-6.6, hy - 3.4); ctx.lineTo(0, hy - 0.6); ctx.lineTo(6.6, hy - 3.4); ctx.lineTo(6.6, hy - 4.6); ctx.lineTo(-6.6, hy - 4.6); ctx.fill();
+    if (isD && crk > 0.75) { const a = sstep(0.75, 0.9, crk), d2 = `M-5,${hy - 8}L-1,${hy - 2}L-6,${hy + 4}L-2,${hy + 8}`; ln1(d2, a, 2, C.ink); ln1(d2, a * 0.85, 0.7, '#ffd98a'); }
+    for (const sd of [-1, 1]) { dot(sd * 2.6, hy + 0.7, 3 + (hot ? 0.8 : 0), eye, 0.3 * eyeA); ctx.globalAlpha = al * eyeA; ctx.fillStyle = eye; ctx.beginPath(); ctx.ellipse(sd * 2.6, hy + 0.7, 1.1, 1.3 + (hot ? 0.5 : 0), 0, 0, TAU); ctx.fill(); ctx.globalAlpha = al; }
+    if (!B && !behind) { ctx.save(); ctx.translate(sx, sy); ctx.rotate(sr * PI / 180); ctx.scale(ss, ss); shield(); ctx.restore(); }
+    if (wind) { for (let i = 0; i < 3; i++) dot(-8 + 8 * i, hy - 24 - (i % 2) * 6, 1.4, eye, 0.85 * wp); for (let i = 0; i < 3; i++) { const a = T0 * 8 + i * 2.09; dot(rhx + Math.cos(a) * 6, rhy - 4 + Math.sin(a) * 5, 1.3, eye, 0.85 * wp); } }
+    if (strike && e.atk === 'sweep') { const u0 = sstep(0, 1, spr), ua = Math.max(0, u0 - 0.55); for (const [wd, col, a] of [[7, eye, 0.3], [1.6, '#ffe9d6', 0.8]]) { ctx.globalAlpha = al * a * (1 - spr * 0.5); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath(); for (let j = 0; j <= 10; j++) { const u = ua + (u0 - ua) * j / 10, x = lerp(w * 0.95, -w * 1.65, u), y = -10 + 8 * Math.sin(PI * u); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); } ctx.globalAlpha = al; }
+    if (strike && e.atk !== 'sweep' && e.atk !== 'blade') for (const [wd, col, a] of [[5, eye, 0.3], [1.4, '#ffe9d6', 0.8]]) { ctx.globalAlpha = al * a * (1 - spr * 0.6); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(w * 1.2 + 14, -46); ctx.quadraticCurveTo(w * 1.2 + 26, -24, w * 1.2 + 14, -2); ctx.stroke(); ctx.globalAlpha = al; }
+    ctx.restore();
+    ctx.restore();
+    e.bd = e.bd === undefined ? e.hp / e.max : e.bd + (e.hp / e.max - e.bd) * 0.16;
+    if (e.bd < 0.995 && !down && !isD) { const bw = 30, bx = e.x - bw / 2, by = e.y - 126, k = clamp(1 - e.bd / 0.6, 0, 1), ink = light ? [0, 0, 0] : [255, 255, 255]; const c = [0, 1, 2].map(j => Math.round(lerp(ink[j], [255, 100, 80][j], k))).join(',');
+      ctx.save(); ctx.globalAlpha = clamp((1 - e.bd) * 8, 0, 1) * 0.95; rr(bx, by, bw, 2.6, 1.3); ctx.clip(); ctx.fillStyle = `rgba(${fg},0.16)`; ctx.fillRect(bx, by, bw, 2.6); ctx.fillStyle = `rgba(${c},0.92)`; ctx.fillRect(bx, by, bw * clamp(e.bd, 0, 1), 2.6); ctx.restore(); }
+  }
+
+  function drawEnemy(e, fg) {
+    if (e.kind === 'knight') return drawKnight(e, fg);   // ÇIRAK KARA BÜYÜCÜ: kamburca, başlıklı, eğri bir değnekle; yumuşak, dumanlı hareket
     if (e.em <= 0) return;
     const em = e.em < 1 ? e.em : 1, al = em * e.al; if (al < 0.02) return;
     const T0 = FX.t, st = e.st, wind = st === 'wind', strike = st === 'strike', rec = st === 'rec', kind = e.atk, slam = kind === 'claw' && e.cmb === 2 && !e.fast, rg = e.rage, hurt = e.flash > 0;
@@ -1356,7 +1671,7 @@
     H.lxv += (60 * (lxT - H.lx) - 9 * H.lxv) * dt; H.lx += H.lxv * dt;
     H.lyv += (60 * (lyT - H.ly) - 9 * H.lyv) * dt; H.ly += H.lyv * dt;
     // poz
-    const flin = sstep(0, 0.6, F.wince), kneel = sstep(0, 0.45, F.dp), fall = sstep(0.45, 1, F.dp);
+    const flin = sstep(0, 0.6, F.wince), kneel = sstep(0, 0.45, Math.max(F.dp, F.kp)), fall = sstep(0.45, 1, Math.max(F.dp, F.kp));
     const sidx = Math.floor(H.phase / PI);   // ayak izi: her adımda
     if (sidx !== H.stepI) { H.stepI = sidx; if (mv > 0.5 && sp > 60) { const sg = (sidx & 1) ? 1 : -1; PR.push({ x: player.x - Math.sin(f) * sg * 3.6, y: player.y + Math.cos(f) * sg * 1.6 + 1, a: f, t: 0 }); if (PR.length > 26) PR.shift(); } }
     const Bn = H.B * bAmp, tw = Math.sin(H.phase) * lerp(0.07, 0.16, rn) * mv, ph = H.phase;
@@ -1531,7 +1846,7 @@
     const drawLegs = () => [-1, 1].forEach((sd, i) => {
       const lp = ph + (sd > 0 ? 0 : PI), s = Math.sin(lp), o = H.foot[i], lift = Math.max(0, Math.cos(lp)) * mv;
       line(bx + sd * lat * 0.9, legY, bx * 0.3 + sd * lat + (s * st + o.x * idle) * v,
-           -lift * (2 + 2.5 * rn) + s * st * 0.3 * (1 - v) * fr + o.y * idle * 0.5 - 2.2, 4.2);
+           -lift * (2 + 2.5 * rn) + s * st * 0.3 * (1 - v) * fr + o.y * idle * 0.5 - 2.2 - (i === 1 ? F.stomp * 11 : 0), 4.2);
     });
 
     // kılıç pozu: taşıma (bıçak yukarı) · koşu (bıçak geride) · siper · kırık siper · savurma
@@ -1575,7 +1890,7 @@
 
     // kollar
     const arm = sd => {
-      const ap = ph + (sd > 0 ? PI : 0), sn = Math.sin(ap), aw = lerp(lerp(0.12, 0.5, clamp(H.sp / 115, 0, 1)), 0.85, rn) * mv, kn = Math.max(H.knee, sstep(0, 0.45, F.dp));
+      const ap = ph + (sd > 0 ? PI : 0), sn = Math.sin(ap), aw = lerp(lerp(0.12, 0.5, clamp(H.sp / 115, 0, 1)), 0.85, rn) * mv, kn = Math.max(H.knee, sstep(0, 0.45, Math.max(F.dp, F.kp)));
       const t1 = lerp(0.05 + 0.04 * Math.sin(H.swPh + sd) + 0.02 * Bn, aw * sn - 0.05 * rn, mv);
       const fx = lerp(0.2 + 0.03 * Bn, lerp(0.2 + 0.2 * (0.5 + 0.5 * sn), 1.4 + 0.2 * Math.sin(ap - 0.6), rn), mv);
       const sx = bx + sd * (tw / 2 + 1) * (1 - v) + P.lx * 0.2, sy = P.neckY + 5.1;
@@ -2546,7 +2861,7 @@
       for (const e of E.slice()) {   // düşmanlar (delme: a.pen)
         if (a.pen <= 0) break;
         if (e.em < 1 || e.ghost || a.hit.includes(e) || !inEll(x0, y0, a.x, a.y, e.x, e.y, 25, 17)) continue;
-        a.hit.push(e); hitEnemy(e, a.dmg * gearM('arrow'), a.a, true);
+        a.hit.push(e); if (e.kind === 'knight' && knightArrow(e, a)) { stop = true; rec = 0.5; break; } hitEnemy(e, a.dmg * gearM('arrow'), a.a, true);
         if (a.perf && a.hit.length === 1) ftext(e.x, e.y - 78, 'Tam isabet!', GOLD);
         if (--a.pen <= 0) { stop = true; rec = 0.3; }
       }
@@ -2957,9 +3272,14 @@
     if (on) { ctx.save(); rr(x, yy, w, h, h / 2); ctx.strokeStyle = 'rgba(120,214,140,0.75)'; ctx.lineWidth = 1.3; ctx.stroke(); ctx.restore(); }
     PAUSE.btns.push({ x, y: yy - 4, w, h: h + 8, fn });
   }
+  function devSeekKnight() {   // geliştirici: oyunu Kalkan Beyi'nin doğmasına 6 sn kala sar (sayaç = K_START, ekran temiz)
+    if (!G.has) { G.has = true; G.eq = 1; }
+    TM.t = K_START; E.length = 0; EP.length = 0; EDUST.length = 0; E.kT = 6; E.spawnT = 3; EV.forEach(s => { s.spawnT = Math.max(s.spawnT, 3.5); });
+    F.fin = null; F.stomp = 0; F.hp = 100; F.dur = 100; resumeGame();
+  }
   function drawDevPage(u, cx) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
-    const bw = Math.min(W * 0.64, 250), oh = 38, gap = 12, n = DEV_OPTS.length;
+    const bw = Math.min(W * 0.64, 250), oh = 38, gap = 12, n = DEV_OPTS.length + 1;
     const total = 46 * u + n * (oh + gap) + 20 + oh;
     let y = Math.max(UI_TOP, (H - total) / 2 - H * 0.03);
     ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = 'rgba(240,194,74,0.9)';
@@ -2967,6 +3287,7 @@
     for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
     y += 46 * u;
     for (const [k, label] of DEV_OPTS) { devPill(cx - bw / 2, y, bw, oh, label + (DEV[k] ? '  AÇIK' : '  KAPALI'), DEV[k], () => { DEV[k] = !DEV[k]; }); y += oh + gap; }
+    menuPill(cx - bw / 2, y, bw, oh, 'KALKAN BEYİNE SAR', 1, false, 0); PAUSE.btns.push({ x: cx - bw / 2, y: y - 4, w: bw, h: oh + 8, fn: devSeekKnight }); y += oh + gap;
     y += 8; menuPill(cx - bw / 2, y, bw, oh, 'GERİ', 1, false, 0); PAUSE.btns.push({ x: cx - bw / 2, y: y - 4, w: bw, h: oh + 8, fn: () => { PAUSE.page = 'main'; } });
   }
 
@@ -3122,20 +3443,20 @@
     if (PAUSE.on) { try { AU.setMode('menu'); AU.update(dt, 0); } catch (_) {} drawPause(dt, false); requestAnimationFrame(frame); return; }
     TM.t += dt;
     const stopped = FX.stop > 0; if (stopped) FX.stop -= dt;
-    const sdt = stopped ? dt * 0.04 : dt;   // vuruş duraklaması: oyun neredeyse donar
+    const sdt = stopped ? dt * 0.04 : dt * finScale();   // vuruş duraklaması: oyun neredeyse donar
 
     let ix = joy.dx, iy = joy.dy;
     if (keys['arrowleft'] || keys['a']) ix -= 1;
     if (keys['arrowright'] || keys['d']) ix += 1;
     if (keys['arrowup'] || keys['w']) iy -= 1;
     if (keys['arrowdown'] || keys['s']) iy += 1;
-    if (F.death >= 0) ix = iy = 0;
+    if (F.death >= 0 || F.fin || (F.kd >= 0 && F.kd < 2.1)) ix = iy = 0;
     const m = Math.hypot(ix, iy);
     if (m > 1) { ix /= m; iy /= m; }
     if (keys['shift']) { const mm = Math.hypot(ix, iy); if (mm > 0.45) { ix *= 0.45 / mm; iy *= 0.45 / mm; } } // Shift = yürü (masaüstü testi)
 
     // yumuşak ivmelenme
-    const t = 1 - Math.exp(-14 * sdt), spd = SPEED * gearM('speed') * (F.guarding ? 0.75 + gearA('guard') : 1) * (1 - 0.45 * BOW.aimw);   // siperdeyken yavaş
+    const t = 1 - Math.exp(-14 * sdt), spd = SPEED * gearM('speed') * (F.guarding ? 0.75 + gearA('guard') : 1) * (1 - 0.45 * BOW.aimw) * (F.kd >= 2.1 ? 0.5 : 1) * (1 - 0.7 * Math.min(F.slow, 2) / 2);   // siperdeyken yavaş
     player.vx += (ix * spd - player.vx) * t;
     player.vy += (iy * spd - player.vy) * t;
     player.x += player.vx * sdt; player.y += player.vy * sdt;
@@ -3159,12 +3480,12 @@
     const bgCol = light ? '#f2f2f2' : '#0a0a0a';
     const fg = light ? '0,0,0' : '255,255,255';
     ctx.fillStyle = bgCol; ctx.fillRect(0, 0, W, H);
-    const ck = dmp(10, dt); cam.x += (player.x - W / 2 - cam.x) * ck; cam.y += (player.y - H / 2 - cam.y) * ck;   // kamera yumuşak takip
+    const ft = F.fin, ck = dmp(ft ? 4 : 10, dt), tx = ft ? (player.x + ft.cx) / 2 : player.x, ty = ft ? (player.y + ft.cy) / 2 : player.y; cam.x += (tx - W / 2 - cam.x) * ck; cam.y += (ty - H / 2 - cam.y) * ck;   // kamera yumuşak takip
     cam.x += FX.ox; cam.y += FX.oy;   // kamera sarsıntısı
     drawWorld(fg);
     setBase();
     drawPrints(fg);
-    drawTele(fg);
+    drawTele(fg); drawFinRing(fg);
 
     drawGroundGun(fg, light);
     const sfg = light ? '105,105,105' : '150,150,150';
