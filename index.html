@@ -3005,7 +3005,7 @@
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs;
-    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 56 : 64, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
+    const P = wdPal(), land = W > H * 1.05 || H < 520, topPad = land ? 10 : 30, hdr = (land ? 56 : 64) + topPad, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
     if (!WDR.drag) { WDR.yaw += WDR.vel * dt; WDR.vel *= Math.exp(-3.2 * dt); if (Math.abs(WDR.vel) < 0.02) WDR.vel = 0; WDR.idle += dt; if (WDR.idle > 4 && WDR.vel === 0) { const tg = Math.round(WDR.yaw / TAU) * TAU; WDR.yaw += (tg - WDR.yaw) * (1 - Math.exp(-4 * dt)); if (Math.abs(tg - WDR.yaw) < 0.002) WDR.yaw = tg; } }
     // --- yerleşim ---
@@ -3032,10 +3032,10 @@
     }
     if (WDR.hint > 0.03) { ctx.font = `400 10px ${UIF}`; ctx.textBaseline = 'middle'; ctx.fillStyle = P.m(WDR.hint * (0.36 + 0.1 * Math.sin(t * 2))); wdLetters('sürükleyerek döndür', scx, gy + 4 * sc + 20, 1.8, 'c'); }
     // --- başlık + düğmeler ---
-    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, hdr / 2 + 1, 6, 'c');
+    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, topPad + (hdr - topPad) / 2 + 1, 6, 'c');
     const any = GEAR_SLOTS.some(([sl]) => OUTFIT[sl]);
     const round = (x, y, en, ico) => { ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = en ? P.ln2 : P.ln; ctx.stroke(); ctx.strokeStyle = en ? P.tx : P.ln2; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ico(x, y); };
-    const by = hdr / 2 + 1;
+    const by = topPad + (hdr - topPad) / 2 + 1;   // topPad: üstteki saat/pil alanından uzak durmak için (safe area kullanılmıyor)
     round(34, by, true, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 2.5, y - 6.5); ctx.lineTo(x - 3.5, y); ctx.lineTo(x + 2.5, y + 6.5); ctx.stroke(); });
     PAUSE.btns.push({ x: 8, y: by - 26, w: 52, h: 52, fn: wdBack });
     round(W - 34, by, any, (x, y) => { const r = 6.6, a0 = -PI / 2 + 0.55, a1 = -PI / 2 - 0.55 + TAU, px = x + r * Math.cos(a1), py = y + r * Math.sin(a1), tx = -Math.sin(a1), ty = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
