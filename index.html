@@ -697,7 +697,7 @@
   const GUARD_ARC = 1.45;       // siper yalnızca kılıcın baktığı yöndeki bu yarım açıyı (≈83°) korur; yanlar ve sırt açıktır
   const TIRED_LO = 15, TIRED_HI = 55, TIRED_DMG = 0.5;   // dayanıklılık LO'nun altına inerse yorulur; HI'ya çıkana kadar vuruşlar yarı hasar verir
   const wpnDmg = () => (F.tired ? TIRED_DMG : 1) * gearM('sword');
-  const DEV = { on: false, peace: false, gold: false, keys: false, arrows: false, god: false, freeze: false, spawn: {} };   // spawn: türe göre doğal doğuş kapatma (false = doğmaz) · geliştirici modu: ana ekranın sağ üstünden girilir · hepsi açık başlar · düğmeleri duraklatma menüsünde
+  const DEV = { on: false, peace: false, gold: false, keys: false, arrows: false, god: false, freeze: false, spawn: {}, mimic: 12 };   // spawn: türe göre doğal doğuş kapatma (false = doğmaz) · geliştirici modu: ana ekranın sağ üstünden girilir · hepsi açık başlar · düğmeleri duraklatma menüsünde
   const E = []; E.spawnT = 1.5;
   const F = { kd: -1, stag: 0, sgx: 0, sgy: 0, kp: 0, lx: 0, ly: 0, slow: 0, bstun: false, gt: 0, pt: -1, dir: 1, aim: 0, buf: false, down: false, hold: 0, guarding: false, gw: 0, dur: 100, broken: 0, bw: 0, regenT: 0, sw: 0, off: 0,
     hp: 100, tired: false, flash: 0, lunge: 0, drop: 0, tx: 0, ty: 0, squint: false, time: 0, fx: null, hit: [], stp: 0, wind: 0, wince: 0, death: -1, dp: 0, fall: 1, ds: null };
@@ -791,16 +791,16 @@
     ctx.restore();
   }
   function hitEnemy(e, dmg, ang, ranged) {
-    const dealt = dmg * (e.st === 'rec' ? 1.5 : 1); e.hp -= dealt; e.flash = 0.12; dmgNum(e.x, e.y - 58, dealt, e.st === 'rec');   // soluklanırken vurulursa fazla hasar
+    const dealt = dmg * (e.st === 'rec' || e.st === 'dz' ? 1.5 : 1) * (e.kind === 'mimic' && e.rage ? 1.3 : 1); e.hp -= dealt; e.flash = 0.12; dmgNum(e.x, e.y - 58, dealt, e.st === 'rec');   // soluklanırken vurulursa fazla hasar
     if (!e.armor) { e.stun = 0.35; e.st = 'chase'; e.t = 0; e.atk = ''; e.cd = Math.max(e.cd, 0.5); e.kx = Math.cos(ang) * 300 * (dmg < 20 ? 0.55 : 1); e.ky = Math.sin(ang) * 300 * (dmg < 20 ? 0.55 : 1); }
     else { e.x += Math.cos(ang) * 4; e.y += Math.sin(ang) * 4; }
     F.fx = { x: e.x, y: e.y - 24, t: 0, k: 'hit' };
     const kill = e.hp <= 0; sparks(e.x - Math.cos(ang) * 8, e.y - 24, kill ? 12 : 7, 200, ang, 0.9); hitFx(kill ? 0.12 : 0.07, kill ? 5 : 3);
     AU.sfx(ranged ? 'arrowHit' : 'hit', e.x, e.y, kill);
-    if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10); AU.sfx('eDie', e.x, e.y, e); E.splice(E.indexOf(e), 1); if (!e.src && e.kind === 'ghost') E.spawnT = 2.5; }
+    if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10); AU.sfx('eDie', e.x, e.y, e); E.splice(E.indexOf(e), 1); if (e.kind === 'mimic') mimicDie(e); if (!e.src && e.kind === 'ghost') E.spawnT = 2.5; }
     else {
       AU.sfx('eHurt', e.x, e.y, e);   // vuruş sarsıntısı
-      if (!e.rg && e.hp <= e.max * 0.5) { e.rg = e.rage = true; AU.sfx('eRage', e.x, e.y); smoke(e.x, e.y - 20, 6, 60, 12); hitFx(0, 2); }   // yarı canda öfkelenir: daha hızlı, 3'lü küre
+      if (!e.rg && e.hp <= e.max * 0.5) { e.rg = e.rage = true; AU.sfx('eRage', e.x, e.y); smoke(e.x, e.y - 20, 6, 60, 12); hitFx(0, 2); if (e.kind === 'mimic') mimicRage(e); }   // yarı canda öfkelenir: daha hızlı, 3'lü küre
     }
   }
   function swingHit() {
@@ -951,6 +951,7 @@
       }
       const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, ap = Math.atan2(dy, dx);
       if (e.stun > 0) { e.stun -= dt; e.x += e.kx * dt; e.y += e.ky * dt; const k = Math.max(0, 1 - 7 * dt); e.kx *= k; e.ky *= k; e.face += wrap(ap - e.face) * dmp(8, dt); continue; }
+      if (e.kind === 'mimic') { mimicAI(e, dt, d, ux, uy, ap, on); continue; }
       const sp = (e.rage ? 122 : 94) * E_SPD;
       if (e.st === 'chase') {
         e.cd -= dt; e.ph += dt * TAU * (e.rage ? 1.7 : 1.2); e.sT -= dt; if ((e.bt -= dt) <= 0) { e.orb = -e.orb; e.bt = rnd(2, 4.5); }
@@ -1052,6 +1053,7 @@
   }
   function drawEnemy(e, fg) {
     if (e.em <= 0) return;
+    if (e.kind === 'mimic') { drawMimicE(e, fg); return; }
     const em = e.em < 1 ? e.em : 1, al = em * e.al; if (al < 0.02) return;
     const T0 = FX.t, st = e.st, wind = st === 'wind', strike = st === 'strike', rec = st === 'rec', kind = e.atk, slam = kind === 'claw' && e.cmb === 2 && !e.fast, rg = e.rage, hurt = e.flash > 0;
     const wp = wind ? sstep(0, e.wd, e.t) : 0, spr = strike ? clamp(e.t / e.sd, 0, 1) : 0, cx = Math.cos(e.face), fs = Math.sign(cx) || 1;
@@ -2095,12 +2097,13 @@
 
   /* ---------- Ganimet sandıkları: kılıçla vurulur, her darbede sarsılır, son darbede parçalanır · zincirli sandık yalnızca altın anahtarla açılır ---------- */
   const CHS = 1.05, CH_HITS = 4, CH_HP = CH_HITS * 20, CC = 320;
-  const CST = new Map(), chestCache = new Map(), baseChests = [[-130, 150, 'cb0', false], [190, 150, 'cb1', true]];   // başlangıçta: biri normal (altın anahtar düşürür), biri zincirli
+  const CST = new Map(), chestCache = new Map(), baseChests = [[-130, 150, 'cb0', false], [190, 150, 'cb1', true]], xChests = [];   // başlangıçta: biri normal (altın anahtar düşürür), biri zincirli
   const INV = { gold: 0, keys: 0, gp: 0, kp: 0, ever: false }, LOOT = [], WD = [], FT = [];
   const WCOL = ['#6a5744', '#44372b', '#6d7079', '#8c7455'], GOLD = '#f0c24a';
   function chestsIn(x0, y0, x1, y1) {
     const out = [];
     baseChests.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push(c); });
+    xChests.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push(c); });
     for (let ci = Math.floor(x0 / CC); ci <= Math.floor(x1 / CC); ci++) for (let cj = Math.floor(y0 / CC); cj <= Math.floor(y1 / CC); cj++) {
       const k = ci + ',' + cj; let c = chestCache.get(k);
       if (c === undefined) {
@@ -2117,7 +2120,7 @@
   }
   function chState(id, lk) {
     let s = CST.get(id);
-    if (!s) CST.set(id, s = { hp: CH_HP, hits: 0, chain: lk, locked: lk, unl: -1, dying: -1, dead: false, sq: 0, rot: 0, rv: 0, lid: 0, lv: 0, flash: 0, glow: 0, shk: 0, t: rnd(0, 9), sd: rnd(0, 50), hint: 0, ct: 0, kx: 0, ky: 0, dd: 0 });
+    if (!s) CST.set(id, s = { hp: CH_HP, hits: 0, chain: lk, locked: lk, unl: -1, dying: -1, dead: false, sq: 0, rot: 0, rv: 0, lid: 0, lv: 0, flash: 0, glow: 0, shk: 0, t: rnd(0, 9), sd: rnd(0, 50), hint: 0, ct: 0, kx: 0, ky: 0, dd: 0, mimic: !lk && !/^(cb|dm)/.test(id) && DEV.spawn.mimic !== false && Math.random() < DEV.mimic / 100, mAt: Math.random() < 0.5 ? 2 : 3, mc: 0, dm: 0, gone: false });
     return s;
   }
   function nearestChest(r) {
@@ -2227,6 +2230,7 @@
     AU.sfx('chestHit', x, y - 14, s.hits); hitFx(0.07, 3.5);
     for (let h = h0 + 1; h <= s.hits; h++) chestShed(x, y, h);
     cdust(x, y + 1, 2, 0.6); if (s.hits >= 2) gsp(x + rnd(-10, 10), y - 28, 2 + s.hits, 60, 110);   // çatlaklardan altın ışık zerreleri sızar
+    if (s.mimic && !DEV.peace) { s.dm += dmg; if (++s.mc >= s.mAt) { revealMimic(s, x, y); return; } }   // mimik: 2. ya da 3. vuruşta ortaya çıkar
     if (s.hp <= 0) { s.hp = 0; s.dying = 0; hitFx(0.12, 6); }
   }
   function breakChest(s, x, y, id) {
@@ -2318,7 +2322,7 @@
   }
   function drawChest(x, y, id, lk, light) {
     const s = chState(id, lk);
-    if (s.dead) { drawChestRubble(x, y, light, s); return; }
+    if (s.dead) { if (!s.gone) drawChestRubble(x, y, light, s); return; }
     const hv = s.hits, fl = s.flash > 0, C = chPal(light);
     if (fl) C.w1 = C.w2 = C.fe = C.fh = C.br = C.bd = C.fl;
     const DK = C.ln, IN = '#050403';
@@ -2423,6 +2427,156 @@
     if (dd < 3) { const a = 0.4 * (1 - dd / 3), g = ctx.createRadialGradient(0, -4, 0, 0, -4, 22); g.addColorStop(0, `rgba(${C.gl},${a})`); g.addColorStop(1, `rgba(${C.gl},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -4, 22, 0, TAU); ctx.fill(); }
     for (let i = 0; i < 8; i++) { ctx.save(); ctx.translate(-24 + hashN(k, i, 2) * 48, -2 + hashN(k, i, 3) * 9); ctx.rotate(hashN(k, i, 4) * 3.1); ctx.fillStyle = i === 7 ? C.rb[2] : i % 3 ? C.rb[0] : C.rb[1]; ctx.fillRect(-6, -1.6, 12 * (0.5 + hashN(k, i, 5) * 0.6), 3.2); ctx.restore(); }
     ctx.restore();
+  }
+  /* ---------- MİMİK: sandık taklitçisi. Normal sandık gibi vurulur; 2. ya da 3. vuruşta (şansa bağlı) ortaya çıkar ---------- */
+  const MS = 1.2;
+  const setMimic = v => { DEV.mimic = clamp(Math.round(v), 0, 100); try { localStorage.setItem('hlk_mimic', String(DEV.mimic)); } catch (_) {} };
+  try { const m = parseFloat(localStorage.getItem('hlk_mimic')); if (isFinite(m)) DEV.mimic = clamp(Math.round(m), 0, 100); } catch (_) {}
+  function newMimic(x, y, em) { const e = newEnemy(x, y, 'mim', em); e.kind = 'mimic'; e.hp = e.max = 150; e.lg = 1; e.lk = 0; e.stk = 0; e.dzD = 1.7; e.d2 = false; return e; }
+  function revealMimic(s, x, y) {   // sandık kaybolur, yerinde mimik belirir; sandığa vurulan hasar canından düşer
+    s.dead = true; s.gone = true; s.dying = -1; s.dd = 0;
+    const e = newMimic(x, y, 1); e.hp = Math.max(e.max * 0.6, e.max - s.dm); e.st = 'rev'; e.t = 0; e.lg = 0; e.face = Math.atan2(player.y - y, player.x - x); E.push(e);
+    AU.sfx('eRage', x, y - 14); sparks(x, y - 20, 12, 230, 0, TAU); cdust(x, y + 1, 5, 1); hitFx(0.14, 7); ftext(x, y - 66, 'Mimik!', null);
+  }
+  function devPlaceMimic() {   // geliştirici: önüne gizli mimik sandığı bırakır
+    const x = player.x + Math.cos(hero.face) * 110, y = player.y + Math.sin(hero.face) * 70, id = 'dm' + (xChests.length + 1);
+    xChests.push([x, y, id, false]); const s = chState(id, false); s.mimic = true; s.mAt = Math.random() < 0.5 ? 2 : 3; devToast('Gizli mimik yerleştirildi');
+  }
+  function mimicAttack(e, kind) {
+    e.atk = kind; e.st = 'wind'; e.t = 0; e.did = false; e.d2 = false; e.wd = (e.rage ? 0.7 : 1) * { bite: 0.5, tongue: 0.62, spit: 0.55 }[kind] * E_WIND; AU.sfx('eWind', e.x, e.y, e);
+  }
+  function mimicAI(e, dt, d, ux, uy, ap, on) {
+    const rg = e.rage, st = e.st, face = () => { e.face += wrap(ap - e.face) * dmp(9, dt); };
+    e.armor = (!rg || st === 'rev' || st === 'dz' || st === 'stuck') ? 1 : 0;   // öfkeden önce zırhlı: vuruşla sendelemez
+    if (st === 'rev') e.lg = sstep(0.3, 0.7, e.t); else e.lg += (1 - e.lg) * dmp(8, dt);
+    if (st === 'rev') {
+      face();
+      if (!e.did && e.t >= 0.5) { e.did = true; AU.sfx('eClaw', e.x, e.y, e); if (d < 84) hurtPlayer(e, Math.round(9 * E_DMG), 22); }
+      if (e.t >= 0.9) { e.st = 'chase'; e.t = 0; e.cd = 0.5; }
+    } else if (st === 'chase') {
+      face(); e.cd -= dt; const sp = rg ? 128 : 76;
+      const ready = on && e.cd <= 0, tx = -uy * e.orb, ty = ux * e.orb; let mx, my;
+      if (ready) { mx = d > 52 ? ux : 0; my = d > 52 ? uy : 0; } else if (d < 95) { mx = -ux * 0.4 + tx * 0.8; my = -uy * 0.4 + ty * 0.8; } else if (d < 210) { mx = tx * 0.85 + ux * 0.3; my = ty * 0.85 + uy * 0.3; } else { mx = ux; my = uy; }
+      e.x += mx * sp * dt; e.y += my * sp * dt; e.ph += dt * TAU * (rg ? 2.2 : 1.4) * (Math.abs(mx) + Math.abs(my) > 0.1 ? 1 : 0.3);
+      if ((e.bt -= dt) <= 0) { e.orb = -e.orb; e.bt = rnd(2, 4); }
+      if (ready && (e.thk -= dt) <= 0) { e.thk = 0.2; const r = Math.random(); if (d < 76) mimicAttack(e, 'bite'); else if (d < 230) { if (r < 0.5) mimicAttack(e, 'tongue'); else if (d > 90 && r < 0.75) mimicAttack(e, 'spit'); } }
+    } else if (st === 'wind') {
+      if (e.t < e.wd - 0.14) face();
+      if (e.t >= e.wd) { e.st = 'strike'; e.t = 0; e.did = false; e.d2 = false; e.lk = e.face; AU.sfx(e.atk === 'bite' ? 'eLunge' : 'eClaw', e.x, e.y, e); }
+    } else if (st === 'strike') {
+      const k = e.atk, cx = Math.cos(e.lk), cy = Math.sin(e.lk), aim = d < 70 * E_AIM && Math.abs(wrap(ap - e.lk)) < 1.2 * E_AIM;
+      if (k === 'bite') {
+        if (e.t < 0.12 || (e.t > 0.26 && e.t < 0.4)) { e.x += cx * 110 * dt; e.y += cy * 110 * dt; }
+        if (!e.did && e.t >= 0.1) { e.did = true; if (aim) hurtPlayer(e, Math.round(8 * E_DMG), 22); }
+        else if (!e.d2 && e.t >= 0.36) { e.d2 = true; if (aim) hurtPlayer(e, Math.round(14 * E_DMG), 30); }
+      } else if (k === 'tongue') {
+        if (!e.did && e.t >= 0.12) {
+          e.did = true; const dx = player.x - e.x, dy = player.y - e.y, along = dx * cx + dy * cy, perp = -dx * cy + dy * cx;
+          if (along > 0 && along < 190 && Math.abs(perp) < 34 * E_AIM) {
+            const aP = Math.atan2(e.y - player.y, e.x - player.x), blocked = F.guarding && F.gw > 0.5 && Math.abs(wrap(aP - hero.face)) < GUARD_ARC, pry = F.gt < 0.22;
+            hurtPlayer(e, Math.round(11 * E_DMG), 26);
+            if (blocked && F.death < 0) { e.st = 'stuck'; e.t = 0; e.stun = 0; e.dzD = pry ? 2.6 : 1.7; ftext(e.x, e.y - 70, 'Dil yapıştı!', GOLD); }   // sipere yapışır: sendeler
+            else { F.lx += -Math.cos(aP) * 300; F.ly += -Math.sin(aP) * 300; }   // dil oyuncuyu kendine çeker
+          }
+        }
+      } else if (!e.did && e.t >= 0.1) {   // altın tükürme: paralar yerde kalır, toplamak risklidir
+        e.did = true; AU.sfx('chestHit', e.x, e.y - 14, 3);
+        for (let i = 0; i < (rg ? 4 : 6); i++) { const a = ap + rnd(-0.9, 0.9), r = rnd(45, 120); LOOT.push({ k: 'coin', x: e.x, y: e.y, z: 22, vx: Math.cos(a) * r / 0.6, vy: Math.sin(a) * r / 0.6, vz: 270, t: 0, ph: rnd(0, 6), b: 0, rest: false }); }
+        gsp(e.x, e.y - 22, 8, 200, 60);
+      }
+      if (e.st === 'strike' && e.t >= (k === 'bite' ? 0.56 : k === 'tongue' ? 0.5 : 0.45)) { e.st = 'rec'; e.t = 0; e.rd = rg ? 0.6 : 0.95; e.cd = rnd(0.8, 1.5) * (rg ? 0.6 : 1); e.atk = ''; }
+    } else if (st === 'stuck') {
+      face(); if (e.t >= 0.9) { e.st = 'dz'; e.t = 0; AU.sfx('eHurt', e.x, e.y, e); }
+    } else if (st === 'dz') {   // sersem: vurulursa %50 fazla hasar
+      e.cd = Math.max(e.cd, 0.4); if (e.t >= e.dzD) { e.st = 'rec'; e.t = 0; e.rd = 0.4; e.cd = 0.6; }
+    } else if (st === 'rec') {
+      e.cd -= dt; face(); if (e.t >= e.rd) { e.st = 'chase'; e.t = 0; }
+    } else { e.st = 'chase'; e.t = 0; }
+  }
+  function mimicRage(e) {   // yarı canda kapağı fırlatır; zırhı kalmaz
+    CHP.push({ x: e.x, y: e.y - 36 * MS, vx: (Math.random() < 0.5 ? -1 : 1) * rnd(80, 160), vy: -rnd(300, 380), gy: e.y + 10, poly: null, k: 3, r: 0, vr: rnd(-7, 7), t: 0, life: 6, b: 0, rest: false, big: true });
+    cdust(e.x, e.y + 2, 5, 1); gsp(e.x, e.y - 20, 14, 260, 120); ftext(e.x, e.y - 70, 'Öfke!', null); hitFx(0.1, 6);
+  }
+  function mimicDie(e) {
+    const x = e.x, y = e.y; AU.sfx('chestBreak', x, y - 14);
+    for (let i = 0, n = 12 + (Math.random() * 7 | 0); i < n; i++) LOOT.push({ k: 'coin', x, y: y + 4, z: 14, vx: rnd(-170, 170), vy: rnd(-80, 80), vz: rnd(230, 420), t: 0, ph: rnd(0, 6), b: 0, rest: false });
+    if (Math.random() < 0.6 * gearM('keyx')) LOOT.push({ k: 'key', x, y: y + 4, z: 18, vx: rnd(-50, 50), vy: rnd(-30, 30), vz: 380, t: 0, ph: rnd(0, 6), b: 0, rest: false });
+    bowDrops(x, y, { chain: true });
+    for (let i = 0; i < 10; i++) wood(x + rnd(-18, 18), y - rnd(4, 30), rnd(-230, 230), -rnd(60, 300), y + rnd(2, 16), rnd(1.6, 6), rnd(1.2, 2.6), [0, 3, 1][i % 3]);
+    CFX.push({ k: 'flash', x, y: y - 22, t: 0, life: 0.42 }, { k: 'ring', x, y: y + 2, r: 70, t: 0, life: 0.55 });
+    cdust(x, y + 2, 9, 1.3); gsp(x, y - 22, 26, 340, 140); hitFx(0.2, 10);
+  }
+  const pls = (a, b, c, d, v) => sstep(a, b, v) * (1 - sstep(c, d, v));
+  function mimicPose(e) {
+    const st = e.st, t = e.t, rg = !!e.rage, P = { gape: rg ? 1 : 0.08 + 0.05 * Math.sin(FX.t * 6), tremor: 0, legs: e.lg, tongue: 0, eyes: 'open', stun: false };
+    if (st === 'rev') { P.gape = t < 0.35 ? 0.12 : pls(0.35, 0.45, 0.55, 0.65, t) * 1.1 + 0.2 * (1 - sstep(0.65, 0.9, t)) * (t > 0.65 ? 1 : 0); P.tremor = t < 0.35 ? 1.4 : 0; }
+    else if (st === 'wind') { const wp = sstep(0, e.wd, t); P.tremor = 1.2 * wp; if (!rg) P.gape = 0.1 + (e.atk === 'bite' ? 0.15 : 0.5) * wp; }
+    else if (st === 'strike') {
+      if (e.atk === 'bite') P.gape = Math.max(pls(0, 0.06, 0.1, 0.18, t), pls(0.24, 0.3, 0.36, 0.44, t) * 1.15, rg ? 0.5 : 0);
+      else if (e.atk === 'tongue') { P.tongue = sstep(0, 0.16, t) * (1 - sstep(0.26, 0.5, t)); P.gape = rg ? 1 : 0.6; }
+      else P.gape = rg ? 1 : 0.1 + 0.75 * pls(0, 0.08, 0.3, 0.45, t);
+    } else if (st === 'stuck') { P.tongue = 1; P.gape = rg ? 1 : 0.6; }
+    else if (st === 'dz') { P.eyes = 'x'; P.stun = true; P.gape = rg ? 1 : 0.2; P.legs = 0.7; }
+    return P;
+  }
+  function drawMimicE(e, fg) {
+    const em = Math.min(1, e.em); if (em <= 0.02) return;
+    const T = FX.t, st = e.st, rg = !!e.rage, fl = e.flash > 0, C = Object.assign({}, chPal(light)), P = mimicPose(e);
+    if (fl) C.w1 = C.w2 = C.fe = C.fh = C.br = C.bd = C.fl;
+    const INK = C.ln, BONE = fl ? C.fl : '#d9d0bc', FL = fl ? C.fl : '#a63a5e', FLH = fl ? C.fl : '#d46a8a', FLD = '#4a1428', fs = Math.sign(Math.cos(e.face)) || 1;
+    const poly = (p, f, s, w) => { ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); if (f) { ctx.fillStyle = f; ctx.fill(); } if (s) { ctx.strokeStyle = s; ctx.lineWidth = w || 0.8; ctx.stroke(); } };
+    const lg = P.legs, lift = lg * 6, g = P.gape * 17, ph = e.ph, tr = P.tremor ? Math.sin(T * 90) * P.tremor : 0;
+    ctx.save(); ctx.globalAlpha = em; ctx.translate(e.x, e.y);
+    ctx.fillStyle = light ? 'rgba(30,20,60,0.2)' : 'rgba(0,0,0,0.38)'; ctx.beginPath(); ctx.ellipse(0, 2, (24 - lift * 0.5) * MS, 6 * MS, 0, 0, TAU); ctx.fill();
+    ctx.scale(MS * fs, MS);
+    if (rg) { const a = 0.3 + 0.15 * Math.sin(T * 12), gr = ctx.createRadialGradient(0, -14, 0, 0, -14, 50); gr.addColorStop(0, `rgba(214,60,120,${a})`); gr.addColorStop(1, 'rgba(214,60,120,0)'); ctx.fillStyle = gr; ctx.fillRect(-60, -70, 120, 90); }
+    [[-14, 0.7, 0], [-6, 1, 1], [6, 1, 3], [14, 0.7, 2]].sort((a, b) => a[1] - b[1]).forEach(([x0, sc, k]) => {
+      if (lg < 0.02) return; const sd = Math.sign(x0), s = Math.sin(ph + k * 1.6), up = Math.max(0, s) * 3.2 * lg, ky = -lift * 0.5 * lg - 1, hx = x0, hy = -lift + 1, kx = x0 + sd * 5 * lg, fx = x0 + sd * 6.5 * lg + s * 2.2, fy = -up;
+      ctx.save(); ctx.globalAlpha = em * (0.55 + 0.45 * sc); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const [w, c] of [[3.6 * sc, INK], [2 * sc, C.st]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke(); }
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.1 * sc; ctx.beginPath(); for (const d of [-1.6, 0, 1.6]) { ctx.moveTo(fx, fy); ctx.lineTo(fx + sd * 2.4 + d, fy + 1.2); } ctx.stroke(); ctx.restore();
+    });
+    ctx.translate(tr * 0.4, -lift); if (rg) ctx.rotate(Math.sin(T * 14) * 0.02); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.fillStyle = C.w1; ctx.fillRect(-18, -20, 36, 20); ctx.fillStyle = C.w2; ctx.fillRect(-18, -13.5, 36, 6.5); ctx.strokeRect(-18, -20, 36, 20);
+    ctx.strokeStyle = C.pl; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -13.5); ctx.lineTo(18, -13.5); ctx.moveTo(-18, -7); ctx.lineTo(18, -7); ctx.stroke();
+    ctx.fillStyle = C.fe; ctx.strokeStyle = INK; ctx.lineWidth = 0.7; ctx.fillRect(-18, -3.2, 36, 3.2); ctx.strokeRect(-18, -3.2, 36, 3.2); [-13, 8.8].forEach(sx => { ctx.fillRect(sx, -20, 4.2, 17); ctx.strokeRect(sx, -20, 4.2, 17); });
+    if (rg) { ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-6, -16); ctx.lineTo(-9, -12); ctx.lineTo(-8, -8); ctx.moveTo(7, -15); ctx.lineTo(5, -10); ctx.stroke(); }
+    const cavH = Math.max(g, rg ? 15 : 0);
+    if (cavH > 0.5) {
+      const gr = ctx.createLinearGradient(0, -20, 0, -20 - cavH); gr.addColorStop(0, '#2a0b18'); gr.addColorStop(1, '#07030a'); ctx.fillStyle = gr; ctx.fillRect(-17, -20 - cavH, 34, cavH + 0.5);
+      if (cavH > 6) { const ey = -20 - cavH * 0.55, hot = rg ? '255,90,140' : '240,194,74'; [-6.5, 6.5].forEach(x => { const gg = ctx.createRadialGradient(x, ey, 0, x, ey, 7); gg.addColorStop(0, `rgba(${hot},.55)`); gg.addColorStop(1, `rgba(${hot},0)`); ctx.fillStyle = gg; ctx.fillRect(x - 8, ey - 8, 16, 16);
+        if (P.eyes === 'x') { ctx.strokeStyle = `rgb(${hot})`; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(x - 1.8, ey - 1.8); ctx.lineTo(x + 1.8, ey + 1.8); ctx.moveTo(x + 1.8, ey - 1.8); ctx.lineTo(x - 1.8, ey + 1.8); ctx.stroke(); }
+        else { ctx.fillStyle = `rgb(${hot})`; ctx.beginPath(); ctx.ellipse(x, ey, 2.2, rg ? 1.5 : 2.6, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#07030a'; ctx.fillRect(x - 0.4, ey - 2.4, 0.8, 4.8); } }); }
+      ctx.fillStyle = FL; ctx.beginPath(); ctx.ellipse(0, -20, 15, 3.2, 0, PI, TAU); ctx.fill(); ctx.strokeStyle = FLD; ctx.lineWidth = 0.8; ctx.stroke();
+      for (let i = 0; i < 7; i++) { const x = -15 + i * 5, h = (2.2 + (i % 2) * 1.2) * clamp(cavH / 8, 0.3, 1.4); poly([[x - 1.9, -20], [x, -20 - h], [x + 1.9, -20]], BONE, INK, 0.6); }
+    }
+    if (rg) { ctx.fillStyle = 'rgba(240,194,74,.8)'; const d = (T * 1.3) % 1; ctx.beginPath(); ctx.ellipse(-12, -20 + d * 14, 1.1, 2 + d, 0, 0, TAU); ctx.fill(); }
+    if (!rg) {
+      ctx.save(); ctx.translate(tr, -g); ctx.translate(-18, -20); ctx.rotate(-g * 0.012); ctx.translate(18, 20);
+      if (g > 1.5) for (let i = 0; i < 7; i++) { const x = -15 + i * 5, h = (2.4 + (i % 2) * 1.2) * clamp(g / 8, 0.3, 1.4); poly([[x - 1.9, -20], [x, -20 + h], [x + 1.9, -20]], BONE, INK, 0.6); }
+      ctx.beginPath(); ctx.moveTo(-18, -20); ctx.lineTo(-18, -25); ctx.quadraticCurveTo(-18, -36, 0, -36); ctx.quadraticCurveTo(18, -36, 18, -25); ctx.lineTo(18, -20); ctx.closePath();
+      ctx.fillStyle = C.w2; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke(); ctx.save(); ctx.clip();
+      ctx.strokeStyle = C.pl; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -28.5); ctx.lineTo(18, -28.5); ctx.stroke();
+      ctx.fillStyle = C.fe; ctx.fillRect(-13, -40, 4.2, 22); ctx.fillRect(8.8, -40, 4.2, 22); ctx.strokeStyle = INK; ctx.lineWidth = 0.7; ctx.strokeRect(-13, -40, 4.2, 22); ctx.strokeRect(8.8, -40, 4.2, 22);
+      if (!fl) { ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-15.5, -27); ctx.quadraticCurveTo(-14.5, -33, -6, -34.2); ctx.stroke(); }
+      ctx.restore();
+      ctx.fillStyle = C.fe; ctx.fillRect(-18.5, -21.5, 37, 2.4); ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.strokeRect(-18.5, -21.5, 37, 2.4);
+      ctx.fillStyle = C.br; ctx.fillRect(-3.5, -25, 7, 7); ctx.strokeRect(-3.5, -25, 7, 7); ctx.fillStyle = C.bd; ctx.fillRect(-3.5, -21.4, 7, 3.4);
+      ctx.restore();
+    }
+    if (P.stun) for (let i = 0; i < 3; i++) { const a = T * 4 + i * 2.1, x = Math.cos(a) * 13, y = -48 - g + Math.sin(a) * 3.5; ctx.save(); ctx.translate(x, y); ctx.rotate(a); poly([[0, -2.6], [0.8, -0.8], [2.6, 0], [0.8, 0.8], [0, 2.6], [-0.8, 0.8], [-2.6, 0], [-0.8, -0.8]], GOLD, null); ctx.restore(); }
+    ctx.restore();
+    if (P.tongue > 0.02) {   // dil dünya koordinatlarında: gerçek yöne uzanır; siperde oyuncuya yapışır
+      ctx.save(); ctx.globalAlpha = em; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      const mx = e.x + fs * 5 * MS, my = e.y - (22 + 6 * lg) * MS; let tx, ty;
+      if (st === 'stuck') { tx = player.x; ty = player.y - 22; } else { const a = e.lk, L = P.tongue * 190; tx = mx + Math.cos(a) * L; ty = my + Math.sin(a) * L * 0.8; }
+      const len = Math.hypot(tx - mx, ty - my) || 1, nx = -(ty - my) / len, ny = (tx - mx) / len, amp = st === 'stuck' ? 0.8 : 3, pts = [];
+      for (let i = 0; i <= 14; i++) { const s = i / 14, w = Math.sin(s * 6 - T * 24) * amp * s; pts.push([lerp(mx, tx, s) + nx * w, lerp(my, ty, s) + ny * w]); }
+      const pa = () => { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
+      ctx.strokeStyle = INK; ctx.lineWidth = 5; pa(); ctx.stroke(); ctx.strokeStyle = FL; ctx.lineWidth = 3.4; pa(); ctx.stroke(); ctx.strokeStyle = FLH; ctx.lineWidth = 0.9; ctx.save(); ctx.translate(0, -0.8); pa(); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = FL; ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(tx, ty, 4, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
   }
   function drawLoot(l) {
     if (l.k === 'bow' || l.k === 'ammo' || l.k === 'arrow') { drawBowLoot(l); return; }
@@ -2969,8 +3123,9 @@
   const DEV_TABS = ['genel', 'canavar', 'silah'], GOLDC = '240,194,74', GREENC = '120,214,140';
   const DEV_SW = [['god', 'Ölümsüzlük', 'Hiç hasar almazsın'], ['peace', 'Barışçıl mod', 'Canavar doğmaz, heykeller uyanmaz'], ['arrows', 'Sınırsız ok', 'Okların hiç bitmez'], ['keys', 'Sınırsız anahtar', 'Kilitli sandıklar anahtarsız açılır'], ['freeze', 'Zamanı dondur', 'Senin dışında her şey durur · ölüm animasyonları oynar']];
   const MON_TYPES = [
-    ['ghost', 'Çırak Büyücü', 'Pençe, kara küre ve gölge dalışı', () => 'can ' + Math.round(70 * E_HP), (x, y, em) => newEnemy(x, y, undefined, em)]];
-  const MON_N = { ghost: 1 }, MON_MAX = 20;
+    ['ghost', 'Çırak Büyücü', 'Pençe, kara küre ve gölge dalışı', () => 'can ' + Math.round(70 * E_HP), (x, y, em) => newEnemy(x, y, undefined, em)],
+    ['mimic', 'Mimik', 'Sandık gibi görünür, 2–3 vuruşta ortaya çıkar · ısırık, dil, altın tükürme', () => 'can 150', (x, y, em) => newMimic(x, y, em)]];
+  const MON_N = { ghost: 1, mimic: 1 }, MON_MAX = 20;
   const WPN_LIST = [
     ['sword', 'Kılıç', 'Savur · siper al', () => G.has, () => { G.has = true; G.eq = 1; G.item = null; G.px = player.x; G.py = player.y - 15; }],
     ['bow', 'Yay', 'Nişan al · ok at', () => BOW.has, () => { bowGive(); }]];
@@ -3067,7 +3222,7 @@
         hair(y + h + 8, 0.08); y += h + 8; }
     } else if (DEVP.tab === 1) {
       y = sec('türler', y);
-      if (!DEVP.pv) { DEVP.pv = { ghost: newEnemy(0, 0, undefined, 1) }; for (const k in DEVP.pv) { const p = DEVP.pv[k]; p.face = 0.3; p.al = 1; p.em = 1; p.st = 'chase'; } }
+      if (!DEVP.pv) { DEVP.pv = { ghost: newEnemy(0, 0, undefined, 1), mimic: newMimic(0, 0, 1) }; for (const k in DEVP.pv) { const p = DEVP.pv[k]; p.face = 0.3; p.al = 1; p.em = 1; p.st = 'chase'; } }
       for (const [k, nm, ds, hpf, mk] of MON_TYPES) {
         const h = 172, px = x0, py = y + 6, pw = 96, ph = h - 12;
         ctx.save(); ctx.beginPath(); ctx.rect(px - 10, py, pw + 20, ph); ctx.clip();
@@ -3082,6 +3237,14 @@
         const cx2 = rx + 2 * sq + 52; ob(cx2, by, x0 + cw - cx2, 36, 'çağır', () => devSummon(k, MON_N[k]), { solid: true });
         hair(y + h, 0.08); y += h;
       }
+      { const h = 202, v = DEV.mimic;   // mimik oranı: doğal sandıkların yüzde kaçı mimik olur
+        dvText('Mimik oranı', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText('sandıkların %' + v + ' kadarı', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
+        const sy = y + 44;
+        ob(x0, sy, 44, 38, '−', () => setMimic(DEV.mimic - 1), { dim: v <= 0, size: 18 }); dvText('%' + v, x0 + cw / 2, sy + 20, 22, 500, fg, 1, 0, 'center'); ob(x0 + cw - 44, sy, 44, 38, '+', () => setMimic(DEV.mimic + 1), { dim: v >= 100, size: 18 });
+        const cy = sy + 50, n = 5, gp = 8, cwid = (cw - gp * (n - 1)) / n; [0, 5, 12, 30, 100].forEach((q, i) => ob(x0 + i * (cwid + gp), cy, cwid, 30, '%' + q, () => setMimic(q), { on: v === q, size: 12.5 }));
+        ob(x0, cy + 42, cw, 42, 'önüme gizli mimik koy', () => devPlaceMimic(), { solid: true, size: 14 });
+        dvText('Yeni oran yalnızca henüz görülmemiş sandıklara işler.', x0, cy + 104, 11, 400, fg, 0.4, 0, 'left');
+        hair(y + h + 8, 0.08); y += h + 8; }
       { const h = 62; dvText('sahada', x0, y + 22, 12, 400, fg, 0.45, 0, 'left'); dvText(String(E.length), x0, y + 45, 20, 500, fg, 1, 0, 'left'); ob(x0 + cw - 104, y + (h - 34) / 2, 104, 34, 'temizle', () => { E.length = 0; EP.length = 0; devToast('Sahadaki canavarlar silindi'); }, { dim: E.length === 0 }); y += h; }
     } else {
       y = sec('silahlar', y);
