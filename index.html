@@ -3479,8 +3479,10 @@
      Sade tasarım: tek renk, kart yok, ince ayırıcı çizgiler, yumuşak geçişler. İki görünüm: 'home' (kategori listesi) · 'enemies' (düşman sayfası).
      Önizleme oyunun gerçek çizim fonksiyonlarını kullanır (drawEnemy / drawMimicE / drawEvil): bir saldırıya dokununca önizlemede oynar.
      YENİ DÜŞMAN: RH_ENEMIES'e giriş + rhScene'de sahne + rhScript'te saldırı senaryosu ekle.
-     YENİ KATEGORİ (silah, zırh…): RH_CATS satırındaki 'on' değerini true yap ve o görünüm için çizim bloğu ekle. */
-  const RH_CATS = [['enemies', 'Düşmanlar', '3 kayıt', true], ['weapons', 'Silahlar', 'yakında', false], ['chars', 'Karakterler', 'yakında', false], ['statues', 'Heykeller', 'yakında', false], ['outfits', 'Kıyafetler', 'yakında', false], ['armor', 'Zırhlar', 'yakında', false]];
+     YENİ SİLAH: RH_WEAPONS'a giriş (kind: 'sword' | 'bow') + rhDrawW'de sahne + RH_WD'de süre. YENİ KARAKTER: RH_CHARS'a giriş (kind: 'hero').
+     YENİ HEYKEL: RH_STATUES'a giriş (kind: 'statue' | 'evil' | 'rubble') + rhDrawW'de sahne. YENİ KIYAFET: RH_OUTFITS'a giriş (kind: 'gear', gear: GEAR anahtarı). YENİ ZIRH: RH_ARMOR'a giriş.
+     YENİ KATEGORİ: RH_CATS satırındaki 'on' değerini true yap, RH_LIST'e liste ekle. Sekme etiketi uzunsa girişe 'tab' alanı ver. */
+  const RH_CATS = [['enemies', 'Düşmanlar', '3 kayıt', true], ['weapons', 'Silahlar', '2 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true]];
   const RH_RED = '224,88,74';
   const RH_ENEMIES = [
     { name: 'Çırak Büyücü', sub: 'HORTLAK  ·  SIRADAN DÜŞMAN', mode: 'rage', atkTitle: 'SALDIRILAR',
@@ -3511,6 +3513,112 @@
         ['Kırılma', 'Sekizinci darbede çatlaklardan ışık sızar ve taş parçalarına ayrılır. Enkazı yoluna engel olmaz.', '—', '8. darbe']],
       tips: ['Heykel kırılana kadar yaratık doğmaya devam eder; saldırıya geçmeden önce yakınına yaklaş.', 'Yayla yalnızca güçlü ok heykele hasar verir.', 'Heykeli kırınca çevresindeki iyileştirme de biter.', 'Yaratıklarla uğraşırken heykelden uzaklaş; yanında canları yenilenir.'] }
   ];
+
+  const RH_WEAPONS = [
+    { kind: 'sword', name: 'Kılıç', sub: 'KILIÇ  ·  YAKIN DÖVÜŞ SİLAHI', atkTitle: 'HAREKETLER',
+      lore: 'Oyunun başında yerde süzülen kılıç. Alınca kınına oturur; dokununca savrulur, basılı tutulunca siper olur. Yakın dövüşün temel silahıdır.',
+      stats: [['Hasar', '20'], ['Savurma süresi', '0.42 sn'], ['Menzil', '74 birim  ·  yarım daire'], ['Siper', 'yalnızca önü  ·  ±83°'], ['Dayanıklılık', '100  ·  38 / sn yenilenir'], ['Yorgunken', 'yarım hasar  ·  <15'], ['Kötücül heykele', 'darbe başına 20']],
+      atks: [
+        ['Savurma', 'Dokununca kılıç öne savrulur; her vuruşta yön değişir. Yakındaki düşmana, yoksa heykele ya da sandığa döner ve vururken bir adım öne atılırsın. Art arda dokunursan vuruşlar bağlanır. Kara küreleri havada keser.', '20', 'süre 0.42 sn  ·  menzil 74'],
+        ['Siper', 'Basılı tutarsan kılıç siper olur. Yalnızca baktığın yönü korur; yanların ve sırtın açıktır. Karşılanan her vuruş hasar vermez ama dayanıklılığı götürür. Siperdeyken yavaş yürürsün.', '—', 'basılı tut  ·  hız × 0.75'],
+        ['Savuşturma', 'Siperi, düşmanın vuruşundan hemen önce kaldırırsan vuruş tam karşılanır: dayanıklılık harcanmaz, düşman sersemler ve bir süre açıkta kalır; o sırada %50 fazla hasar alır.', '—', 'siperin ilk 0.22 sn\'si'],
+        ['Yorgunluk', 'Dayanıklılık 15\'in altına inerse yorulursun; 55\'e çıkana kadar vuruşların yarı hasar verir. Dayanıklılık tamamen biterse siper kırılır: 1.5 sn savunmasız kalırsın.', '× 0.5', 'dayanıklılık < 15']],
+      tips: ['Düşman kolunu kaldırınca siperi kaldır: tam zamanında olursa savuşturma olur.', 'Siperi boş yere tutma: tutarken dayanıklılık yenilenmez; bıraktıktan 0.45 sn sonra dolmaya başlar.', 'Soluklanan ya da sersemleyen düşmana vur: %50 fazla hasar alır.', 'Kılıç kara küreleri havada keser; siper almana gerek kalmaz.', 'Sandıklara ve kötücül heykele de kılıçla vurulur.'] },
+    { kind: 'bow', name: 'Yay', sub: 'YAY  ·  UZAK MENZİL SİLAHI', atkTitle: 'ATIŞLAR',
+      lore: 'Bulunca 8 ok verir. Kılıç kuşanılıyken sırtta durur, düğmeye basınca ele gelir. Oku ne kadar çekersen o kadar sert ve uzağa gider; ama gererken yavaşlar ve açıkta kalırsın.',
+      stats: [['Hasar', '9 → 32  ·  tam isabet 40'], ['Çekiş süresi', '0.75 sn'], ['Menzil', '250 → 860 birim'], ['Delme', '1 → 2 → 3 düşman'], ['Cephane', 'en çok 30 ok'], ['Gererken hız', '× 0.55'], ['Hedef kilidi', '450 birim']],
+      atks: [
+        ['Hafif atış', 'Yayı kısa gerip bırakırsan ok hızlı ama zayıf gider ve tek düşmanı vurur. Çekişi %22\'nin altında bırakırsan atış iptal olur ve ok harcanmaz.', String(Math.round(bowStats(0.35, false).dmg)), 'çekiş %35  ·  delme 1'],
+        ['Tam çekiş', 'Yayı 0.75 sn boyunca tam gerersen ok en hızlı ve en uzağa gider; iki düşmanı deler.', String(Math.round(bowStats(1, false).dmg)), 'çekiş %100  ·  delme 2'],
+        ['Tam isabet', 'Yay dolduğu anda kısa bir altın pencere açılır. Bu sırada bırakırsan ok altın renkli gider: %25 fazla hasar verir ve üç düşmanı deler. Beklersen pencere kapanır.', String(Math.round(bowStats(1, true).dmg)), 'pencere 0.38 sn  ·  delme 3'],
+        ['Cephane', 'İsabet etmeyen bazı oklar yerde kalır; üstlerinden geçerek toplarsın. Yerdeki cephane yığınları da ok verir. En çok 30 ok taşırsın.', '—', 'ok yoksa yay boş çeker']],
+      tips: ['Tam isabet için yay dolar dolmaz bırak: beklersen altın pencere kapanır ve sapma artar.', 'Gererken vurulursan gerginlik kaçar: ok harcanmaz ama 0.35 sn yeniden geremezsin.', 'Yay, 450 birim içindeki en yakın düşmanı (yoksa heykeli) kendiliğinden hedefler.', 'Yayla yalnızca güçlü ok heykele hasar verir.', 'Kılıca geçince yay anında sırta döner.'] }
+  ];
+  const RH_CHARS = [
+    { kind: 'hero', name: 'Kahraman', sub: 'OYUNCU  ·  KARAKTER', atkTitle: 'YETENEKLER', noplay: true,
+      lore: 'Çizgilerden ibaret sessiz bir savaşçı. Zırhı yoktur; kılıcı ve yayı vardır. Hayatta kalmak, vuruşları okumasına, siperi doğru anda kaldırmasına ve mesafeyi iyi tutmasına bağlıdır.',
+      stats: [['Can', '100'], ['Dayanıklılık', '100  ·  38 / sn yenilenir'], ['Hız', '230'], ['Siperde hız', '× 0.75'], ['Yay gererken hız', '× 0.55'], ['Can yenilenmesi', 'yalnızca Şifa Hilali'], ['Kıyafet yuvası', '5']],
+      atks: [
+        ['Hareket', 'Ekranı sürükle: karakter sürüklediğin yöne gider. Saldırı düğmesi kılıcı, yay düğmesi yayı kullanır.', '—', 'sürükle  ·  hareket'],
+        ['Kılıç', 'Dokun: savur. Basılı tut: siper. Ayrıntılar Silahlar sayfasındadır.', '20', 'Silahlar  ›  Kılıç'],
+        ['Yay', 'Yay düğmesine basılı tut: gerilir. Bırak: ok gider. Ayrıntılar Silahlar sayfasındadır.', '9 – 40', 'Silahlar  ›  Yay'],
+        ['Kıyafet', 'Baş, gövde, tılsım, eller ve ayak yuvalarına parça takılır. Bandana ve hilal tılsımları küçük avantajlar sağlar. Kıyafetler sayfasından değiştirilir.', '—', '5 yuva'],
+        ['Altın ve anahtar', 'Altın toplanır. Altın anahtar, kilitli sandıkların kilidini açar.', '—', 'kilitli sandık']],
+      tips: ['Vuruş sırasında bir adım öne atılırsın; mesafeyi buna göre ayarla.', 'Canın kendiliğinden yenilenmez: kaçınmak çoğu zaman saldırmaktan iyidir.', 'Dayanıklılığın düşükken vurmak yarım hasar verir; önce nefes al.', 'Anahtarlı sandıklar için altın anahtarı sakla.'] }
+  ];
+
+  const RH_STATUES = [
+    { kind: 'statue', name: 'Taş Heykel', tab: 'Taş', sub: 'HEYKEL  ·  DEKOR', atkTitle: 'DAVRANIŞ', noplay: true,
+      lore: 'Kukuletalı, kalkanlı, yere eğik kılıç tutan taş bir savaşçı. Kıpırdamaz, ses çıkarmaz, kimseye zarar vermez. Yine de yoluna dikilir ve atılan okları durdurur.',
+      stats: [['Boyut', '× 1.1'], ['Çarpışma', 'elips  ·  28 × 11'], ['Kılıçla', 'vurulmaz'], ['Kırılma', 'kırılmaz'], ['Ses', 'sessiz'], ['Dağılım', 'her 400 birimlik parçada %50']],
+      atks: [
+        ['Engel', 'Üzerinden geçemezsin; yürürken çevresinden kayarsın. Çarpışma alanı yalnızca ayaklarının bulunduğu kaide kadardır, bu yüzden gövdesinin arkasından geçebilirsin.', '—', 'elips  ·  28 × 11'],
+        ['Ok kalkanı', 'Ok heykelin kaidesine çarparsa kıvılcım çıkarır, tınlar ve durur. Delici ok da heykeli geçemez. Taş heykele hasar vermez.', '—', 'oku durdurur'],
+        ['Korunak', 'Heykelin arkasına geçersen, heykel ile aranda kalan oklar kaidede durur ve sana ulaşmaz.', '—', 'yalnızca ok'],
+        ['Yerleşim', 'Başlangıç alanında dört taş heykel sabit durur. Uzaklaştıkça dünya parçalara ayrılır ve her parçada yarı yarıya bir heykel çıkar. Bunların %12\'si kötücüldür. Sandıklar heykelin 90 birim yakınında belirmez.', '—', 'parça başına en çok 1']],
+      tips: ['Kılıçla vurmak boşunadır: taş heykel hasar almaz.', 'Kendi okların da taş heykele çarpıp durur; yay kullanırken aradaki heykele dikkat et.', 'Daha iri ve boynuzlu heykel taş değil, kötücül heykeldir.', 'Taş heykel sessizdir; yalnızca kötücül heykeller ruh sesi çıkarır.'] },
+    { kind: 'evil', name: 'Kötücül Heykel', tab: 'Kötücül', sub: 'HEYKEL  ·  KÖTÜ RUH', atkTitle: 'ÖZELLİKLER', noplay: true,
+      lore: 'Taş heykelden büyük, boynuzlu ve zırhlı bir kap. İçindeki ruh uyandığında yaratık doğurur. Davranışları ve darbe kademeleri Düşmanlar sayfasındadır; burada dünyadaki yeri anlatılır.',
+      stats: [['Boyut', '× 1.25'], ['Çarpışma', 'elips  ·  38 × 14'], ['Can', '8 darbe  ·  160'], ['Dağılım', 'heykellerin %12\'si'], ['Başlangıç', 'üstte bir tane görünür'], ['Ses', 'yaklaştıkça yükselir']],
+      atks: [
+        ['Mühür', 'Ayakları altında sekizgen mühür halkaları döner, kor parçacıkları yükselir. Darbe aldıkça çatlaklar ışıldar ve heykel biraz daha büyür.', '—', 'her darbede çatlak uzar'],
+        ['Ruh sesi', 'Taş heykellerin aksine ses çıkarır. Yaklaştıkça yükselir, hareket edince ses yönü değişir. Heykel yıkılınca susar.', '—', 'yıkılınca sessizleşir'],
+        ['Ok', 'Zayıf ok heykelden sekip düşer. Yalnızca güçlü ok hasar verir; ayrıntılar Silahlar › Yay sayfasındadır.', '—', 'yalnızca güçlü ok'],
+        ['Ayrıntı', 'Doğurma, iyileştirme, öfkelenme ve kırılma ayrıntıları için Düşmanlar sayfasındaki Kötücül Heykel kaydına bak.', '—', 'Düşmanlar  ›  Kötücül Heykel']],
+      tips: ['Kötücül heykeller uzaktan da duyulur: ses yönünden yaklaştığını anlarsın.', 'Yıkılan heykel bir daha doğurmaz ve çevresindeki iyileştirme sona erer.', 'Başlangıç alanındaki heykel, ilk alıştırma için uygundur.', 'Kılıçla yaklaşınca uyanır; yaklaşmadan önce canını ve dayanıklılığını kontrol et.'] },
+    { kind: 'rubble', name: 'Enkaz', tab: 'Enkaz', sub: 'HEYKEL  ·  KALINTI', atkTitle: 'DAVRANIŞ', noplay: true,
+      lore: 'Sekizinci darbede kırılan kötücül heykelin geride bıraktığı taş yığını. Kırık kılıç parçası ve yere düşmüş bir boynuz vardır. Artık kimseye zarar vermez, kimseyi iyileştirmez.',
+      stats: [['Boyut', '× 1.25'], ['Çarpışma', 'yok'], ['Doğurma', 'durur'], ['İyileştirme', 'biter'], ['Ses', 'susar'], ['Kalıcılık', 'yeniden doğmaz']],
+      atks: [
+        ['Yolun açılır', 'Enkaz yoluna engel olmaz; üzerinden yürüyebilirsin. Çarpışma, heykel yıkıldığı anda kalkar.', '—', 'çarpışma yok'],
+        ['Sessizlik', 'Yıkılırken acı çeken ruh sesi yıkılınca susar. Çevredeki hortlaklar da artık heykel tarafından iyileştirilmez.', '—', 'iyileştirme biter'],
+        ['Kalıcı', 'Heykelin durumu oyun sürerken saklanır. Aynı heykele geri dönersen enkaz yerinde durur ve yeni yaratık çıkmaz.', '—', 'yeniden doğmaz']],
+      tips: ['Enkaz gördüğünde bölge güvenlidir: oradan yaratık gelmez.', 'Heykeli kırınca doğmuş yaratıklar yine de sana saldırır; kırdıktan sonra onlarla ilgilen.', 'Taş heykel kırılmaz; yalnızca kötücül heykel enkaza dönüşür.'] }
+  ];
+  const RH_OUTFITS = [
+    { kind: 'gear', gear: 'band', name: 'Savaşçı Bandanası', tab: 'Bandana', sub: 'BAŞ  ·  KIYAFET', atkTitle: 'ETKİLER', noplay: true,
+      lore: 'Alnı saran kırmızı bir şerit. Koşarken kuyrukları arkaya savrulur; sırtın dönükken kuyruklar önde görünür. Kılıç hasarını küçük bir miktar artırır ve tam isabet fırsatını uzatır.',
+      stats: [['Yuva', 'Baş'], ['Kılıç hasarı', '+%5  ·  20 → 21'], ['Tam isabet süresi', '+%25  ·  0.38 → 0.48 sn'], ['Renk', 'kırmızı'], ['Geliştirici', 'hayır']],
+      atks: [
+        ['Kılıç hasarı', 'Her kılıç vuruşunda hasar %5 artar. Yorgunken yarım hasar kuralı yine geçerlidir.', '+%5', 'kılıç'],
+        ['Tam isabet', 'Yay tam dolduğunda açılan altın pencere uzar. Altın ok için biraz daha geç bırakabilirsin.', '+%25', 'pencere 0.38 → 0.475 sn'],
+        ['Kumaş', 'Şerit hareketle savrulur: ilerlediğin yönün tersine uçar. Bu yalnızca görünümdür.', '—', 'görünüm']],
+      tips: ['Güç Hilali ile birlikte kılıç hasarı yaklaşık %15 artar (× 1.155).', 'Yay kullanıyorsan asıl faydası tam isabet penceresidir.', 'Baş yuvası tek parça alır; başka bir baş parçası takınca bandana çıkar.'] },
+    { kind: 'gear', gear: 'hilalG', name: 'Şifa Hilali', tab: 'Şifa', sub: 'TILSIM  ·  KIYAFET', atkTitle: 'ETKİLER', noplay: true,
+      lore: 'Boynundan sarkan yeşil bir hilal. Oyundaki tek can yenileme kaynağıdır: canın dolana kadar yavaşça iyileştirir.',
+      stats: [['Yuva', 'Tılsım'], ['Yenilenme', '2 sn\'de 1 can'], ['Hız', 'saniyede 0.5 can'], ['Üst sınır', '100 can'], ['Ölürken', 'işlemez'], ['Renk', 'yeşil']],
+      atks: [
+        ['Yenilenme', 'Canın 100\'ün altındayken her 2 saniyede 1 can yenilenir. Can doluysa sayaç sıfırlanır.', '+1', 'her 2 sn'],
+        ['Kesinti', 'Hasar almak yenilenmeyi kesmez. Yalnızca ölüm ya da tam can durumunda işlemez.', '—', 'hasarla kesilmez']],
+      tips: ['Bu hilal olmadan can kendiliğinden yenilenmez: Karakterler sayfasındaki notu hatırla.', 'Yavaş bir iyileşmedir; uzun çatışmalarda değil, aralarda işe yarar.', 'Tılsım yuvası tek parça alır: Şifa takıyorsan Güç ya da Koruma takamazsın.'] },
+    { kind: 'gear', gear: 'hilalR', name: 'Güç Hilali', tab: 'Güç', sub: 'TILSIM  ·  KIYAFET', atkTitle: 'ETKİLER', noplay: true,
+      lore: 'Boynundan sarkan kırmızı bir hilal. Elindeki silah ne olursa olsun vuruşları sertleştirir.',
+      stats: [['Yuva', 'Tılsım'], ['Kılıç hasarı', '+%10  ·  20 → 22'], ['Ok hasarı', '+%10'], ['Bandana ile', 'kılıç × 1.155  ·  20 → 23'], ['Renk', 'kırmızı']],
+      atks: [
+        ['Kılıç', 'Kılıç vuruşlarının hasarı %10 artar. Kötücül heykele de aynı oranda etki eder.', '+%10', 'kılıç'],
+        ['Yay', 'Okların hasarı %10 artar; altın ok dahil her atışa uygulanır.', '+%10', 'yay']],
+      tips: ['Kılıç ve yayı eşit kullanıyorsan en dengeli saldırı tılsımıdır.', 'Bandana ile birlikte takılabilir: farklı yuvalarda oldukları için çarpılırlar.'] },
+    { kind: 'gear', gear: 'hilalY', name: 'Koruma Hilali', tab: 'Koruma', sub: 'TILSIM  ·  KIYAFET', atkTitle: 'ETKİLER', noplay: true,
+      lore: 'Boynundan sarkan altın rengi bir hilal. Aldığın hasarı azaltır ve dayanıklılığın biraz daha çabuk dolmasını sağlar.',
+      stats: [['Yuva', 'Tılsım'], ['Alınan hasar', '−%8'], ['Dayanıklılık yenilenmesi', '+%5  ·  38 → 39.9 / sn'], ['Renk', 'altın']],
+      atks: [
+        ['Hasar azaltma', 'Düşmandan aldığın her vuruşun hasarı %8 azalır. Siperle tam karşılanan vuruşlara etki etmez; onlar zaten hasar vermez.', '−%8', 'alınan hasar'],
+        ['Dayanıklılık', 'Dayanıklılık bar\'ı biraz daha hızlı dolar. Yorgunluktan çıkmak ve siperi toplamak kolaylaşır.', '+%5', '38 → 39.9 / sn']],
+      tips: ['Savunmacı oynuyorsan en uygun tılsımdır: siper ve savuşturmayla birlikte iyi çalışır.', 'Etkisi küçüktür; asıl koruma yine siperi doğru anda kaldırmaktan gelir.', 'Bandana ile birlikte takılabilir.'] }
+  ];
+  const RH_ARMOR = [
+    { kind: 'armor', name: 'Zırh', tab: 'Zırh', sub: 'GÖVDE  ·  SAVUNMA', atkTitle: 'SAVUNMA', noplay: true,
+      lore: 'Henüz giyilebilir zırh parçası yok. Gövde, eller ve ayak yuvaları boştur ve açma yöntemi sonradan eklenecek. O zamana kadar savunma, siperden, savuşturmadan ve Koruma Hilali\'nden gelir.',
+      stats: [['Gövde yuvası', 'boş'], ['Eller yuvası', 'boş'], ['Ayak yuvası', 'boş'], ['Siper', 'yalnızca önü  ·  ±83°'], ['Koruma Hilali', 'alınan hasar −%8'], ['Düşmanlarda zırh', 'sendelemez']],
+      atks: [
+        ['Siper', 'Basılı tutarsan kılıç siper olur. Karşılanan vuruş hasar vermez ama dayanıklılığı götürür. Ayrıntılar Silahlar › Kılıç sayfasındadır.', '—', 'yalnızca önü korur'],
+        ['Savuşturma', 'Siperi vuruştan hemen önce kaldırırsan vuruş bedavaya karşılanır ve düşman sersemler.', '—', 'ilk 0.22 sn'],
+        ['Koruma Hilali', 'Tılsım yuvasına takılırsa aldığın tüm hasarı %8 azaltır.', '−%8', 'Kıyafetler  ›  Koruma'],
+        ['Düşman zırhı', 'Bazı düşmanlar zırhlıdır: vuruşlar onları sendeletmez. Çırak Büyücü yalnızca ağır ezmesinde, Mimik ise öfkelenmeden önce zırhlıdır.', '—', 'sendelemez']],
+      tips: ['Zırhlı bir düşmana vurmak onu durdurmaz; vuruşunu savuşturma anına sakla.', 'Mimik öfkelendiğinde zırhı kapağıyla birlikte uçar; o andan sonra sendeler.', 'Çırak Büyücü\'nün ağır ezmesi sırasında vurmak yerine yoldan çekil.', 'Zırh parçaları eklendiğinde bu sayfa güncellenecek.'] }
+  ];
+  const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR };
+  const RH_WD = { sword: [1.1, 1.9, 1.6, 2.8], bow: [1.7, 2.6, 2.2, 2.4] };   // silah önizlemesi: hareket süreleri (sn)
   const RH = { view: 'home', tv: 'home', ei: 0, tei: 0, ca: 0, ina: 0, scroll: 0, tg: 0, vel: 0, max: 0, dn: null, ux: -1, uw: 0, t: 0, sc: null, rage: false, hits: 0, wc: new Map(), capS: '', capA: 0, last: 0 };
   const RH_CAP = { wind: 'uyarı', strike: 'vuruş', rec: 'soluklanıyor  ·  vurursan +%50 hasar', bo: 'dumana dönüşür', iv: 'görünmez  ·  vurulamaz', bi: 'belirir', rev: 'maske düşüyor', stuck: 'dil siperde yapıştı', dz: 'sersem  ·  vurursan +%50 hasar' };
   function rehberEnter() { RH.view = RH.tv = 'home'; RH.ei = RH.tei = 0; RH.ca = 0; RH.ina = 0; RH.scroll = RH.tg = RH.vel = 0; RH.dn = null; RH.sc = null; RH.ux = -1; RH.last = 0; PAUSE.page = 'guide'; }
@@ -3521,7 +3629,7 @@
     if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; } else PAUSE.page = 'main';
   }
   function rehberOpen(id) { RH.tv = id; RH.tei = 0; }
-  function rehberShift(d) { const n = clamp(RH.tei + d, 0, RH_ENEMIES.length - 1); if (n !== RH.tei) RH.tei = n; }
+  function rehberShift(d) { const L = RH_LIST[RH.tv]; if (!L) return; const n = clamp(RH.tei + d, 0, L.length - 1); if (n !== RH.tei) RH.tei = n; }
   function rehberDown(e) {
     const px = e.clientX, py = e.clientY; let hit = null;
     for (const b of PAUSE.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { hit = b; break; }
@@ -3536,7 +3644,7 @@
   addEventListener('pointerup', e => {
     const d = RH.dn; RH.dn = null; if (!d || !PAUSE.on || PAUSE.page !== 'guide') return;
     if (d.mode === 'v') RH.tg = clamp(RH.scroll + RH.vel * 0.28, 0, RH.max);
-    else if (d.mode === 'h') { const dx = e.clientX - d.x; if (RH.tv === 'enemies' && Math.abs(dx) > 48) rehberShift(dx < 0 ? 1 : -1); }
+    else if (d.mode === 'h') { const dx = e.clientX - d.x; if (RH.tv !== 'home' && Math.abs(dx) > 48) rehberShift(dx < 0 ? 1 : -1); }
     else if (d.hit) { MENU.fl = 1; d.hit.fn(); }
   });
   addEventListener('pointercancel', () => { RH.dn = null; });
@@ -3544,7 +3652,8 @@
 
   /* ---- sahne: önizlemedeki canlı varlık ---- */
   function rhScene() {
-    RH.sc = null; RH.rage = false; RH.hits = 0; RH.capS = ''; RH.capA = 0; if (RH.view !== 'enemies') return;
+    RH.sc = null; RH.rage = false; RH.hits = 0; RH.capS = ''; RH.capA = 0; if (RH.view === 'home') return;
+    if (RH.view !== 'enemies') { const ent = RH_LIST[RH.view][RH.ei]; RH.sc = { w: true, kind: ent.kind, gear: ent.gear, t: 0, play: null, sel: -1, idle: 0.7, fa: 1, cap: '', dir: -1, yaw: 0 }; if (ent.kind === 'evil') { EV.delete('rhs'); const es = evState('rhs'); es.aw = 1; es.t = rnd(0, 20); RH.sc.s = es; } return; }
     const i = RH.ei, sc = { i, t: 0, play: null, sel: -1, idle: 0.7, bolts: [], coins: [], ring: null, minion: null, fa: 0, fade: { dir: 1 }, cap: '' };
     if (i === 0) { const e = newEnemy(0, 0, undefined, 1); e.em = 1; e.face = 0.1; sc.e = e; }
     else if (i === 1) { const e = newMimic(0, 0, 1); e.em = 1; e.face = 0.1; e.lg = 1; sc.e = e; }
@@ -3574,7 +3683,7 @@
     return [[{ d: 3.4, act: 'spawn', cap: 'yaratık doğurur' }], [{ d: 2.8, act: 'heal', cap: 'hortlakları iyileştirir' }], [{ d: 1.5, act: 'hit', cap: 'öfkelenir' }], [{ d: 1.5, act: 'break', cap: 'kırılır' }]][k];
   }
   function rhPlay(k) {
-    const sc = RH.sc; if (!sc) return; sc.sel = k; sc.idle = 0; sc.bolts.length = 0; sc.coins.length = 0; sc.ring = null; sc.play = null;
+    const sc = RH.sc; if (!sc) return; if (sc.w) { rhPlayW(k); return; } sc.sel = k; sc.idle = 0; sc.bolts.length = 0; sc.coins.length = 0; sc.ring = null; sc.play = null;
     if ((sc.i === 1 && k === 0 && sc.e.lg > 0.5) || (sc.i === 2 && sc.s.dying >= 0)) sc.fade = { dir: -1, then: () => rhBegin(k) }; else rhBegin(k);
   }
   function rhBegin(k) {
@@ -3626,7 +3735,7 @@
           if (sc.i === 2) { if (p.k === 3) sc.fade = { dir: -1 }; else sc.minion = null; }
         } else rhEnter(sc);
       }
-    } else if (!RH.dn) { sc.idle += dt; if (sc.idle > 1.7 && !sc.fade) rhPlay((sc.sel + 1) % RH_ENEMIES[sc.i].atks.length); }
+    } else if (!RH.dn) { sc.idle += dt; if (sc.sel >= 0 && sc.idle > 0.9 && !sc.fade) rhPlay(sc.sel); }   // seçili hareket döngüde tekrar oynar; kendiliğinden başka harekete geçmez
   }
   function rhRing(r, ex, ey) {   // ağır ezme şok halkası
     const u = r.t / 0.55, k = 0.3 + 0.7 * u, R = 70 * k, al = 1 - u;
@@ -3649,6 +3758,111 @@
     } catch (_) {}
     ctx.restore();
   }
+
+  /* ---------- Silah / karakter önizlemesi (rhScene: sc.w = true) ---------- */
+  function rhPlayW(k) {
+    const sc = RH.sc; if (!sc || !RH_WD[sc.kind] || !RH_WD[sc.kind][k]) return;
+    sc.sel = k; sc.idle = 0; sc.dir = -sc.dir; sc.play = { k, t: 0, d: RH_WD[sc.kind][k] };
+  }
+  function rhCapW(sc) {
+    const p = sc.play; if (!p) return '';
+    if (sc.kind === 'sword') return ['savurma  ·  yön her vuruşta değişir', p.t < 0.9 ? 'siper  ·  yalnızca önü korur' : 'karşılanan vuruş dayanıklılığı götürür', p.t < 0.45 ? 'siper kalkar' : 'savuşturma  ·  bedava  ·  düşman açıkta', p.t < 1.6 ? 'dayanıklılık düşüyor' : 'yorgun  ·  vuruşlar yarı hasar'][p.k];
+    return ['hafif atış  ·  hasar ' + Math.round(bowStats(0.35, false).dmg), 'tam çekiş  ·  hasar ' + Math.round(bowStats(1, false).dmg) + '  ·  2 düşmanı deler', 'tam isabet  ·  altın ok  ·  hasar ' + Math.round(bowStats(1, true).dmg) + '  ·  3 düşmanı deler', 'yerdeki oklar toplanır'][p.k];
+  }
+  function rhTickW(dt) {
+    const sc = RH.sc; if (!sc || !sc.w) return; sc.t += dt; sc.yaw += dt * 0.75;
+    if (sc.s) { const es = sc.s; es.t += dt; es.aw = 1; es.flash = Math.max(0, es.flash - dt); es.flare = Math.max(0, es.flare - dt * 2.2); es.pulse = Math.max(0, es.pulse - dt * 1.1); es.rv += (-70 * es.rot - 8 * es.rv) * dt; es.rot += es.rv * dt; }
+    const p = sc.play;
+    if (p) { p.t += dt; sc.cap = rhCapW(sc); if (p.t >= p.d) { sc.play = null; sc.idle = 0; sc.cap = ''; } }
+    else if ((sc.kind === 'sword' || sc.kind === 'bow') && !RH.dn) { sc.idle += dt; if (sc.sel >= 0 && sc.idle > 0.7) rhPlayW(sc.sel); }   // seçili hareket döngüde tekrar oynar
+  }
+  function rhDummy(x, flash, recoil, fg) {   // hedef kuklası
+    ctx.save(); ctx.translate(x + recoil, 0); ctx.lineCap = 'round'; ctx.lineWidth = 1.3; ctx.strokeStyle = `rgba(${fg},0.6)`;
+    ctx.beginPath(); ctx.ellipse(0, 0, 9, 2.6, 0, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, -40); ctx.moveTo(-8, -32); ctx.lineTo(8, -32); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -47, 6, 0, TAU); if (flash > 0) { ctx.fillStyle = `rgba(${fg},${0.9 * flash})`; ctx.fill(); } ctx.stroke();
+    ctx.restore();
+  }
+  function rhSpark(x, y, u, fg, n) {   // kısa kıvılcım çizgileri
+    if (u < 0 || u > 1) return; ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = 1.3; ctx.strokeStyle = `rgba(${fg},${1 - u})`;
+    for (let i = 0; i < (n || 8); i++) { const a = i / (n || 8) * TAU + 0.3, r0 = 5 + 12 * u, r1 = r0 + 7 * (1 - u); ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); ctx.stroke(); }
+    ctx.restore();
+  }
+  function rhNum(txt, x, y, u, col) { if (u < 0 || u > 1) return; dvText(txt, x, y - 16 * u, 11, 600, col, Math.min(1, (1 - u) * 2), 0, 'center'); }
+  function rhSwordD(x, y, ang, sc, bg, col) {   // drawSword ile aynı çizim; dünya dönüşümünü (setBase) sıfırlamaz
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(sc, sc); ctx.lineJoin = 'round'; ctx.lineWidth = 1.3; ctx.strokeStyle = bg; ctx.fillStyle = col;
+    ctx.stroke(SW); ctx.fill(SW); ctx.fillStyle = bg; ctx.fillRect(4.5, -0.18, 12.5, 0.36); ctx.restore();
+  }
+  function rhDrawW(sc, cx, gy, S, fg, bgRGB) {
+    const col = `rgb(${fg})`, bg = `rgb(${bgRGB})`, p = sc.play, k = p ? p.k : -1, t = p ? p.t : 0, T = sc.t;
+    ctx.save(); ctx.globalAlpha *= sc.fa;
+    try {
+      if (sc.kind === 'hero' || sc.kind === 'armor') wdChar(cx, gy, S, PI / 2 - sc.yaw, T, fg, false, wdPal());
+      else if (sc.kind === 'gear') {   // kıyafet: yalnızca bu parça takılıyken çiz (kıyafet sayfasıyla aynı yöntem)
+        const sv = {}; for (const q in OUTFIT) { sv[q] = OUTFIT[q]; OUTFIT[q] = null; } OUTFIT[GEAR[sc.gear].slot] = sc.gear;
+        try { wdChar(cx, gy, S * 1.12, PI / 2 - sc.yaw, T, fg, false, wdPal()); } finally { for (const q in sv) OUTFIT[q] = sv[q]; }
+      }
+      else if (sc.kind === 'statue' || sc.kind === 'evil' || sc.kind === 'rubble') {   // heykeller: oyunun kendi çizimleri
+        ctx.translate(cx, gy); ctx.scale(S, S);
+        if (sc.kind === 'statue') drawStatue(0, 0, SS, light ? '105,105,105' : '150,150,150', light);
+        else if (sc.kind === 'evil') drawEvil(0, 0, 'rhs', light);
+        else drawRubble(0, 0, light);
+      }
+      else {
+        ctx.translate(cx, gy); ctx.scale(S, S);
+        if (sc.kind === 'sword') {
+          const PV = [-16, -34], SC = 2.8, rest = -0.45 + Math.sin(T * 1.6) * 0.04, dir = sc.dir, ss = sstep;
+          const swing = (a0, a1, w0, w1, tt, amp) => {   // hazırlık · savurma · dönüş
+            const A0 = dir > 0 ? a0 : a1, A1 = dir > 0 ? a1 : a0, m = (A0 + A1) / 2, q = (A1 - A0) * amp / 2, B0 = m - q, B1 = m + q;
+            if (tt < w0) return rest + (B0 - rest) * ss(0, w0, tt);
+            if (tt < w1) { const u = (tt - w0) / (w1 - w0); return B0 + (B1 - B0) * (1 - Math.pow(1 - u, 3)); }
+            return B1 + (rest - B1) * ss(w1, w1 + 0.5, tt);
+          };
+          let ang = rest, guard = 0, bar = 1, flash = 0, rec = 0, hu = -1, txt = '', gold = false, tr = null, stun = 0, spk = -1;
+          if (k === 0) { ang = swing(-1.6, 1.1, 0.2, 0.6, t, 1); tr = tt => swing(-1.6, 1.1, 0.2, 0.6, tt, 1); hu = (t - 0.36) / 0.4; flash = Math.max(0, 1 - Math.abs(hu - 0.15) * 4); rec = 7 * Math.sin(PI * clamp(hu, 0, 1)); spk = hu; txt = '20'; }
+          else if (k === 1) { guard = ss(0.15, 0.4, t) * (1 - ss(1.5, 1.9, t)); ang = rest + (-1.3 - rest) * guard; bar = 1 - 0.18 * ss(0.9, 1.0, t); spk = (t - 0.9) / 0.4; }
+          else if (k === 2) { guard = ss(0.3, 0.45, t) * (1 - ss(1.3, 1.6, t)); ang = rest + (-1.3 - rest) * guard; spk = (t - 0.55) / 0.5; gold = true; rec = 9 * Math.sin(PI * clamp((t - 0.55) / 0.5, 0, 1)); stun = ss(0.7, 0.9, t) * (1 - ss(1.4, 1.55, t)); }
+          else if (k === 3) { bar = 1 - 0.92 * ss(0.2, 1.5, t); guard = ss(0.2, 0.4, t) * (1 - ss(1.5, 1.8, t)); const sh = Math.sin(t * 62) * 0.035 * (1 - bar);
+            ang = t < 1.7 ? rest + (-1.3 - rest) * guard + 0.45 * (1 - bar) * (1 - ss(1.5, 1.7, t)) + sh : swing(-1.0, 0.45, 1.85, 2.2, t, 1);
+            hu = (t - 2.0) / 0.4; flash = hu > 0 && hu < 0.5 ? 1 - hu * 2 : 0; rec = 3 * Math.sin(PI * clamp(hu, 0, 1)); spk = hu; txt = '10'; }
+          // etki alanı: yarım daire
+          ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.16)`; ctx.beginPath(); ctx.arc(PV[0], PV[1], 22 * SC + 6, -1.6, 1.6); ctx.stroke();
+          rhDummy(56, flash, rec, fg);
+          if (guard > 0.02) { ctx.lineWidth = 1.8; ctx.strokeStyle = `rgba(${fg},${0.55 * guard})`; ctx.beginPath(); ctx.arc(PV[0], PV[1], 44, -1.45, 1.45); ctx.stroke(); }
+          if (tr) for (let j = 4; j >= 1; j--) { const ga = ctx.globalAlpha; ctx.globalAlpha = ga * 0.16 * (5 - j) / 4; rhSwordD(PV[0], PV[1], tr(t - j * 0.03), SC, bg, col); ctx.globalAlpha = ga; }
+          rhSwordD(PV[0], PV[1], ang, SC, bg, col);
+          if (k === 1) rhSpark(PV[0] + 46, PV[1] - 2, spk, fg, 8);
+          if (k === 2 && spk >= 0 && spk <= 1) { ctx.save(); ctx.lineWidth = 2.2 * (1 - spk) + 0.5; ctx.strokeStyle = GOLD; ctx.globalAlpha *= 1 - spk; ctx.beginPath(); ctx.arc(PV[0] + 46, PV[1] - 2, 6 + 30 * spk, 0, TAU); ctx.stroke(); ctx.restore(); rhSpark(PV[0] + 46, PV[1] - 2, spk, '240,194,74', 10); }
+          if (stun > 0.02) { ctx.save(); ctx.globalAlpha *= stun; ctx.fillStyle = GOLD; for (let i = 0; i < 3; i++) { const a = T * 5 + i * TAU / 3; ctx.beginPath(); ctx.arc(56 + Math.cos(a) * 9, -58 + Math.sin(a) * 3, 1.8, 0, TAU); ctx.fill(); } ctx.restore(); }
+          if ((k === 0 || k === 3) && hu >= 0) { rhSpark(50, -34, hu, fg, 7); rhNum(txt, 56, -62, hu, RH_RED); }
+          // dayanıklılık barı
+          ctx.fillStyle = `rgba(${fg},0.18)`; rr(-42, 8, 84, 3.5, 1.75); ctx.fill(); ctx.fillStyle = bar < 0.15 ? `rgb(${RH_RED})` : col; if (bar > 0.02) { rr(-42, 8, 84 * bar, 3.5, 1.75); ctx.fill(); }
+        } else {
+          const BX = -70, BY = -36, SC = 2.2, ss = sstep, shot = [[0.35, false, 0.55], [1, false, 1.3], [1, true, 1.05]][k];
+          let d = 0, vib = 0, vt = 0, glow = 0, perf = false, ring = -1;
+          const arrowsG = [[-34, -0.1], [-2, 0.15], [30, -0.05], [60, 0.12]];
+          let got = 0;
+          if (shot) {
+            const [ch, pf, rel] = shot, full = ch >= 1;
+            d = t < rel ? ch * ss(0.1, full ? 0.85 : 0.55, t) : 0;
+            if (full && t < rel) { const fu = (t - 0.85) / 0.4; if (t >= 0.85) { ring = fu; if (t < 1.23) { perf = true; glow = 0.5; } } }
+            if (t >= rel) { vib = Math.max(0, 1 - (t - rel) / 0.4); vt = t - rel; }
+            const st = bowStats(ch, pf), nx = (-4 - 5 * ch) - 12 * ch, x0 = BX + (nx + 13.2) * SC, v = lerp(260, 520, st.pw), posts = [12, 54, 96], stop = Math.min(st.pen, 3) - 1, tipOff = 15.2 * SC;
+            posts.forEach((px, i) => { const tHit = rel + (px - tipOff - x0) / v, hu = (t - tHit) / 0.35, hit = i <= stop && t >= tHit; rhDummy(px, hit ? Math.max(0, 1 - hu * 1.6) : 0, hit ? 5 * Math.sin(PI * clamp(hu, 0, 1)) : 0, fg); if (hit) { rhSpark(px - 4, -34, hu, fg, 6); rhNum(String(Math.round(st.dmg)), px, -64, hu, pf ? '240,194,74' : RH_RED); } });
+            if (t >= rel) { const ex = Math.min(x0 + v * (t - rel), posts[stop] - tipOff + 3), prevX = Math.max(x0, ex - 40); ctx.strokeStyle = `rgba(${pf ? '240,194,74' : fg},0.25)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(prevX, BY); ctx.lineTo(ex - 12, BY); ctx.stroke(); drawArrowShape(ex, BY, 0, SC, pf ? GOLD : col, 24); }
+          } else if (k === 3) {
+            arrowsG.forEach(([ax, ar], i) => { const u = (t - (0.5 + 0.4 * i)) / 0.35; if (u >= 0.5) got++; if (u >= 1) return; const q = clamp(u, 0, 1), ga = ctx.globalAlpha; ctx.globalAlpha = ga * (1 - q); drawArrowShape(ax, -4 - 14 * q, ar, 1.7, col, 24); ctx.globalAlpha = ga; if (u > 0) rhSpark(ax, -8, u, fg, 5); });
+          }
+          const bob = Math.sin(T * 1.7) * 1.4;
+          drawBowShape(BX, BY + bob, 0, SC, { col, bg, draw: d, arrow: d > 0.02, acol: perf ? GOLD : undefined, glow: glow || undefined, vib, vt });
+          if (ring >= 0 && ring <= 1) { ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 2 * (1 - ring) + 0.5; ctx.globalAlpha *= 1 - ring; ctx.beginPath(); ctx.arc(BX, BY, 10 + 30 * ring, 0, TAU); ctx.stroke(); ctx.restore(); }
+          if (k === 3) { dvText('x' + (8 + got), BX, -88, 11, 600, fg, 1, 0, 'center'); }
+          ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.moveTo(-150, 0.5); ctx.lineTo(150, 0.5); ctx.stroke();
+        }
+      }
+    } catch (_) {}
+    ctx.restore();
+  }
   function rhPara(str, x, y, size, wt, col, al, w, lh) {
     const k = str + '|' + size + '|' + wt + '|' + w; let L = RH.wc.get(k);
     if (!L) { ctx.font = `${wt} ${size}px ${UIF}`; L = []; let ln = ''; for (const wd of str.split(' ')) { const tt = ln ? ln + ' ' + wd : wd; if (ln && ctx.measureText(tt).width > w) { L.push(ln); ln = wd; } else ln = tt; } if (ln) L.push(ln); RH.wc.set(k, L); }
@@ -3662,8 +3876,8 @@
     // --- geçiş: görünüm / düşman değişince içerik yumuşakça solar, sonra yeni içerik belirir
     if (!over) {
       if (RH.view !== RH.tv || RH.ei !== RH.tei) { RH.ca -= dt / 0.17; if (RH.ca <= 0) { RH.ca = 0; RH.view = RH.tv; RH.ei = RH.tei; RH.scroll = RH.tg = RH.vel = 0; RH.ina = 0; rhScene(); } }
-      else { RH.ca = Math.min(1, RH.ca + dt / 0.32); RH.ina = Math.min(4, RH.ina + dt); if (RH.view === 'enemies' && !RH.sc) rhScene(); }
-      if (RH.view === 'enemies') rhTick(dt);
+      else { RH.ca = Math.min(1, RH.ca + dt / 0.32); RH.ina = Math.min(4, RH.ina + dt); if (RH.view !== 'home' && !RH.sc) rhScene(); }
+      if (RH.view === 'enemies') rhTick(dt); else if (RH.view !== 'home') rhTickW(dt);
       if (!RH.dn || !RH.dn.mv) RH.scroll += (RH.tg - RH.scroll) * dmp(12, dt);
     }
     const CA = RH.ca, tint = c => `rgba(${fg},${c})`;
@@ -3690,32 +3904,33 @@
       return;
     }
     // ================= DÜŞMANLAR =================
-    const EN = RH_ENEMIES[RH.ei], ty = hy + hh + 14, th = 34, vt = ty + th + 10;
+    const LST = RH_LIST[RH.view], EN = LST[RH.ei], isEn = RH.view === 'enemies', ty = hy + hh + 14, th = 34; let vt = ty + th + 10;
     // --- sekmeler: düz yazı, seçili olanın altında kayan ince çizgi
-    { const fs = cw < 300 ? 13 : 15; ctx.font = `500 ${fs}px ${UIF}`; const ws = RH_ENEMIES.map(n => ctx.measureText(n.name).width), gap = clamp((cw - ws.reduce((a, b) => a + b, 0)) / 2, 12, 28); let tx = x0, ut = x0, uw2 = ws[0];
-      RH_ENEMIES.forEach((n, i) => {
+    { const fs = cw < 300 ? 13 : 15; ctx.font = `500 ${fs}px ${UIF}`; const ws = LST.map(n => ctx.measureText(n.tab || n.name).width), gap = clamp((cw - ws.reduce((a, b) => a + b, 0)) / 2, 12, 28); let tx = x0, ut = x0, uw2 = ws[0];
+      LST.forEach((n, i) => {
         const on = RH.tei === i; RH['tv' + i] = (RH['tv' + i] || 0) + ((on ? 1 : 0) - (RH['tv' + i] || 0)) * dmp(9, dt);
-        dvText(n.name, tx, ty + th / 2 - 2, fs, 500, fg, 0.36 + 0.64 * RH['tv' + i], 0, 'left'); if (on) { ut = tx; uw2 = ws[i]; }
+        dvText(n.tab || n.name, tx, ty + th / 2 - 2, fs, 500, fg, 0.36 + 0.64 * RH['tv' + i], 0, 'left'); if (on) { ut = tx; uw2 = ws[i]; }
         PAUSE.btns.push({ x: tx - 10, y: ty - 6, w: ws[i] + 20, h: th + 10, fn: () => { RH.tei = i; } }); tx += ws[i] + gap;
       });
       if (RH.ux < 0) { RH.ux = ut; RH.uw = uw2; } else { const k = dmp(10, dt); RH.ux += (ut - RH.ux) * k; RH.uw += (uw2 - RH.uw) * k; }
       ctx.fillStyle = tint(0.85); ctx.fillRect(RH.ux, ty + th - 1, RH.uw, 1.5); hair(ty + th + 1.5, 0.07); }
-    ctx.save(); ctx.beginPath(); ctx.rect(0, vt, W, H - vt); ctx.clip(); ctx.translate(0, -RH.scroll);
-    let y = vt + 10;
-    // --- önizleme: oyunun gerçek çizimi, yumuşak zemin ışığı
-    begin(); { const ph = Math.round(clamp(H * 0.27, 190, 250)) + (RH.ei === 2 ? 26 : 0), gy = y + ph * (RH.ei === 2 ? 0.84 : 0.8), S = RH.ei === 0 ? 2.05 : RH.ei === 1 ? 2.1 : clamp(ph / 215, 0.75, 1.05), sc = RH.sc;
-      const R = Math.max(cw * 0.55, 150), g = ctx.createRadialGradient(W / 2, gy - ph * 0.25, 0, W / 2, gy - ph * 0.25, R); g.addColorStop(0, tint(0.075)); g.addColorStop(1, tint(0)); ctx.fillStyle = g; ctx.fillRect(0, y - 150, W, ph + 300);
+    // --- önizleme: SABİT (liste altında kayar, açıklamayı okurken animasyon görünür kalır) · oyunun gerçek çizimi, yumuşak zemin ışığı
+    { const phF = Math.round(clamp(H * 0.235, 150, 205)), pY = vt, gy = pY + phF * ((isEn && RH.ei === 2) || EN.kind === 'evil' ? 0.86 : 0.8), kS = clamp(phF / 220, 0.68, 1), sc = RH.sc;
+      const S = !isEn ? (EN.kind === 'hero' || EN.kind === 'armor' || EN.kind === 'gear' ? clamp(phF * 0.0175, 2.9, 4.6) : EN.kind === 'evil' ? clamp(phF * 1.1 / 215, 0.7, 1.05) : Math.min(clamp(cw / 270, 1.1, 1.7), (phF * 0.8 - 10) / 98)) : RH.ei === 0 ? 2.05 * kS : RH.ei === 1 ? 2.1 * kS : clamp(phF * 1.1 / 215, 0.7, 1.05);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, pY, W, phF); ctx.clip(); ctx.globalAlpha *= CA;
+      const R = Math.max(cw * 0.55, 150), g = ctx.createRadialGradient(W / 2, gy - phF * 0.25, 0, W / 2, gy - phF * 0.25, R); g.addColorStop(0, tint(0.075)); g.addColorStop(1, tint(0)); ctx.fillStyle = g; ctx.fillRect(0, pY, W, phF);
       ctx.save(); ctx.translate(W / 2, gy + 4); ctx.scale(1, 0.16); ctx.strokeStyle = tint(0.1); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, cw * 0.36, 0, TAU); ctx.stroke(); ctx.restore();
-      if (sc) { rhDraw(sc, W / 2, gy, S, fg); if (sc.cap !== RH.capS) { RH.capA -= dt / 0.14; if (RH.capA <= 0) { RH.capA = 0; RH.capS = sc.cap; } } else RH.capA = Math.min(1, RH.capA + dt / 0.2); }
-      ctx.save(); ctx.globalAlpha *= RH.capA; dvText(RH.capS, W / 2, y + ph - 8, 12, 500, fg, 0.55, 1.2, 'center'); ctx.restore();
+      if (sc) { if (isEn) rhDraw(sc, W / 2, gy, S, fg); else rhDrawW(sc, W / 2, gy, S, fg, bgRGB); if (sc.cap !== RH.capS) { RH.capA -= dt / 0.14; if (RH.capA <= 0) { RH.capA = 0; RH.capS = sc.cap; } } else RH.capA = Math.min(1, RH.capA + dt / 0.2); }
+      ctx.save(); ctx.globalAlpha *= RH.capA; dvText(RH.capS, W / 2, pY + phF - 8, 12, 500, fg, 0.55, 1.2, 'center'); ctx.restore();
       // mod düğmesi: öfke aç/kapat · heykelde hasar kademesi
-      const bw = 108, bh = 28, bx = x0 + cw - bw, byy = y + 2, rageOn = RH.rage, label = EN.mode === 'rage' ? (rageOn ? 'ÖFKE  AÇIK' : 'ÖFKE  KAPALI') : 'HASAR  ' + RH.hits + ' / 4';
-      menuPill(bx, byy, bw, bh, label, 1, false, 0, EN.mode === 'rage' ? (rageOn ? RH_RED : undefined) : (RH.hits > 0 ? RH_RED : undefined));
-      { const by = byy - RH.scroll; if (by + bh > vt && by < H) PAUSE.btns.push({ x: bx - 6, y: Math.max(by - 6, vt), w: bw + 12, h: bh + 12, fn: () => {
-        if (!RH.sc) return; if (EN.mode === 'rage') { RH.rage = !RH.rage; RH.sc.e.rage = RH.sc.e.rg = RH.rage; if (RH.sc.play) { const k = RH.sc.play.k; rhPlay(k); } }
-        else { RH.hits = (RH.hits + 1) % 5; const s = RH.sc.s; s.hits = RH.hits; s.hp = EV_HP * (1 - RH.hits / 5); s.flash = 0.14; s.flare = 0.8; s.pulse = 0.6; s.rv += 0.9; } } }); }
-      y += ph; }
-    end();
+      if (isEn) { const bw = 108, bh = 28, bx = x0 + cw - bw, byy = pY + 4, rageOn = RH.rage, label = EN.mode === 'rage' ? (rageOn ? 'ÖFKE  AÇIK' : 'ÖFKE  KAPALI') : 'HASAR  ' + RH.hits + ' / 4';
+        menuPill(bx, byy, bw, bh, label, 1, false, 0, EN.mode === 'rage' ? (rageOn ? RH_RED : undefined) : (RH.hits > 0 ? RH_RED : undefined));
+        PAUSE.btns.push({ x: bx - 6, y: byy - 6, w: bw + 12, h: bh + 12, fn: () => {
+          if (!RH.sc) return; if (EN.mode === 'rage') { RH.rage = !RH.rage; RH.sc.e.rage = RH.sc.e.rg = RH.rage; if (RH.sc.play) { const k = RH.sc.play.k; rhPlay(k); } }
+          else { RH.hits = (RH.hits + 1) % 5; const s = RH.sc.s; s.hits = RH.hits; s.hp = EV_HP * (1 - RH.hits / 5); s.flash = 0.14; s.flare = 0.8; s.pulse = 0.6; s.rv += 0.9; } } }); }
+      ctx.restore(); hair(pY + phF, 0.07); vt = pY + phF + 1; }
+    ctx.save(); ctx.beginPath(); ctx.rect(0, vt, W, H - vt); ctx.clip(); ctx.translate(0, -RH.scroll);
+    let y = vt + 4;
     // --- ad · alt başlık · açıklama
     begin(); y += 14; dvText(EN.name, x0, y + 20, 31, 300, fg, 1, 0.4, 'left'); y += 42; dvText(EN.sub, x0, y + 7, 11, 500, fg, 0.42, 2.6, 'left'); y += 24; end();
     begin(); y = rhPara(EN.lore, x0, y, 14, 400, fg, 0.64, cw, 22) + 26; end();
@@ -3723,13 +3938,13 @@
     begin(); dvText('ÖZELLİKLER', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09); end();
     EN.stats.forEach(s => { begin(); dvText(s[0], x0, y + 20, 14, 400, fg, 0.5, 0, 'left'); dvText(s[1], x0 + cw, y + 20, 14, 500, fg, 0.95, 0, 'right'); y += 40; hair(y, 0.07); end(); });
     // --- saldırılar / yetenekler: dokununca önizlemede oynar
-    begin(); y += 28; dvText(EN.atkTitle, x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); dvText('dokun  ·  önizlemede izle', x0 + cw, y + 7, 11, 400, fg, 0.3, 0.4, 'right'); y += 20; hair(y, 0.09); end();
+    begin(); y += 28; dvText(EN.atkTitle, x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); if (!EN.noplay) dvText('dokun  ·  önizlemede izle', x0 + cw, y + 7, 11, 400, fg, 0.3, 0.4, 'right'); y += 20; hair(y, 0.09); end();
     EN.atks.forEach((a, k) => {
       begin(); const y1 = y, sel = RH.sc && RH.sc.sel === k, dim = sel ? 1 : 0.82; y += 16;
       if (sel) { ctx.fillStyle = tint(0.9); ctx.beginPath(); ctx.arc(x0 - 9, y + 11, 2.4, 0, TAU); ctx.fill(); }
       dvText(a[0], x0, y + 11, 17, 600, fg, dim, 0.2, 'left'); if (a[2] !== '—') dvText(a[2], x0 + cw, y + 11, 13.5, 600, RH_RED, 0.95, 0.3, 'right'); y += 28;
       y = rhPara(a[1], x0, y, 13.5, 400, fg, 0.58 * dim + 0.1, cw, 20.5) + 4; dvText(a[3], x0, y + 10, 11.5, 400, fg, 0.36, 0.4, 'left'); y += 28; hair(y, 0.07); end();
-      const by = y1 - RH.scroll, hh2 = y - y1; if (by + hh2 > vt && by < H) PAUSE.btns.push({ x: x0 - 12, y: Math.max(by, vt), w: cw + 24, h: hh2, fn: () => rhPlay(k) });
+      const by = y1 - RH.scroll, hh2 = y - y1; if (!EN.noplay && by + hh2 > vt && by < H) PAUSE.btns.push({ x: x0 - 12, y: Math.max(by, vt), w: cw + 24, h: hh2, fn: () => rhPlay(k) });
     });
     // --- ipuçları
     begin(); y += 28; dvText('İPUÇLARI', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09); y += 6; end();
