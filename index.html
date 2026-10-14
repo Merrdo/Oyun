@@ -3311,7 +3311,7 @@
     const bgCol = light ? '#f2f2f2' : '#0a0a0a';
     const fg = light ? '0,0,0' : '255,255,255';
     ctx.fillStyle = bgCol; ctx.fillRect(0, 0, W, H);
-    const ck = 10; cam.x += (player.x - W / 2 - cam.x) * ck; cam.y += (player.y - H / 2 - cam.y) * ck;   // kamera yumuşak takip
+    const ck = dmp(10, dt); cam.x += (player.x - W / 2 - cam.x) * ck; cam.y += (player.y - H / 2 - cam.y) * ck;   // kamera yumuşak takip
     cam.x += FX.ox; cam.y += FX.oy;   // kamera sarsıntısı
     drawWorld(fg);
     setBase();
