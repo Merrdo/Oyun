@@ -4265,7 +4265,7 @@
   function wdStageUi(st, scx, P, t, dt, pvk) {   // sahnenin üstünde: bakiye hapı · alttan süzülen satın al / bilgi hapı · efektler
     {   // --- bakiye hapı (sol üst) ---
       const txt = String(Math.max(0, Math.round(WDR.dv))); ctx.save(); ctx.font = `700 15px ${UIF}`;
-      const tw = ctx.measureText(txt).width, h = 32, w = 20 + 16 + tw + 18, bx = st.x + 16, by = st.y + 12, bs = 1 + 0.12 * WDR.bump, sk = Math.sin(WDR.shake * 22) * 4 * WDR.shake;
+      const tw = ctx.measureText(txt).width, h = 32, w = 20 + 16 + tw + 18, bx = st.x + 16, by = st.y + 14, bs = 1 + 0.12 * WDR.bump, sk = Math.sin(WDR.shake * 22) * 4 * WDR.shake;
       ctx.translate(bx + w / 2 + sk, by + h / 2); ctx.scale(bs, bs); ctx.translate(-w / 2, -h / 2);
       rr(0, 0, w, h, h / 2); ctx.fillStyle = P.p2; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = WDR.shake > 0.05 ? '#e0584a' : P.ln2; ctx.stroke();
       drawIngot(21, 18, 0.82, 0.26 + 0.18 * Math.sin(t * 1.8));
@@ -4278,7 +4278,7 @@
     WDR.bt += ((pvk ? 1 : 0) - WDR.bt) * (1 - Math.exp(-12 * dt)); if (!pvk && WDR.bt < 0.01) { WDR.bt = 0; WDR.bk = null; }
     const gk = WDR.bk, g = gk ? GEAR[gk] : null;
     if (g && WDR.bt > 0.02) {
-      const a = WDR.bt, msg = WDR.mt > 0 && WDR.msg ? WDR.msg : '', cy = st.y + st.h - 19 + (1 - a) * 14, h = 32, sk = Math.sin(WDR.shake * 22) * 5 * WDR.shake;
+      const a = WDR.bt, msg = WDR.mt > 0 && WDR.msg ? WDR.msg : '', cy = st.y + st.h - 29 + (1 - a) * 14, h = 32, sk = Math.sin(WDR.shake * 22) * 5 * WDR.shake;
       ctx.save(); ctx.globalAlpha = a; ctx.textBaseline = 'middle';
       if (g.price) {
         const en = wdBank() >= g.price, ps = String(g.price), LB = 'SATIN AL', IW = 13, G1 = 12, G2 = 5;
@@ -4350,7 +4350,7 @@
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs; WDR.mt = Math.max(0, WDR.mt - dt); wdTick(dt);
-    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 46 : UI_TOP + 42, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
+    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 42 : UI_TOP + 36, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
     if (!WDR.drag) { WDR.yaw += WDR.vel * dt; WDR.vel *= Math.exp(-3.2 * dt); if (Math.abs(WDR.vel) < 0.02) WDR.vel = 0; WDR.idle += dt; if (WDR.idle > 4 && WDR.vel === 0) { const tg = Math.round(WDR.yaw / TAU) * TAU; WDR.yaw += (tg - WDR.yaw) * (1 - Math.exp(-4 * dt)); if (Math.abs(tg - WDR.yaw) < 0.002) WDR.yaw = tg; } }
     // --- yerleşim ---
@@ -4359,7 +4359,7 @@
     if (!land) { cw = H < 700 ? 68 : 84; const ph = padT + 28 + 16 + 26 + chipsH + 12 + cw + 26 + 22; pr = { x: 0, y: H - ph, w: W, h: ph }; st = { x: 0, y: hdr, w: W, h: pr.y - hdr }; }
     else { cw = 62; const pw = clamp(W * 0.44, 280, 380); pr = { x: W - pw - 12, y: hdr, w: pw, h: H - hdr - 12 }; st = { x: 0, y: hdr, w: pr.x, h: H - hdr }; }
     cw = Math.min(cw, (pr.w - 32 - gC * (nO - 1)) / nO); WDR.stage = st;
-    const scx = st.x + st.w / 2, sc = clamp(Math.min((st.h - 52) / 51, (st.w / 2 - 14) / 15, (st.w / 2 - 78) / 8.8), 2.2, 7.6), gy = st.y + st.h - (4 * sc + 46);
+    const scx = st.x + st.w / 2, sc = clamp(Math.min((st.h - 70) / 51, (st.w / 2 - 14) / 15, (st.w / 2 - 78) / 8.8), 2.2, 7.6), gy = st.y + st.h - (4 * sc + 62);
     // --- sahne: opak radyal zemin, platform, karakter ---
     { ctx.save(); ctx.beginPath(); ctx.rect(st.x, st.y, st.w, st.h); ctx.clip(); const R = Math.max(st.w * 0.6, 170), gr = ctx.createRadialGradient(scx, gy - 22 * sc, 0, scx, gy - 22 * sc, R); gr.addColorStop(0, P.m(0.07)); gr.addColorStop(1, P.bg); ctx.fillStyle = gr; ctx.fillRect(st.x, st.y, st.w, st.h); ctx.restore(); }
     ctx.beginPath(); ctx.ellipse(scx, gy, 15 * sc, 4 * sc, 0, 0, TAU); ctx.fillStyle = P.p2; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.ln; ctx.stroke();
@@ -4380,10 +4380,10 @@
     wdStageUi(st, scx, P, t, dt, pvk);
     if (WDR.hint * (1 - WDR.bt) > 0.03) { ctx.font = `400 10px ${UIF}`; ctx.textBaseline = 'middle'; ctx.fillStyle = P.m(WDR.hint * (1 - WDR.bt) * (0.36 + 0.1 * Math.sin(t * 2))); wdLetters('sürükleyerek döndür', scx, gy + 4 * sc + 20, 1.8, 'c'); }
     // --- başlık + düğmeler ---
-    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, land ? hdr / 2 + 1 : UI_TOP + 22, 6, 'c');
+    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, land ? hdr / 2 + 1 : UI_TOP + 19, 6, 'c');
     const any = GEAR_SLOTS.some(([sl]) => OUTFIT[sl]);
     const round = (x, y, en, ico) => { ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = en ? P.ln2 : P.ln; ctx.stroke(); ctx.strokeStyle = en ? P.tx : P.ln2; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ico(x, y); };
-    const by = land ? hdr / 2 + 1 : UI_TOP + 22;   // portre: düğmeler UI_TOP bandının altında
+    const by = land ? hdr / 2 + 1 : UI_TOP + 19;   // portre: düğmeler UI_TOP bandının altında
     round(34, by, true, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 2.5, y - 6.5); ctx.lineTo(x - 3.5, y); ctx.lineTo(x + 2.5, y + 6.5); ctx.stroke(); });
     PAUSE.btns.push({ x: 8, y: by - 26, w: 52, h: 52, fn: wdBack });
     round(W - 34, by, any, (x, y) => { const r = 6.6, a0 = -PI / 2 + 0.55, a1 = -PI / 2 - 0.55 + TAU, px = x + r * Math.cos(a1), py = y + r * Math.sin(a1), tx = -Math.sin(a1), ty = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
@@ -4871,7 +4871,7 @@
       tips: ['Toz tek başına bir şey almaz: külçeye çevirmeyi unutma.', 'Eritmeden önce kabın içindeki toz miktarına bak; 10\'un katı olmayan kısım envantere geri döner.', 'Bandana gibi kıyafetler için külçe biriktir; fiyatlar parçanın kartında görünür.'] });
   const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR, items: RH_ITEMS };
   const RH_WD = { sword: [1.1, 1.9, 1.6, 2.8], bow: [1.7, 2.6, 2.2, 2.4] };   // silah önizlemesi: hareket süreleri (sn)
-  const RH = { view: 'home', tv: 'home', ei: 0, tei: 0, ca: 0, ina: 0, scroll: 0, tg: 0, vel: 0, max: 0, dn: null, ux: -1, uw: 0, t: 0, sc: null, rage: false, hits: 0, wc: new Map(), capS: '', capA: 0, last: 0 };
+  const RH = { tsx: 0, tsv: 0, tsT: null, ltei: -1, tmax: 0, tby0: 0, tby1: 0, view: 'home', tv: 'home', ei: 0, tei: 0, ca: 0, ina: 0, scroll: 0, tg: 0, vel: 0, max: 0, dn: null, ux: -1, uw: 0, t: 0, sc: null, rage: false, hits: 0, wc: new Map(), capS: '', capA: 0, last: 0 };
   const RH_CAP = { wind: 'uyarı', strike: 'vuruş', rec: 'soluklanıyor  ·  vurursan +%50 hasar', bo: 'dumana dönüşür', iv: 'görünmez  ·  vurulamaz', bi: 'belirir', rev: 'maske düşüyor', stuck: 'dil siperde yapıştı', dz: 'sersem  ·  vurursan +%50 hasar' };
   function rehberEnter() { RH.view = RH.tv = 'home'; RH.ei = RH.tei = 0; RH.ca = 0; RH.ina = 0; RH.scroll = RH.tg = RH.vel = 0; RH.dn = null; RH.sc = null; RH.ux = -1; RH.last = 0; PAUSE.page = 'guide'; }
   function rehberEnterFromMenu() { rehberEnter(); PAUSE.fromMenu = true; PAUSE.on = true; PAUSE.a = 0; PAUSE.drag = null; PAUSE.snap = null; }
@@ -4880,22 +4880,24 @@
     if (RH.tv !== 'home') { RH.tv = 'home'; return; }
     if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; } else PAUSE.page = 'main';
   }
-  function rehberOpen(id) { RH.tv = id; RH.tei = 0; }
+  function rehberOpen(id) { RH.tv = id; RH.tei = 0; RH.tsx = 0; RH.tsv = 0; RH.tsT = null; RH.ltei = -1; }
   function rehberShift(d) { const L = RH_LIST[RH.tv]; if (!L) return; const n = clamp(RH.tei + d, 0, L.length - 1); if (n !== RH.tei) RH.tei = n; }
   function rehberDown(e) {
     const px = e.clientX, py = e.clientY; let hit = null;
     for (const b of PAUSE.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { hit = b; break; }
-    RH.dn = { x: px, y: py, s: RH.scroll, hit, mv: false, mode: '', ly: py, lt: performance.now() }; RH.vel = 0;
+    RH.dn = { x: px, y: py, s: RH.scroll, hit, mv: false, mode: '', ly: py, lt: performance.now(), tab: RH.tv !== 'home' && RH.tmax > 0 && py >= RH.tby0 && py <= RH.tby1, tx0: RH.tsx, lx: px }; RH.vel = 0; if (RH.dn.tab) { RH.tsv = 0; RH.tsT = null; }
   }
   addEventListener('pointermove', e => {
     const d = RH.dn; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y;
-    if (!d.mode && (Math.abs(dx) > 9 || Math.abs(dy) > 9)) d.mode = Math.abs(dx) > Math.abs(dy) * 1.3 ? 'h' : 'v';
+    if (!d.mode && (Math.abs(dx) > 9 || Math.abs(dy) > 9)) d.mode = d.tab && Math.abs(dx) > Math.abs(dy) ? 't' : Math.abs(dx) > Math.abs(dy) * 1.3 ? 'h' : 'v';
+    if (d.mode === 't') { d.mv = true; const nw = performance.now(), dtm = Math.max(1, nw - d.lt); RH.tsv = RH.tsv * 0.6 + (-(e.clientX - d.lx) / dtm * 1000) * 0.4; d.lx = e.clientX; d.lt = nw; RH.tsx = clamp(d.tx0 - dx, 0, RH.tmax); }
     if (d.mode === 'h') d.mv = true;
     if (d.mode === 'v') { d.mv = true; const nw = performance.now(), dtm = Math.max(1, nw - d.lt); RH.vel = RH.vel * 0.6 + (-(e.clientY - d.ly) / dtm * 1000) * 0.4; d.ly = e.clientY; d.lt = nw; RH.tg = RH.scroll = clamp(d.s - dy, 0, RH.max); }
   });
   addEventListener('pointerup', e => {
     const d = RH.dn; RH.dn = null; if (!d || !PAUSE.on || PAUSE.page !== 'guide') return;
-    if (d.mode === 'v') RH.tg = clamp(RH.scroll + RH.vel * 0.28, 0, RH.max);
+    if (d.mode === 't') { if (performance.now() - d.lt > 90) RH.tsv = 0; }
+    else if (d.mode === 'v') RH.tg = clamp(RH.scroll + RH.vel * 0.28, 0, RH.max);
     else if (d.mode === 'h') { const dx = e.clientX - d.x; if (RH.tv !== 'home' && Math.abs(dx) > 48) rehberShift(dx < 0 ? 1 : -1); }
     else if (d.hit) { MENU.fl = 1; d.hit.fn(); }
   });
@@ -5165,14 +5167,29 @@
     // ================= DÜŞMANLAR =================
     const LST = RH_LIST[RH.view], EN = LST[RH.ei], isEn = RH.view === 'enemies', ty = hy + hh + 14, th = 34; let vt = ty + th + 10;
     // --- sekmeler: düz yazı, seçili olanın altında kayan ince çizgi
-    { const fs = cw < 300 ? 13 : 15; ctx.font = `500 ${fs}px ${UIF}`; const ws = LST.map(n => ctx.measureText(n.tab || n.name).width), gap = clamp((cw - ws.reduce((a, b) => a + b, 0)) / 2, 12, 28); let tx = x0, ut = x0, uw2 = ws[0];
+    { const fs = cw < 300 ? 13 : 15; ctx.font = `500 ${fs}px ${UIF}`; const ws = LST.map(n => ctx.measureText(n.tab || n.name).width), sum = ws.reduce((a, b) => a + b, 0), fit = sum + 12 * (LST.length - 1) <= cw;
+      const gap = fit ? clamp((cw - sum) / (LST.length - 1 || 1), 12, 28) : 24, total = sum + gap * (LST.length - 1), tmax = fit ? 0 : total - cw;
+      RH.tmax = tmax; RH.tby0 = ty - 8; RH.tby1 = ty + th + 6;
+      // kaydırma: sürükleme (RH.dn.mode 't') · bırakınca eylemsizlik · seçili sekme görünür alana yumuşakça gelir
+      const tdrag = RH.dn && RH.dn.mode === 't';
+      if (!tdrag) { if (Math.abs(RH.tsv) > 1) { RH.tsx += RH.tsv * dt; RH.tsv *= Math.exp(-4.5 * dt); } else RH.tsv = 0; }
+      if (RH.ltei !== RH.tei) { RH.ltei = RH.tei; let l = 0; for (let q = 0; q < RH.tei; q++) l += ws[q] + gap; RH.tsT = clamp(l + ws[RH.tei] / 2 - cw / 2, 0, tmax); }
+      if (RH.tsT !== null && !tdrag && !RH.tsv) { RH.tsx += (RH.tsT - RH.tsx) * dmp(10, dt); if (Math.abs(RH.tsT - RH.tsx) < 0.4) { RH.tsx = RH.tsT; RH.tsT = null; } }
+      RH.tsx = clamp(RH.tsx, 0, tmax);
+      const cl0 = x0 - 14, cl1 = x0 + cw + 14; let tx = x0 - RH.tsx, ut = x0, uw2 = ws[0];
+      ctx.save(); ctx.beginPath(); ctx.rect(cl0, ty - 8, cl1 - cl0, th + 14); ctx.clip();
       LST.forEach((n, i) => {
         const on = RH.tei === i; RH['tv' + i] = (RH['tv' + i] || 0) + ((on ? 1 : 0) - (RH['tv' + i] || 0)) * dmp(9, dt);
         dvText(n.tab || n.name, tx, ty + th / 2 - 2, fs, 500, fg, 0.36 + 0.64 * RH['tv' + i], 0, 'left'); if (on) { ut = tx; uw2 = ws[i]; }
-        PAUSE.btns.push({ x: tx - 10, y: ty - 6, w: ws[i] + 20, h: th + 10, fn: () => { RH.tei = i; } }); tx += ws[i] + gap;
+        const bl = Math.max(tx - 10, cl0), br = Math.min(tx + ws[i] + 10, cl1); if (br - bl > 12) PAUSE.btns.push({ x: bl, y: ty - 6, w: br - bl, h: th + 10, fn: () => { RH.tei = i; } }); tx += ws[i] + gap;
       });
       if (RH.ux < 0) { RH.ux = ut; RH.uw = uw2; } else { const k = dmp(10, dt); RH.ux += (ut - RH.ux) * k; RH.uw += (uw2 - RH.uw) * k; }
-      ctx.fillStyle = tint(0.85); ctx.fillRect(RH.ux, ty + th - 1, RH.uw, 1.5); hair(ty + th + 1.5, 0.07); }
+      ctx.fillStyle = tint(0.85); ctx.fillRect(RH.ux, ty + th - 1, RH.uw, 1.5);
+      if (tmax > 0) {   // kenar solması: kaydırılabilir olduğunu belli eder
+        const fw = 26; if (RH.tsx > 1) { const g = ctx.createLinearGradient(cl0, 0, cl0 + fw, 0); g.addColorStop(0, `rgb(${bgRGB})`); g.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = g; ctx.fillRect(cl0, ty - 8, fw, th + 14); }
+        if (RH.tsx < tmax - 1) { const g = ctx.createLinearGradient(cl1 - fw, 0, cl1, 0); g.addColorStop(0, `rgba(${bgRGB},0)`); g.addColorStop(1, `rgb(${bgRGB})`); ctx.fillStyle = g; ctx.fillRect(cl1 - fw, ty - 8, fw, th + 14); }
+      }
+      ctx.restore(); hair(ty + th + 1.5, 0.07); }
     // --- önizleme: SABİT (liste altında kayar, açıklamayı okurken animasyon görünür kalır) · oyunun gerçek çizimi, yumuşak zemin ışığı
     { const phF = Math.round(clamp(H * 0.235, 150, 205)), pY = vt, gy = pY + phF * ((isEn && RH.ei === 2) || EN.kind === 'evil' ? 0.86 : 0.8), kS = clamp(phF / 220, 0.68, 1), sc = RH.sc;
       const S = !isEn ? (EN.kind === 'hero' || EN.kind === 'armor' || EN.kind === 'gear' ? clamp(phF * 0.0175, 2.9, 4.6) : EN.kind === 'evil' ? clamp(phF * 1.1 / 215, 0.7, 1.05) : Math.min(clamp(cw / 270, 1.1, 1.7), (phF * 0.8 - 10) / 98)) : RH.ei === 0 ? 1.5 * kS : RH.ei === 1 ? 1.8 * kS : clamp(phF * 1.1 / 215, 0.7, 1.05);
