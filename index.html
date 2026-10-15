@@ -2871,20 +2871,29 @@
     for (let i = FT.length - 1; i >= 0; i--) { const p = FT[i]; if ((p.t += dt) >= p.life) { FT.splice(i, 1); continue; } p.y -= 22 * dt; }
   }
   function keyPath() { ctx.beginPath(); ctx.arc(-6, 0, 3.3, 0, TAU); ctx.moveTo(-2.7, 0); ctx.lineTo(9, 0); ctx.moveTo(6, 0); ctx.lineTo(6, 3.4); ctx.moveTo(9, 0); ctx.lineTo(9, 2.6); ctx.stroke(); }
-  function drawDustIcon(x, y, sc) {   // altın tozu: küçük altın kümesi + parıltı
-    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
-    ctx.fillStyle = GOLD; ctx.strokeStyle = '#8a5e14'; ctx.lineWidth = 0.7;
-    for (const [px, py, r] of [[-4.2, 2.4, 2], [0, 3, 2.2], [4.2, 2.4, 2], [-2, -0.8, 1.9], [2.2, -0.6, 1.9], [0, -3.8, 1.7]]) { ctx.beginPath(); ctx.arc(px, py, r, 0, TAU); ctx.fill(); ctx.stroke(); }
-    ctx.strokeStyle = 'rgba(255,248,214,0.95)'; ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(6, -6.5); ctx.lineTo(6, -2.5); ctx.moveTo(4, -4.5); ctx.lineTo(8, -4.5); ctx.stroke();
+  function drawDustIcon(x, y, sc) {   // altın tozu: mor prizmayla aynı dil — yüzeyli 3 tonlu külçük kümesi + koyu çizgi + beyaz parlama
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const nug = (px, py, r) => {   // tek külçük: sol açık yüz · sağ orta yüz · alt koyu yüz
+      ctx.save(); ctx.translate(px, py); ctx.strokeStyle = '#6b4308'; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.85, -r * 0.3); ctx.lineTo(r * 0.62, r * 0.85); ctx.lineTo(-r * 0.62, r * 0.85); ctx.lineTo(-r * 0.85, -r * 0.3); ctx.closePath(); ctx.fillStyle = '#f0b73a'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(-r * 0.85, -r * 0.3); ctx.lineTo(-r * 0.62, r * 0.85); ctx.lineTo(0, r * 0.15); ctx.closePath(); ctx.fillStyle = '#ffeaa3'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * 0.62, r * 0.85); ctx.lineTo(0, r * 0.15); ctx.lineTo(r * 0.62, r * 0.85); ctx.closePath(); ctx.fillStyle = '#b9780f'; ctx.fill(); ctx.stroke();
+      ctx.restore();
+    };
+    nug(-5.4, 3.6, 3.1); nug(5.4, 3.8, 3.3); nug(0, 1.2, 4.3); nug(-0.6, -4.2, 2.6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2.2, -0.8); ctx.lineTo(-1.6, 2.4); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,248,214,0.95)'; ctx.beginPath(); ctx.moveTo(7, -7.5); ctx.lineTo(7, -3.5); ctx.moveTo(5, -5.5); ctx.lineTo(9, -5.5); ctx.stroke();
     ctx.restore();
   }
-  function drawIngot(x, y, sc, glow) {   // altın külçe
-    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.lineJoin = 'round';
+  function drawIngot(x, y, sc, glow) {   // altın külçe: mor prizmayla aynı dil — üst açık yüz · sol orta yüz · sağ koyu yüz · koyu çizgi · beyaz parlama
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     if (glow) { const g = ctx.createRadialGradient(0, -2, 1, 0, -2, 22); g.addColorStop(0, `rgba(255,214,100,${0.5 * glow})`); g.addColorStop(1, 'rgba(255,214,100,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -2, 22, 0, TAU); ctx.fill(); }
-    const g2 = ctx.createLinearGradient(0, -8, 0, 5); g2.addColorStop(0, '#ffe58a'); g2.addColorStop(1, '#d99a22');
-    ctx.fillStyle = g2; ctx.strokeStyle = '#7a520e'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-13, 5); ctx.lineTo(13, 5); ctx.lineTo(9.5, -3); ctx.lineTo(-9.5, -3); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#fff1b0'; ctx.beginPath(); ctx.moveTo(-9.5, -3); ctx.lineTo(9.5, -3); ctx.lineTo(7, -7.5); ctx.lineTo(-7, -7.5); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-6, -5.2); ctx.lineTo(1, -5.2); ctx.stroke();
+    ctx.strokeStyle = '#6b4308'; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(-13, 6); ctx.lineTo(13, 6); ctx.lineTo(9.5, -2.5); ctx.lineTo(-9.5, -2.5); ctx.closePath(); ctx.fillStyle = '#f0b73a'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-13, 6); ctx.lineTo(-9.5, -2.5); ctx.lineTo(2, -2.5); ctx.lineTo(-3, 6); ctx.closePath(); ctx.fillStyle = '#f9d46a'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-3, 6); ctx.lineTo(2, -2.5); ctx.lineTo(9.5, -2.5); ctx.lineTo(13, 6); ctx.closePath(); ctx.fillStyle = '#c98717'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-9.5, -2.5); ctx.lineTo(9.5, -2.5); ctx.lineTo(6.5, -7.5); ctx.lineTo(-6.5, -7.5); ctx.closePath(); ctx.fillStyle = '#ffeaa3'; ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-4.6, -5.1); ctx.lineTo(1.4, -5.1); ctx.moveTo(-9.6, 2); ctx.lineTo(-8.6, 3.6); ctx.stroke();
     ctx.restore();
   }
   function drawKey(x, y, a, sc) {
@@ -3207,7 +3216,8 @@
       drawKey(gx, gy, -0.5 + Math.sin(l.t * 2 + l.ph) * 0.12 + (l.rest ? 0 : l.t * 8), 1.35);
     } else {
       const gx = l.x, gy = l.y - l.z - (l.rest ? 3 + Math.sin(l.t * 2.4 + l.ph) * 1.2 : 0), tw = 0.5 + 0.5 * Math.sin(l.t * 6 + l.ph);   // altın tozu: küçük altın benekler + parıltı
-      ctx.fillStyle = GOLD; for (const [px, py, r] of [[-3, 1, 1.6], [0, 1.6, 1.8], [3, 1, 1.5], [-1, -1.6, 1.4], [1.8, -1.2, 1.3]]) { ctx.beginPath(); ctx.arc(gx + px, gy + py, r, 0, TAU); ctx.fill(); }
+      const gl = ctx.createRadialGradient(gx, gy, 1, gx, gy, 18); gl.addColorStop(0, `rgba(255,214,100,${0.28 + 0.14 * tw})`); gl.addColorStop(1, 'rgba(255,214,100,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(gx, gy, 18, 0, TAU); ctx.fill();
+      drawDustIcon(gx, gy - 1, 0.62);
       ctx.strokeStyle = `rgba(255,248,214,${0.35 + 0.6 * tw})`; ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(gx + 4, gy - 6 - tw * 1.5); ctx.lineTo(gx + 4, gy - 2 + tw * 1.5); ctx.moveTo(gx + 2, gy - 4); ctx.lineTo(gx + 6, gy - 4); ctx.stroke();
     }
   }
@@ -4268,14 +4278,21 @@
     WDR.bt += ((pvk ? 1 : 0) - WDR.bt) * (1 - Math.exp(-12 * dt)); if (!pvk && WDR.bt < 0.01) { WDR.bt = 0; WDR.bk = null; }
     const gk = WDR.bk, g = gk ? GEAR[gk] : null;
     if (g && WDR.bt > 0.02) {
-      const a = WDR.bt, msg = WDR.mt > 0 && WDR.msg ? WDR.msg : '', cy = st.y + st.h - 22 + (1 - a) * 14, h = 38, sk = Math.sin(WDR.shake * 22) * 5 * WDR.shake;
+      const a = WDR.bt, msg = WDR.mt > 0 && WDR.msg ? WDR.msg : '', cy = st.y + st.h - 19 + (1 - a) * 14, h = 32, sk = Math.sin(WDR.shake * 22) * 5 * WDR.shake;
       ctx.save(); ctx.globalAlpha = a; ctx.textBaseline = 'middle';
       if (g.price) {
-        const w = 176, bx = scx - w / 2 + sk, by = cy - h / 2, en = wdBank() >= g.price;
-        rr(bx, by, w, h, h / 2); ctx.fillStyle = en ? P.goldBg : P.p2; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = msg ? '#e0584a' : en ? P.gold : P.ln; ctx.stroke();
-        ctx.font = `600 10px ${UIF}`;
-        if (msg) { ctx.fillStyle = '#e0584a'; wdLetters(msg.toLocaleUpperCase('tr'), bx + w / 2, cy + 0.5, 2.2, 'c'); }
-        else { ctx.fillStyle = en ? P.gold : P.dim; wdLetters('SATIN AL', bx + 60, cy + 0.5, 2.4, 'c'); drawIngot(bx + w - 52, cy + 2, 0.62, en ? 0.25 + 0.15 * Math.sin(t * 3) : 0); ctx.textAlign = 'left'; ctx.font = `700 13px ${UIF}`; ctx.fillStyle = en ? P.gold : P.dim; ctx.fillText(String(g.price), bx + w - 38, cy + 0.5); }
+        const en = wdBank() >= g.price, ps = String(g.price), LB = 'SATIN AL', IW = 13, G1 = 12, G2 = 5;
+        ctx.font = `600 10px ${UIF}`; const lw = wdW(LB, 2.4); ctx.font = `700 13px ${UIF}`; const pw = ctx.measureText(ps).width;
+        const tot = lw + G1 + 1 + G1 + IW + G2 + pw, w = Math.max(Math.round(tot + 44), 138), bx = scx - w / 2 + sk, by = cy - h / 2;
+        rr(bx, by, w, h, h / 2); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = msg ? '#e0584a' : en ? P.gold : P.ln; ctx.stroke();
+        if (msg) { ctx.font = `600 10px ${UIF}`; ctx.fillStyle = '#e0584a'; wdLetters(msg.toLocaleUpperCase('tr'), bx + w / 2, cy + 0.5, 2.2, 'c'); }
+        else {
+          let sx = bx + w / 2 - tot / 2;
+          ctx.font = `600 10px ${UIF}`; ctx.fillStyle = en ? P.gold : P.dim; wdLetters(LB, sx, cy + 0.5, 2.4); sx += lw + G1;
+          ctx.strokeStyle = en ? P.gold : P.ln2; ctx.globalAlpha = a * 0.45; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sx + 0.5, cy - 6); ctx.lineTo(sx + 0.5, cy + 6); ctx.stroke(); ctx.globalAlpha = a; sx += 1 + G1;
+          drawIngot(sx + IW / 2, cy + 0.5, 0.5, en ? 0.2 + 0.12 * Math.sin(t * 3) : 0); sx += IW + G2;
+          ctx.font = `700 13px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = en ? P.gold : P.dim; ctx.fillText(ps, sx, cy + 0.5);
+        }
         if (a > 0.7 && pvk === gk) PAUSE.btns.push({ x: bx - 6, y: by - 6, w: w + 12, h: h + 12, fn: () => wdBuy(gk) });
       } else {
         ctx.font = `600 9.5px ${UIF}`; const lb = 'KÖTÜCÜL HEYKELLERDEN DÜŞER', w = wdW(lb, 1.8) + 54, bx = scx - w / 2;
@@ -4333,7 +4350,7 @@
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs; WDR.mt = Math.max(0, WDR.mt - dt); wdTick(dt);
-    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 56 : UI_TOP + 52, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
+    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 46 : UI_TOP + 42, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
     if (!WDR.drag) { WDR.yaw += WDR.vel * dt; WDR.vel *= Math.exp(-3.2 * dt); if (Math.abs(WDR.vel) < 0.02) WDR.vel = 0; WDR.idle += dt; if (WDR.idle > 4 && WDR.vel === 0) { const tg = Math.round(WDR.yaw / TAU) * TAU; WDR.yaw += (tg - WDR.yaw) * (1 - Math.exp(-4 * dt)); if (Math.abs(tg - WDR.yaw) < 0.002) WDR.yaw = tg; } }
     // --- yerleşim ---
@@ -4342,7 +4359,7 @@
     if (!land) { cw = H < 700 ? 68 : 84; const ph = padT + 28 + 16 + 26 + chipsH + 12 + cw + 26 + 22; pr = { x: 0, y: H - ph, w: W, h: ph }; st = { x: 0, y: hdr, w: W, h: pr.y - hdr }; }
     else { cw = 62; const pw = clamp(W * 0.44, 280, 380); pr = { x: W - pw - 12, y: hdr, w: pw, h: H - hdr - 12 }; st = { x: 0, y: hdr, w: pr.x, h: H - hdr }; }
     cw = Math.min(cw, (pr.w - 32 - gC * (nO - 1)) / nO); WDR.stage = st;
-    const scx = st.x + st.w / 2, sc = clamp(Math.min((st.h - 40) / 51, (st.w / 2 - 14) / 15, (st.w / 2 - 78) / 8.8), 2.2, 7.6), gy = st.y + st.h - (4 * sc + 34);
+    const scx = st.x + st.w / 2, sc = clamp(Math.min((st.h - 52) / 51, (st.w / 2 - 14) / 15, (st.w / 2 - 78) / 8.8), 2.2, 7.6), gy = st.y + st.h - (4 * sc + 46);
     // --- sahne: opak radyal zemin, platform, karakter ---
     { ctx.save(); ctx.beginPath(); ctx.rect(st.x, st.y, st.w, st.h); ctx.clip(); const R = Math.max(st.w * 0.6, 170), gr = ctx.createRadialGradient(scx, gy - 22 * sc, 0, scx, gy - 22 * sc, R); gr.addColorStop(0, P.m(0.07)); gr.addColorStop(1, P.bg); ctx.fillStyle = gr; ctx.fillRect(st.x, st.y, st.w, st.h); ctx.restore(); }
     ctx.beginPath(); ctx.ellipse(scx, gy, 15 * sc, 4 * sc, 0, 0, TAU); ctx.fillStyle = P.p2; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.ln; ctx.stroke();
@@ -4363,10 +4380,10 @@
     wdStageUi(st, scx, P, t, dt, pvk);
     if (WDR.hint * (1 - WDR.bt) > 0.03) { ctx.font = `400 10px ${UIF}`; ctx.textBaseline = 'middle'; ctx.fillStyle = P.m(WDR.hint * (1 - WDR.bt) * (0.36 + 0.1 * Math.sin(t * 2))); wdLetters('sürükleyerek döndür', scx, gy + 4 * sc + 20, 1.8, 'c'); }
     // --- başlık + düğmeler ---
-    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, land ? hdr / 2 + 1 : UI_TOP + 27, 6, 'c');
+    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; wdLetters('KIYAFET', cxW, land ? hdr / 2 + 1 : UI_TOP + 22, 6, 'c');
     const any = GEAR_SLOTS.some(([sl]) => OUTFIT[sl]);
     const round = (x, y, en, ico) => { ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = en ? P.ln2 : P.ln; ctx.stroke(); ctx.strokeStyle = en ? P.tx : P.ln2; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ico(x, y); };
-    const by = land ? hdr / 2 + 1 : UI_TOP + 27;   // portre: düğmeler UI_TOP bandının altında
+    const by = land ? hdr / 2 + 1 : UI_TOP + 22;   // portre: düğmeler UI_TOP bandının altında
     round(34, by, true, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 2.5, y - 6.5); ctx.lineTo(x - 3.5, y); ctx.lineTo(x + 2.5, y + 6.5); ctx.stroke(); });
     PAUSE.btns.push({ x: 8, y: by - 26, w: 52, h: 52, fn: wdBack });
     round(W - 34, by, any, (x, y) => { const r = 6.6, a0 = -PI / 2 + 0.55, a1 = -PI / 2 - 0.55 + TAU, px = x + r * Math.cos(a1), py = y + r * Math.sin(a1), tx = -Math.sin(a1), ty = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
@@ -4399,7 +4416,7 @@
       for (const q in sv) OUTFIT[q] = sv[q];
       { const la = lk ? 1 : rv;   // sahip olunmayan parça: soluk + kilit; açılınca yumuşakça solar
         if (la > 0.01) { ctx.globalAlpha = 0.62 * la; ctx.fillStyle = P.bg; ctx.fillRect(x, y, cw, cw); ctx.globalAlpha = la; wdLock(x + cw - 14, y + 15, P); ctx.globalAlpha = 1; }
-        if (lk && !pn && GEAR[k].price) { drawIngot(x + cw / 2 - 11, y + cw - 13, 0.5); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = `700 10px ${UIF}`; ctx.fillStyle = P.gold; ctx.fillText(String(GEAR[k].price), x + cw / 2 - 1, y + cw - 12.5); }
+        if (lk && !pn && GEAR[k].price) { ctx.save(); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = `700 10px ${UIF}`; drawIngot(x + 13, y + 14, 0.46); ctx.fillStyle = P.gold; ctx.fillText(String(GEAR[k].price), x + 22, y + 14.5); ctx.restore(); }   // fiyat: sol üst köşede, kilidin karşısında; karakteri örtmez
         if (rv > 0) { ctx.globalAlpha = 0.5 * rv; ctx.fillStyle = P.gold; ctx.fillRect(x, y, cw, cw); ctx.globalAlpha = 1; } }
       ctx.restore();
       rr(x, y, cw, cw, 16); ctx.lineWidth = on || pvd ? 2 : 1.25; ctx.strokeStyle = on ? P.gold : pvd ? P.mid : P.ln; ctx.stroke();
@@ -4843,6 +4860,15 @@
         ['Bulma', 'Kötücül heykel kırılınca şansa bağlı çıkar; her seferinde birkaç parça yere saçılır. Sandıklardan düşmez.', '—', '%55  ·  2–4 parça'],
         ['Kullanım', 'Şu an harcanacak bir yeri yoktur; envanterde saklanır ve kayıtla birlikte korunur.', '—', 'henüz yok']],
       tips: ['Heykeli kırınca yerdeki prizmaları toplamayı unutma; yaratıklar dağılmadan önce ganimeti al.', 'Kayıtta saklanır: kamptan sonra kaybolmaz.'] });
+  RH_ITEMS.push({ kind: 'item', item: 'gold', name: 'Altın', tab: 'Altın', sub: 'EŞYA  ·  PARA', atkTitle: 'KULLANIM', noplay: true,
+      lore: 'İki hâlli tek maden. Altın tozu sandıklardan ve kötücül heykellerden saçılan ince parıltıdır; eritme kabında toz külçeye dönüşür. Külçe ise oyunun gerçek parasıdır ve kıyafet dükkânında harcanır.',
+      stats: [['Altın tozu', 'sandık  ·  kötücül heykel  ·  harabe'], ['Eritme oranı', '10 toz = 1 külçe'], ['Eritme süresi', '3,5 sn + külçe başına 1 sn'], ['Taşıma', 'sınırsız'], ['Harcama', 'kıyafet dükkânı']],
+      atks: [
+        ['Altın tozu', 'Sandık kırılınca ve kötücül heykel yıkılınca yere saçılır; üzerinden geçerek toplanırsın. Tozun kendisi harcanmaz, yalnızca külçeye çevrilir.', '—', 'toplanır  ·  envanter'],
+        ['Eritme', 'Kamptaki eritme kabına toz doldur ve eritmeyi başlat. Kap sıvıya döner, kalıba dökülür ve külçe çıkar. Artan toz kapta kalmaz, envantere döner.', '+1', '10 toz  ·  3,5 sn + 1 sn / külçe'],
+        ['Altın külçe', 'Kıyafet dükkânında parçaların fiyatı külçeyle ödenir. Satın alınca külçeler bakiyeden karaktere uçar ve kilit açılır.', '—', 'Kıyafet  ›  Satın al'],
+        ['Saklama', 'Toz ve külçe envanterde tutulur ve kayıtla birlikte korunur; kamptan sonra kaybolmaz.', '—', 'kayıtta saklanır']],
+      tips: ['Toz tek başına bir şey almaz: külçeye çevirmeyi unutma.', 'Eritmeden önce kabın içindeki toz miktarına bak; 10\'un katı olmayan kısım envantere geri döner.', 'Bandana gibi kıyafetler için külçe biriktir; fiyatlar parçanın kartında görünür.'] });
   const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR, items: RH_ITEMS };
   const RH_WD = { sword: [1.1, 1.9, 1.6, 2.8], bow: [1.7, 2.6, 2.2, 2.4] };   // silah önizlemesi: hareket süreleri (sn)
   const RH = { view: 'home', tv: 'home', ei: 0, tei: 0, ca: 0, ina: 0, scroll: 0, tg: 0, vel: 0, max: 0, dn: null, ux: -1, uw: 0, t: 0, sc: null, rage: false, hits: 0, wc: new Map(), capS: '', capA: 0, last: 0 };
@@ -5030,8 +5056,10 @@
       }
       else if (sc.kind === 'item') {   // eşya: yerde süzülen simge
         ctx.translate(cx, gy); ctx.scale(S, S); const bob = Math.sin(T * 1.7) * 2.2;
-        ctx.fillStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.ellipse(0, 2, 22 - bob, 4.5 - bob * 0.2, 0, 0, TAU); ctx.fill();
-        drawItemIcon(sc.item, 0, -38 + bob, 2.6);
+        const two = sc.item === 'gold', ew = two ? 40 : 22;
+        ctx.fillStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.ellipse(0, 2, ew - bob, 4.5 - bob * 0.2, 0, 0, TAU); ctx.fill();
+        if (two) { drawDustIcon(-24, -36 + bob, 2.5); drawIngot(22, -36 - bob * 0.7, 2.1, 0.3); }   // toz + külçe yan yana
+        else drawItemIcon(sc.item, 0, -38 + bob, 2.6);
       }
       else if (sc.kind === 'statue' || sc.kind === 'evil' || sc.kind === 'rubble') {   // heykeller: oyunun kendi çizimleri
         ctx.translate(cx, gy); ctx.scale(S, S);
