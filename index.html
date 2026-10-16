@@ -1042,8 +1042,8 @@
   /* ---------- BECERİ AĞACI: her seviye atlayışta 1 Göz Yaşı Puanı kazanılır · puanlar kamptaki Dev Çınar'da harcanır · açılan beceriler kayda işlenir ---------- */
   const SK = { pts: 0, own: {}, sel: 0, flash: 0, msg: '', mt: 0, fx: [], at: 0, gl: 0, pgl: 0, np: [0, 0] };
   const SKILLS = [
-    { id: 'sifa', name: 'Şifalı Eller', cost: 1, desc: 'Sağlık ekipmanları kalıcı olarak %25 daha güçlü iyileştirir: bandaj %10 yerine %12,5, medkit %50 yerine %62,5 can yeniler. Şifa Hilali de aynı oranda güçlenir.', buff: { healMul: 1.25 }, cls: 'hero', req: [], ico: 'heal' },
-    { id: 'hisim', name: 'Kor Hışım', cost: 1, desc: 'Verdiğin hasar %20 artar (kılıç, ok, bomba, ışın). Yan etki olarak dayanıklılık %6 daha hızlı yenilenir, siper ve prizma ışını %5 daha az yorar.', buff: { dmgDealt: 1.2, stamRegen: 1.06, stamCost: 0.95 }, cls: 'hero', req: [], ico: 'dmg' }
+    { id: 'sifa', name: 'Şifalı Eller', cost: 2, desc: 'Sağlık ekipmanları kalıcı olarak %25 daha güçlü iyileştirir: bandaj %10 yerine %12,5, medkit %50 yerine %62,5 can yeniler. Şifa Hilali de aynı oranda güçlenir.', buff: { healMul: 1.25 }, cls: 'hero', req: [], ico: 'heal' },
+    { id: 'hisim', name: 'Kor Hışım', cost: 2, desc: 'Verdiğin hasar %20 artar (kılıç, ok, bomba, ışın). Yan etki olarak dayanıklılık %6 daha hızlı yenilenir, siper ve prizma ışını %5 daha az yorar.', buff: { dmgDealt: 1.2, stamRegen: 1.06, stamCost: 0.95 }, cls: 'hero', req: [], ico: 'dmg' }
   ];   // yeni beceri eklemek için buraya bir kayıt + ağaçtaki düğüm konumu yeterli · cls: 'hero' (Halaskar) | 'sword' (Kılıç) | 'bow' (Yay) · req: önce açık olması gereken becerilerin id'leri (Güçlendirmeler sayfasında bağlantı çizgisi olarak görünür; sınıflar arası da olabilir)
   const skM = n => { let m = 1; for (const q of SKILLS) if (SK.own[q.id] && q.buff[n] !== undefined) m *= q.buff[n]; return m; };   // beceri çarpanları (gearM ile birlikte okunur)
   const skSpent = () => SKILLS.reduce((a, q) => a + (SK.own[q.id] ? q.cost : 0), 0);
@@ -3866,6 +3866,14 @@
     // çan sesi dalgaları
     if (tol > 0) for (let i = 0; i < 3; i++) { const u = clamp((1 - tol) * 1.3 - i * 0.13, 0, 1); if (u <= 0 || u >= 1) continue; c.strokeStyle = `rgba(${gcol},${0.55 * (1 - u)})`; c.lineWidth = 1.6; c.beginPath(); c.ellipse(bodyX + 2.5, -54 + dip, 22 + u * 60, 28 + u * 74, 0, 0, TAU); c.stroke(); }
     c.restore();
+    bellBar(e, em, e.y - 156, 34, 3);
+  }
+  function bellBar(e, em, by, bw, bh) {   // çancı / çan kafa can çubuğu: diğer düşmanlarla aynı mantık (yumuşak akar, hasar alınca belirir, ölürken gizlenir)
+    e.bd = e.bd === undefined ? e.hp / e.max : e.bd + (e.hp / e.max - e.bd) * 0.16;
+    if (e.st === 'die' || e.bd >= 0.995 || em < 0.5) return;
+    const rg = e.rage, k = clamp(1 - e.bd / 0.6, 0, 1), ink = light ? [0, 0, 0] : [255, 255, 255], bx = e.x - bw / 2, col = [0, 1, 2].map(j => Math.round(lerp(ink[j], [255, 100, 80][j], rg ? 1 : k))).join(',');
+    ctx.save(); ctx.globalAlpha = clamp((1 - e.bd) * 8, 0, 1) * 0.95; rr(bx, by, bw, bh, bh / 2); ctx.clip();
+    ctx.fillStyle = `rgba(${light ? '0,0,0' : '255,255,255'},0.16)`; ctx.fillRect(bx, by, bw, bh); ctx.fillStyle = `rgba(${col},0.92)`; ctx.fillRect(bx, by, bw * clamp(e.bd, 0, 1), bh); ctx.restore();
   }
   const ball0 = (ir, fl) => fl ? '#fff' : ir;
   function drawBellet(e, fg) {
@@ -3885,6 +3893,7 @@
     blDot(c, 0, 0.6, 11, 2.4, dk); blBell(c, 10.5, 24, P, 52);
     if (!fl) { blDot(c, -3.2, -11, 1.8, 2.4, dk); blDot(c, 3, -11.4, 1.2, 1.7, dk); blDot(c, -3, -10.6, 0.7, 0.9, wk ? '#6d5a3a' : ember); blDot(c, 3.1, -11, 0.5, 0.7, wk ? '#6d5a3a' : ember); }
     c.restore(); c.restore();
+    bellBar(e, em, e.y - 54, 20, 2.4);
   }
   // Rehber / geliştirici önizlemesi için bağımsız daire çizimi kullanır: drawBellCircle({x, y, r, t})
 
@@ -5248,7 +5257,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   const UIF = '-apple-system, "Segoe UI", Roboto, sans-serif';
   addEventListener('pointermove', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });
   addEventListener('pointerdown', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });   // dokunmatik: imleç olmadığı için dokunulan yere de bakar
-  function menuStart(cont) { if (!MENU.on || MENU.st !== 'idle') return; if (cont === true && SAVED) loadGame(SAVED); else newGame(); MENU.st = 'go'; try { AU.intro(); } catch (_) {} MENU.mode = Math.random() < 0.1 ? 'stab' : 'zoom'; MENU.sT = 0; MENU.snd = 0; MENU.fl = 1; if (MENU.mode === 'zoom') { try { AU.sfx('pickup'); } catch (_) {} } }   // çoğunlukla yakınlaşma; %10 ihtimalle kılıç saplanması (gizli)
+  // menuStart: yeni oyun başlayınca eski kayıt silinir; devam düğmesi yeni oyunun ilk kaydından sonra (kamp / ana menüden çıkış) açılır
+  function menuStart(cont) { if (!MENU.on || MENU.st !== 'idle') return; if (cont === true && SAVED) loadGame(SAVED); else { newGame(); try { localStorage.removeItem(SAVE_KEY); } catch (_) {} SAVED = null; } MENU.st = 'go'; try { AU.intro(); } catch (_) {} MENU.mode = Math.random() < 0.1 ? 'stab' : 'zoom'; MENU.sT = 0; MENU.snd = 0; MENU.fl = 1; if (MENU.mode === 'zoom') { try { AU.sfx('pickup'); } catch (_) {} } }   // çoğunlukla yakınlaşma; %10 ihtimalle kılıç saplanması (gizli)
   function menuTap(px, py) { if (MENU.st !== 'idle') return false; for (const b of MENU.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return true; } return false; }
   function menuPill(x, y, w, h, label, a, strong, t, tint) {   // tint: isteğe bağlı renk ('r,g,b') — farklı renkli düğme
     ctx.save(); ctx.globalAlpha *= a; rr(x, y, w, h, h / 2);
@@ -5937,7 +5947,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     }
     { const cf = (PAUSE.cfT || 0) > 0;   // ANA MENÜ: kırmızı, en altta ayrı · yanlışlıkla basılmasın diye ilk dokunuş onay ister (2,5 sn), ikincisi menüye döner
       y += oh + 30 * u; menuPill(bx0, y, bw, oh, cf ? 'EMİN MİSİN?' : 'ANA MENÜ', 1, false, 0, '224,88,74');
-      PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} location.reload(); } else PAUSE.cfT = 2.5; } }); }
+      PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); location.reload(); }   // çıkarken kaydet: devam, bu oyunun kaldığı kamptan açılır
+         else PAUSE.cfT = 2.5; } }); }
     {   // sağ üst: küçük simge düğmeleri · solda bilgi (Rehber), sağda ayarlar (ses)
       const ir = 19, iy = UI_TOP + 24, sx2 = W - 16 - ir, ix2 = sx2 - 2 * ir - 10;
       const icon = (x, kind, fn) => {
