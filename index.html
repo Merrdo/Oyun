@@ -55,8 +55,10 @@
   let W = 0, H = 0, DPR = 1;
   let SEED = 0;   // harita tohumu: her yeni oyunda rastgele; hashN ile üretilen her şey (heykel, sandık, kamp, harabe) buna bağlıdır
   const cam = { x: 0, y: 0 };
+  let ZT = 1, ZOOM = 1;   // dünya yakınlaştırması: ZT hedef (yatayda <1 = uzak kamera), ZOOM o an kullanılan (ana menüde 1)
+  const camCX = () => W / ZT / 2, camCY = () => H / ZT / 2;   // kameranın oyuncuyu ortalayan yarı görüş alanı (dünya birimi)
   const atk = { id: null, down: false, kb: false, x: 0, y: 0, r: 42, vis: 0, rip: 0, was: false, spin: 0 };   // saldırı butonu (vis: 0 = yok, 1 = tam görünür)
-  const setBase = () => ctx.setTransform(DPR, 0, 0, DPR, -cam.x * DPR, -cam.y * DPR);   // dünya -> ekran
+  const setBase = () => ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -cam.x * DPR * ZOOM, -cam.y * DPR * ZOOM);   // dünya -> ekran
 
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -72,12 +74,17 @@
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    cam.x = player.x - W / 2; cam.y = player.y - H / 2;
+    // yatay: kamerayı biraz uzaklaştır (görüş yüksekliği ~460 birim; eskiden 520, biraz yakınlaştırıldı); dikey: eskisi gibi 1:1
+    ZT = W > H ? clamp(H / 460, 0.7, 1) : 1; ZOOM = ZT;
+    // HUD: sol panel ile sağ düğme aynı kenar boşluğunda (çentik/yuvarlak köşe güvenli alanı dahil), yatayda üst boşluk küçük
+    const cs = getComputedStyle(probe), sal = parseFloat(cs.paddingLeft) || 0, sar = parseFloat(cs.paddingRight) || 0;
+    HUD_M = Math.max(12, sal, sar); HUD_Y = W > H ? 38 : 66; HUD_S = W > H ? clamp(H / 300, 1.25, 1.6) : 1;   // yatayda HUD yazıları/panelleri büyütülür
+    cam.x = player.x - camCX(); cam.y = player.y - camCY();
   }
 
   /* ---------- Hata ayıklama bilgisi (açık zemin modunda görünür) ---------- */
   const probe = document.createElement('div');
-  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100vh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);pointer-events:none;visibility:hidden';
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100vh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);pointer-events:none;visibility:hidden';
   document.body.appendChild(probe);
   function debugLines() {
     const sab = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
@@ -123,7 +130,7 @@
     if (MENU.on && PAUSE.on) { pauseDown(e); return; }   // ana menüden açılan kıyafet sayfası
     if (MENU.on) { menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
     if (PAUSE.on) { pauseDown(e); return; }   // duraklatılmışken dokunuşlar yalnızca menüye gider
-    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r + 14) { togglePause(); return; }   // duraklatma düğmesi
+    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r * HUD_S + 14) { togglePause(); return; }   // duraklatma düğmesi
     if (atk.id === null && atkActive() && Math.hypot(e.clientX - atk.x, e.clientY - atk.y) < atk.r + 14) {   // buton joystick'ten önceliklidir
       atk.id = e.pointerId; atk.down = true; pressAtk();
       try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1398,7 +1405,7 @@
       if (k !== 'hit') { for (let i = 0; i < 6; i++) { const a = i * 1.047 + 0.4, r0 = 6 + 14 * u, r1 = r0 + 7; ctx.beginPath(); ctx.moveTo(F.fx.x + Math.cos(a) * r0, F.fx.y + Math.sin(a) * r0); ctx.lineTo(F.fx.x + Math.cos(a) * r1, F.fx.y + Math.sin(a) * r1); ctx.stroke(); } }
     }
   }
-  const HUD_Y = 66;   // sol üst profil paneli ile sağ üst düğme aynı yatay hizada
+  let HUD_Y = 66, HUD_M = 12, HUD_S = 1;   // HUD_S: HUD ölçeği (yatayda büyür) · sol üst profil paneli ile sağ üst düğme aynı yatay hizada ve aynı kenar boşluğunda (resize'da güncellenir)
   const HB = { hp: 1, lag: 1, mx: 1, du: 1, low: 0 };   // karakter barı: yumuşak akan can/dayanıklılık, gecikmeli iz
   function hudHeart(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + 3.2 * s); ctx.bezierCurveTo(x - 6 * s, y - 1.5 * s, x - 3 * s, y - 5.5 * s, x, y - 2 * s); ctx.bezierCurveTo(x + 3 * s, y - 5.5 * s, x + 6 * s, y - 1.5 * s, x, y + 3.2 * s); ctx.fill(); }
   function hudShield(x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y - 4 * s); ctx.lineTo(x + 4 * s, y + 0.5 * s); ctx.quadraticCurveTo(x + 4 * s, y + 4 * s, x, y + 5.5 * s); ctx.quadraticCurveTo(x - 4 * s, y + 4 * s, x - 4 * s, y + 0.5 * s); ctx.closePath(); ctx.fill(); }
@@ -1436,8 +1443,9 @@
     const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0';
     HB.hp += (clamp(F.hp / 100, 0, ELIX_HP / 100) - HB.hp) * 0.25; HB.mx += (clamp(F.hpMax / 100, 1, ELIX_HP / 100) - HB.mx) * 0.12; HB.lag += (HB.hp - HB.lag) * 0.05; if (HB.lag < HB.hp) HB.lag = HB.hp; HB.du += (clamp(F.dur / 100, 0, 1) - HB.du) * 0.25;
     const low = F.hp > 0 && F.hp < 30 ? 1 : 0; HB.low += (low - HB.low) * 0.1; const pulse = 0.5 + 0.5 * Math.sin(F.time * 7) ;
-    const X = 10, R = 22, Y = HUD_Y - R - 2, cx = X + R + 2, cy = Y + R + 2, bx = cx + R + 9, bw = 104, ex = (bw - 13 - 22) * (HB.mx - 1);   // ex: iksirin uzattığı çubuk payı
+    const X = HUD_M + 7, R = 22, Y = HUD_Y - R - 2, cx = X + R + 2, cy = Y + R + 2, bx = cx + R + 9, bw = 104, ex = (bw - 13 - 22) * (HB.mx - 1);   // ex: iksirin uzattığı çubuk payı
     ctx.save();
+    if (HUD_S !== 1) { const oy = HUD_Y - 29; ctx.translate(HUD_M, oy); ctx.scale(HUD_S, HUD_S); ctx.translate(-HUD_M, -oy); }   // panel sol üst köşesinden büyür
     // panel
     ctx.fillStyle = `rgba(${bgc},0.42)`; rr(X - 7, Y - 5, bx + bw - X + 15 + ex, R * 2 + 14, 13); ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.14)`; ctx.stroke();
     // portre çerçevesi (can azalınca kırmızı nabız)
@@ -1484,18 +1492,19 @@
       ctx.font = `600 9.5px ${UIF}`; ctx.textAlign = 'right'; ctx.fillStyle = `rgba(${fg},0.5)`; ctx.fillText(LVL.lv >= LV_MAX ? 'MAX' : Math.floor(pr * 100) + '%', bx + bw, ry + 0.5);
       ctx.restore();
       const tg = LVL.tAt ? performance.now() - LVL.tAt : 1e9;   // seviye atlama yazısı
-      if (tg < 2600 && !MENU.on) { const a = Math.min(1, tg / 250) * Math.min(1, (2600 - tg) / 500), yy = HUD_Y + 116 - (1 - Math.min(1, tg / 250)) * 6; ctx.save(); ctx.globalAlpha = a; dvText('SEVİYE ' + LVL.lv, W / 2, yy, 15, 600, GOLDRGB, 1, 6, 'center'); dvText('+' + (LVL.tGain || 1) + ' Göz Yaşı Puanı', W / 2, yy + 20, 12, 500, tl, 1, 1.2, 'center'); ctx.restore(); }
+      if (tg < 2600 && !MENU.on) { const a = Math.min(1, tg / 250) * Math.min(1, (2600 - tg) / 500), yy = HUD_Y + 116 + 20 * (HUD_S - 1) - (1 - Math.min(1, tg / 250)) * 6, q = HUD_S; ctx.save(); if (q !== 1) { const oy = HUD_Y - 29; ctx.translate(HUD_M, oy); ctx.scale(1 / q, 1 / q); ctx.translate(-HUD_M, -oy); }   // panelin büyütmesini geri al: yazı ekran ortasında kalır
+        ctx.globalAlpha = a; dvText('SEVİYE ' + LVL.lv, W / 2, yy, 15 * q, 600, GOLDRGB, 1, 6 * q, 'center'); dvText('+' + (LVL.tGain || 1) + ' Göz Yaşı Puanı', W / 2, yy + 20 * q, 12 * q, 500, tl, 1, 1.2 * q, 'center'); ctx.restore(); }
     }
     ctx.restore();
-    if (G.has && (F.guarding || F.dur < 100)) { const sx = player.x - cam.x, sy = player.y - cam.y + 13; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
+    if (G.has && (F.guarding || F.dur < 100)) { const sx = (player.x - cam.x) * ZOOM, sy = (player.y - cam.y) * ZOOM + 13 * ZOOM; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
   }
   function drawPauseBtn(fg, dt) {   // sağ üst: duraklatma düğmesi; çevresindeki ince yay saniyeleri süpürür
-    const b = AU.btn; b.x = W - 34; b.y = HUD_Y;
+    const b = AU.btn; b.x = W - HUD_M - b.r * HUD_S; b.y = HUD_Y + 29 * (HUD_S - 1);
     b.pop = Math.max(0, b.pop - dt * 2.2); b.ring = Math.max(0, b.ring - dt * 2.2);
     const u = 1 - b.pop, sc = 1 + 0.2 * b.pop * Math.sin(u * 10);
     ctx.save(); ctx.translate(b.x, b.y);
-    if (b.ring > 0.01) { const k = 1 - b.ring; ctx.globalAlpha = 0.5 * b.ring; ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6 * b.ring + 0.4; ctx.beginPath(); ctx.arc(0, 0, b.r + 26 * k, 0, TAU); ctx.stroke(); }
-    ctx.scale(sc, sc); ctx.globalAlpha = 0.6 + 0.35 * b.pop;
+    if (b.ring > 0.01) { const k = 1 - b.ring; ctx.globalAlpha = 0.5 * b.ring; ctx.strokeStyle = `rgba(${fg},0.9)`; ctx.lineWidth = 1.6 * b.ring + 0.4; ctx.beginPath(); ctx.arc(0, 0, (b.r + 26 * k) * HUD_S, 0, TAU); ctx.stroke(); }
+    ctx.scale(sc * HUD_S, sc * HUD_S); ctx.globalAlpha = 0.6 + 0.35 * b.pop;
     ctx.fillStyle = `rgba(${fg},0.07)`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
     ctx.strokeStyle = `rgba(${fg},0.2)`; ctx.lineWidth = 1.2; ctx.stroke();
     const sw = (TM.t % 60) / 60; if (sw > 0.002) { ctx.strokeStyle = `rgba(${fg},0.6)`; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, 0, b.r, -PI / 2, -PI / 2 + TAU * sw); ctx.stroke(); }
@@ -2255,7 +2264,7 @@
   function devGoCamp() {
     let b = null, bd = 1e12; for (const c of campsIn(player.x - 7000, player.y - 7000, player.x + 7000, player.y + 7000)) { if (c.ruin) continue; const d = Math.hypot(c.x - player.x, c.y - player.y); if (d > 220 && d < bd) { bd = d; b = c; } }
     if (!b) { devToast('Yakında kamp yok'); return; }
-    player.x = b.x - b.fl * 10; player.y = b.y + 100; player.vx = player.vy = 0; cam.x = player.x - W / 2; cam.y = player.y - H / 2; devToast('Kampa ışınlandın');
+    player.x = b.x - b.fl * 10; player.y = b.y + 100; player.vx = player.vy = 0; cam.x = player.x - camCX(); cam.y = player.y - camCY(); devToast('Kampa ışınlandın');
   }
   /* --- kamp çizimi: zemin (parıltı + taş halka) ve sıralı nesneler (ateş, tezgah, çadır, fener, yatak, çanta, kasalar) --- */
   const campFlare = (x, y, r) => { let m = 1e9; for (const e of E) if (e.em >= 1) { const d = Math.hypot(e.x - x, (e.y - y) / CAMP_KY); if (d < m) m = d; } return clamp(1 - (m - r) / 170, 0, 1); };   // düşman yaklaştıkça mühür parlar
@@ -2738,15 +2747,15 @@
       ctx.restore();
     }
     if (CAMP.ban > 0) {
-      CAMP.ban -= dt; const a = Math.min(1, CAMP.ban / 0.8) * Math.min(1, (3 - CAMP.ban) / 0.5), by = HUD_Y + 84;
-      ctx.save(); ctx.globalAlpha = Math.max(0, a); dvText('KAMP', W / 2, by, 15, 500, GOLDRGB, 1, 6, 'center'); dvText('mühürlü alan', W / 2, by + 20, 11.5, 400, fg, 0.55, 1, 'center'); ctx.restore();
+      CAMP.ban -= dt; const a = Math.min(1, CAMP.ban / 0.8) * Math.min(1, (3 - CAMP.ban) / 0.5), by = HUD_Y + 56 + 28 * HUD_S, q = HUD_S;
+      ctx.save(); ctx.globalAlpha = Math.max(0, a); dvText('KAMP', W / 2, by, 15 * q, 500, GOLDRGB, 1, 6 * q, 'center'); dvText('mühürlü alan', W / 2, by + 20 * q, 11.5 * q, 400, fg, 0.55, 1, 'center'); ctx.restore();
     }
     const need = INV.herb >= RECIPE.herb && INV.resin >= RECIPE.resin && INV.medk < HEAL_CAP.medk;
     CAMP.arrow += ((need && !CAMP.in && CAMP.seen.size ? 1 : 0) - CAMP.arrow) * (1 - Math.exp(-6 * dt));
     if (CAMP.arrow > 0.02) {
       let b = null, bd = 1e12; for (const c of CAMP.seen.values()) { const d = Math.hypot(c.x - player.x, c.y - player.y); if (d < bd) { bd = d; b = c; } }
       if (b) {
-        const sx = b.x - cam.x, sy = b.y - cam.y;
+        const sx = (b.x - cam.x) * ZOOM, sy = (b.y - cam.y) * ZOOM;
         if (!(sx > -40 && sx < W + 40 && sy > -40 && sy < H + 40)) {
           const dx = sx - W / 2, dy = sy - H / 2, k = Math.min((W / 2 - 34) / Math.abs(dx || 1e-3), (H / 2 - 120) / Math.abs(dy || 1e-3)), ax = W / 2 + dx * k, ay = H / 2 + dy * k, ang = Math.atan2(dy, dx);
           ctx.save(); ctx.globalAlpha = CAMP.arrow * (0.55 + 0.35 * Math.sin(CAMP.t * 3)); ctx.translate(ax, ay); ctx.rotate(ang);
@@ -4754,7 +4763,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   }
   function drawDevHp(fg, dt) {
     if (!(DEV.on && DEV.hpbtn)) { DEVH.r.dmg = DEVH.r.heal = null; return; }
-    const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0', bw = 50, bh = 26, y0 = HUD_Y + 34, xH = W - 10 - bw, xD = xH - 8 - bw;
+    const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0', bw = 50, bh = 26, y0 = HUD_Y + 29 * (HUD_S - 1) + 20 * HUD_S + 14, xH = W - HUD_M - bw, xD = xH - 8 - bw;
     DEVH.r.dmg = { x: xD, y: y0, w: bw, h: bh }; DEVH.r.heal = { x: xH, y: y0, w: bw, h: bh };
     ctx.save(); ctx.font = `700 12px ${UIF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const k of ['dmg', 'heal']) {
@@ -4773,6 +4782,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     HEAL.ha += ((u ? 1 : 0) - HEAL.ha) * (1 - Math.exp(-(u ? 14 : 7) * dt)); if (HEAL.ha < 0.01) { HEAL.ha = 0; return; }
     const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0', a = HEAL.ha, pw = 152, ph = 24, x0 = W / 2 - pw / 2, y0 = HUD_Y + 34, cy = y0 + ph / 2;
     ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * -6);
+    if (HUD_S !== 1) { ctx.translate(W / 2, y0); ctx.scale(HUD_S, HUD_S); ctx.translate(-W / 2, -y0); }   // üst orta: yukarıdan büyür
     ctx.fillStyle = `rgba(${bgc},0.42)`; rr(x0, y0, pw, ph, ph / 2); ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.14)`; ctx.stroke();
     drawItemIcon(HEAL.hk, x0 + 15, cy + 0.5, 0.6);
     const bx = x0 + 31, bw = pw - 31 - 38, wrap = HEAL.hph === 'wrap', col = HEAL.hit > 0.05 ? `rgb(${Math.round(lerp(79, 228, HEAL.hit))},${Math.round(lerp(176, 96, HEAL.hit))},${Math.round(lerp(108, 79, HEAL.hit))})` : wrap ? `rgba(${fg},0.85)` : GCOL.green;
@@ -4970,8 +4980,9 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   }
   function drawBowHud(fg) {   // sol üst panelin altında: yay + kalan ok + doluluk çubuğu
     const B = BOW; if (!B.has || B.vv < 0.02) return;
-    const bgc = light ? '242,242,242' : '0,0,0', red = light ? '214,40,40' : '255,64,56', low = B.ammo <= 3, X = 10, Y = 100, w = 96, h = 22;
+    const bgc = light ? '242,242,242' : '0,0,0', red = light ? '214,40,40' : '255,64,56', low = B.ammo <= 3, X = HUD_M, Y = HUD_Y - 29 + 58 * HUD_S + 5, w = 96, h = 22;   // büyüyen panelin hemen altı
     ctx.save(); ctx.globalAlpha = clamp(B.vv, 0, 1);
+    if (HUD_S !== 1) { ctx.translate(X, Y); ctx.scale(HUD_S, HUD_S); ctx.translate(-X, -Y); }
     ctx.fillStyle = `rgba(${bgc},0.42)`; rr(X, Y, w, h, 11); ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.14)`; ctx.stroke();
     drawBowShape(X + 14, Y + h / 2, -PI / 4, 0.62, { col: `rgba(${fg},0.9)`, bg: light ? '#f2f2f2' : '#000' });
     ctx.font = `700 12px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = low ? `rgb(${red})` : `rgb(${fg})`;
@@ -5284,16 +5295,18 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   const T = 72;
   const hsh = (x, y, k) => { let h = (x * 374761393 + y * 668265263 + k * 1274126177) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
   function drawWorld(fg) {
-    const x0 = Math.floor(cam.x / T), x1 = Math.floor((cam.x + W) / T), y0 = Math.floor(cam.y / T), y1 = Math.floor((cam.y + H) / T);
+    const z = ZOOM, VW = W / z, VH = H / z;
+    ctx.save(); ctx.scale(z, z);
+    const x0 = Math.floor(cam.x / T), x1 = Math.floor((cam.x + VW) / T), y0 = Math.floor(cam.y / T), y1 = Math.floor((cam.y + VH) / T);
     for (let iy = y0; iy <= y1; iy++) for (let ix = x0; ix <= x1; ix++) {
       const px = ix * T - cam.x, py = iy * T - cam.y, a = hsh(ix, iy, 1);
       if (a > 0.45) { ctx.fillStyle = `rgba(${fg},${(a - 0.45) * 0.07})`; ctx.fillRect(px, py, T, T); }   // bazı karolar biraz daha açık
       if (hsh(ix, iy, 2) < 0.38) { const d = 1 + hsh(ix, iy, 5) * 1.2; ctx.fillStyle = `rgba(${fg},0.2)`; ctx.fillRect(px + 6 + hsh(ix, iy, 3) * (T - 12), py + 6 + hsh(ix, iy, 4) * (T - 12), d, d); }
     }
-    ctx.strokeStyle = `rgba(${fg},0.07)`; ctx.lineWidth = 1; ctx.beginPath();
-    for (let ix = x0; ix <= x1 + 1; ix++) { const x = ix * T - cam.x; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
-    for (let iy = y0; iy <= y1 + 1; iy++) { const y = iy * T - cam.y; ctx.moveTo(0, y); ctx.lineTo(W, y); }
-    ctx.stroke();
+    ctx.strokeStyle = `rgba(${fg},0.07)`; ctx.lineWidth = 1 / z; ctx.beginPath();
+    for (let ix = x0; ix <= x1 + 1; ix++) { const x = ix * T - cam.x; ctx.moveTo(x, 0); ctx.lineTo(x, VH); }
+    for (let iy = y0; iy <= y1 + 1; iy++) { const y = iy * T - cam.y; ctx.moveTo(0, y); ctx.lineTo(VW, y); }
+    ctx.stroke(); ctx.restore();
   }
 
   /* ---------- Ana menü: Halaskâr uyanır · arada sırada kılıç belirir · Başla'da kılıç kafaya saplanır ve ekran kararır ---------- */
@@ -5463,7 +5476,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const k in OWN) delete OWN[k]; (sv.own || []).forEach(k => { if (GEAR[k]) OWN[k] = true; }); gearSanitize();
     if (sv.sword) { G.has = true; G.eq = 1; G.item = null; G.spawnT = 1e9; }
     if (sv.bow >= 0) { BOW.has = true; BOW.ammo = Math.min(BOW_MAX, sv.bow | 0); }
-    player.x = sv.x; player.y = sv.y; player.vx = player.vy = 0; cam.x = player.x - W / 2; cam.y = player.y - H / 2; G.px = player.x; G.py = player.y - 15;
+    player.x = sv.x; player.y = sv.y; player.vx = player.vy = 0; cam.x = player.x - camCX(); cam.y = player.y - camCY(); G.px = player.x; G.py = player.y - 15;
     F.hp = 100; F.hpMax = 100; F.dur = 100; TM.t = isFinite(sv.t) ? sv.t : 0;   // kampta dinlenilmiş sayılır: can dolu
     (sv.evDead || []).forEach(id => { const s = evState(id); s.dead = true; s.dying = -1; s.hp = 0; });
     (sv.chDead || []).forEach(id => { const s = chState(id, false); s.dead = true; s.gone = true; s.dying = -1; s.dd = 0; s.hp = 0; });
@@ -5500,8 +5513,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawTimer(fg, dt) {   // her rakam değişirken yukarı kayarak yenilenir, iki nokta saniyede bir nabız atar
     const str = fmtTime(TM.t), prev = TM.str;
     if (str !== prev) { for (let i = 1; i <= str.length; i++) { const c = str[str.length - i], o = prev ? prev[prev.length - i] : ''; if (c !== o) { TM.old[i] = o || ''; TM.rc[i] = 1; } } TM.str = str; }
-    ctx.save(); ctx.font = `500 17px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = AU.btn.x - AU.btn.r - 16; const y = HUD_Y + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
+    ctx.save(); ctx.font = `500 ${17 * HUD_S}px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = AU.btn.x - AU.btn.r * HUD_S - 16 * HUD_S; const y = HUD_Y + 29 * (HUD_S - 1) + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
     ctx.shadowColor = `rgba(${bgc},0.9)`; ctx.shadowBlur = 5;
     for (let i = 1; i <= str.length; i++) {
       const c = str[str.length - i], col = c === ':', w = col ? cw : dw, cx = x - w / 2; x -= w;
@@ -5974,6 +5987,42 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (PAUSE.page === 'skills') { drawSkillsPage(u, cx, dt, fg, bgRGB, over); ctx.restore(); return; }
     if (PAUSE.page === 'powers') { drawPowersPage(u, cx, dt, fg, bgRGB, over); ctx.restore(); return; }
     if (PAUSE.page === 'settings') { drawSettingsPage(u, cx, fg); ctx.restore(); return; }
+    const land = W > H * 1.05;   // YATAY: sol sütunda başlık + süre, sağ sütunda düğmeler (dikey ekranda eski tek sütun düzeni)
+    if (land) {
+      const ls = clamp(H / 390, 0.8, 1.3), M = Math.max(HUD_M, 16), colW = W / 2 - M, cxL = M + colW / 2, cxR = W / 2 + colW / 2;
+      const top = 16 + 19 * 2 + 8;   // sağ üstteki simge düğmelerinin altı
+      let bh = 46 * ls, oh = 38 * ls, g1 = 14 * ls, g2 = 8 * ls, g3 = 18 * ls;
+      const nExtra = (DEV.anycraft ? 1 : 0) + (DEV.on ? 1 : 0);
+      let total = bh + g1 + oh + g2 + oh + nExtra * (g2 + oh) + g3 + oh;
+      const k = Math.min(1, (H - 10 - top) / total); if (k < 1) { bh *= k; oh *= k; g1 *= k; g2 *= k; g3 *= k; total *= k; }
+      const y0 = Math.max(top, (H - total) / 2), midY = y0 + total / 2;
+      // sol sütun: başlık · süre · "geçen süre"
+      const titleH = 16 * ls, gapA = 10 * ls, timeH = 54 * ls, gapB = 6 * ls, lblH = 14 * ls, blockH = titleH + gapA + timeH + gapB + lblH;
+      let ty = midY - blockH / 2;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * ls + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
+      { const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cxL - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, ty + 14 * ls); lx += ctx.measureText(c).width + sp; } }
+      ty += titleH + gapA; ctx.textAlign = 'center'; ctx.font = `200 ${54 * ls}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(TM.t), cxL, ty + 44 * ls);
+      ty += timeH + gapB; ctx.font = `400 ${11 * ls + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('geçen süre', cxL, ty + 12 * ls);
+      // iki sütun arasında ince ayraç
+      ctx.save(); ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W / 2, y0); ctx.lineTo(W / 2, y0 + total); ctx.stroke(); ctx.restore();
+      // sağ sütun: düğmeler
+      PAUSE.btns.length = 0; PAUSE.sl.length = 0;
+      const bw = Math.min(colW * 0.82, 300), og = 10, ow = (bw - og) / 2, bx0 = cxR - bw / 2; let y = y0;
+      menuPill(bx0, y, bw, bh, 'DEVAM ET', 1, true, performance.now() / 1000); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: bh + 8, fn: resumeGame });
+      y += bh + g1;
+      menuPill(bx0, y, ow, oh, 'ENVANTER', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: ow, h: oh + 8, fn: () => invEnter('main') });
+      menuPill(bx0 + ow + og, y, ow, oh, 'KIYAFET', 1, false, 0); PAUSE.btns.push({ x: bx0 + ow + og, y: y - 4, w: ow, h: oh + 8, fn: wdEnter });
+      y += oh + g2; menuPill(bx0, y, bw, oh, 'GÜÇLENDİRMELER', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: powersEnter });
+      if (DEV.anycraft) { y += oh + g2; menuPill(bx0, y, bw, oh, 'CRAFT', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: craftEnter }); }
+      if (DEV.on) {
+        y += oh + g2; menuPill(bx0, y, bw, oh, 'GELİŞTİRİCİ AYARLARI', 1, false, 0); ctx.save(); rr(bx0, y, bw, oh, oh / 2); ctx.strokeStyle = 'rgba(240,194,74,0.6)'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
+        PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { PAUSE.page = 'dev'; } });
+      }
+      { const cf = (PAUSE.cfT || 0) > 0;
+        y += oh + g3; menuPill(bx0, y, bw, oh, cf ? 'EMİN MİSİN?' : 'ANA MENÜ', 1, false, 0, '224,88,74');
+        PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); location.reload(); }
+           else PAUSE.cfT = 2.5; } }); }
+    } else {
     const total = (316 + (DEV.on ? 50 : 0)) * u + 52; let y = Math.max(UI_TOP, (H - total) / 2 - H * 0.03);
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
     const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cx - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
@@ -5995,8 +6044,9 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       y += oh + 30 * u; menuPill(bx0, y, bw, oh, cf ? 'EMİN MİSİN?' : 'ANA MENÜ', 1, false, 0, '224,88,74');
       PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); location.reload(); }   // çıkarken kaydet: devam, bu oyunun kaldığı kamptan açılır
          else PAUSE.cfT = 2.5; } }); }
+    }   // /dikey düzen
     {   // sağ üst: küçük simge düğmeleri · solda bilgi (Rehber), sağda ayarlar (ses)
-      const ir = 19, iy = UI_TOP + 24, sx2 = W - 16 - ir, ix2 = sx2 - 2 * ir - 10;
+      const ir = 19, iy = land ? 16 + ir : UI_TOP + 24, sx2 = W - (land ? Math.max(HUD_M, 16) : 16) - ir, ix2 = sx2 - 2 * ir - 10;
       const icon = (x, kind, fn) => {
         ctx.save(); ctx.translate(x, iy); ctx.beginPath(); ctx.arc(0, 0, ir, 0, TAU); ctx.fillStyle = `rgba(${fg},0.06)`; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(${fg},0.28)`; ctx.stroke();
         ctx.strokeStyle = `rgba(${fg},0.88)`; ctx.fillStyle = `rgba(${fg},0.88)`; ctx.lineCap = 'round';
@@ -7071,6 +7121,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   let last = performance.now();
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05); last = now;
+    ZOOM = MENU.on ? 1 : ZT;   // ana menü 1:1 çizilir (kılıç/zemin ekran koordinatıyla çiziliyor)
     trnWatch();
     if (MENU.on && PAUSE.on) { try { AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
     if (MENU.on) { drawMenu(dt); trnDraw(dt); try { AU.update(dt, 0); } catch (_) {} requestAnimationFrame(frame); return; }
@@ -7117,7 +7168,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const bgCol = light ? '#f2f2f2' : '#0a0a0a';
     const fg = light ? '0,0,0' : '255,255,255';
     ctx.fillStyle = bgCol; ctx.fillRect(0, 0, W, H);
-    const ck = dmp(10, dt); cam.x += (player.x - W / 2 - cam.x) * ck; cam.y += (player.y - H / 2 - cam.y) * ck;   // kamera yumuşak takip
+    const ck = dmp(10, dt); cam.x += (player.x - W / ZOOM / 2 - cam.x) * ck; cam.y += (player.y - H / ZOOM / 2 - cam.y) * ck;   // kamera yumuşak takip
     cam.x += FX.ox; cam.y += FX.oy;   // kamera sarsıntısı
     drawWorld(fg);
     setBase();
@@ -7125,10 +7176,10 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     drawTele(fg);
 
     drawGroundGun(fg, light);
-    const campV = campsIn(cam.x - 400, cam.y - 400, cam.x + W + 400, cam.y + H + 400); drawCampGround(campV, fg);
+    const campV = campsIn(cam.x - 400, cam.y - 400, cam.x + W / ZOOM + 400, cam.y + H / ZOOM + 400); drawCampGround(campV, fg);
     const sfg = light ? '105,105,105' : '150,150,150';
-    const sObjs = statuesIn(cam.x - 80, cam.y - 20, cam.x + W + 80, cam.y + H + 140).map(([x, y, id, ev]) => ({ y, f: ev ? () => drawEvil(x, y, id, light) : () => drawStatue(x, y, SS, sfg, light) }));
-    const cObjs = chestsIn(cam.x - 80, cam.y - 20, cam.x + W + 80, cam.y + H + 140).map(([x, y, id, lk]) => ({ y, f: () => drawChest(x, y, id, lk, light) })).concat(LOOT.map(l => ({ y: l.y, f: () => drawLoot(l) })));
+    const sObjs = statuesIn(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, ev]) => ({ y, f: ev ? () => drawEvil(x, y, id, light) : () => drawStatue(x, y, SS, sfg, light) }));
+    const cObjs = chestsIn(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, lk]) => ({ y, f: () => drawChest(x, y, id, lk, light) })).concat(LOOT.map(l => ({ y: l.y, f: () => drawLoot(l) })));
     const eObjs = E.map(e => ({ y: e.y, f: () => drawEnemy(e, fg) })).concat(EP.map(p => ({ y: p.y, f: () => drawBolt(p, fg) }))), kObjs = campV.flatMap(c => campObjs(c, fg, light)), allO = sObjs.concat(eObjs, cObjs, kObjs).sort((a, b) => a.y - b.y);
     allO.filter(o => o.y < player.y).forEach(o => o.f());
     drawBowAim(fg);
