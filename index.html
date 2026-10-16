@@ -1076,7 +1076,7 @@
     // düğmeler
     const ba = clamp((T - 1.8) / 0.5, 0, 1) * A; DEATH.btns.length = 0; ctx.globalAlpha = 1;
     const bw = Math.min(pw, 260 * u + 20), bx = cx - bw / 2, bs = [];
-    bs.push([hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { sessionStorage.setItem('hlk_auto', hasSave ? 'c' : 'n'); } catch (_) {} location.reload(); }]);
+    bs.push([hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} location.reload(); }]);
     bs.push(['ANA MENÜ', false, () => { location.reload(); }]);
     bs.forEach(([lb, strong, fn], j) => { const by = btop + j * (bh + bgap); menuPill(bx, by, bw, bh, lb, ba, strong, T, strong ? undefined : red); DEATH.btns.push({ x: bx, y: by, w: bw, h: bh, fn }); });
     ctx.restore();
@@ -1109,8 +1109,9 @@
     const on = G.has && G.eq >= 1;
     for (let i = EDUST.length - 1; i >= 0; i--) { const p = EDUST[i]; if ((p.t += dt) >= p.life) { EDUST.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 1.5 * dt; p.vy *= 1 - 1.5 * dt; }
     if (DEV.peace) { E.length = 0; EP.length = 0; BC.length = 0; E.spawnT = 3; return; }   // barışçıl: yaratık yok, yeni yaratık gelmez
-    for (let i = E.length - 1; i >= 0; i--) if (E[i].src && Math.hypot(E[i].x - player.x, E[i].y - player.y) > 1500) E.splice(i, 1);
-    for (let i = E.length - 1; i >= 0; i--) { const q = E[i]; if (q.rm || (q.kind === 'sentinel' && q.st !== 'die' && Math.hypot(q.x - player.x, q.y - player.y) > 1100) || (q.kind === 'bellman' && Math.hypot(q.x - player.x, q.y - player.y) > 1400)) E.splice(i, 1); }
+    for (const q of E) if (q.keep && Math.hypot(q.x - player.x, q.y - player.y) < 1400) q.keep = false;   // kayıttan dönüşte korunan canavar oyuncuya yaklaşınca normal kurallara döner
+    for (let i = E.length - 1; i >= 0; i--) if (!E[i].keep && E[i].src && Math.hypot(E[i].x - player.x, E[i].y - player.y) > 1500) E.splice(i, 1);
+    for (let i = E.length - 1; i >= 0; i--) { const q = E[i]; if (q.rm || (!q.keep && q.kind === 'sentinel' && q.st !== 'die' && Math.hypot(q.x - player.x, q.y - player.y) > 1100) || (!q.keep && q.kind === 'bellman' && Math.hypot(q.x - player.x, q.y - player.y) > 1400)) E.splice(i, 1); }
     sentSpawn(dt, on); bellSpawn(dt, on); bellUpdate(dt);
     let nat = 0; for (const e of E) if (!e.src && e.kind === 'ghost') nat++;
     if (on && !CAMP.in && DEV.spawn.ghost !== false && nat < NAT_CAP && (E.spawnT -= dt) <= 0) {
@@ -5251,6 +5252,18 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     (sv.evDead || []).forEach(id => { const s = evState(id); s.dead = true; s.dying = -1; s.hp = 0; });
     (sv.chDead || []).forEach(id => { const s = chState(id, false); s.dead = true; s.gone = true; s.dying = -1; s.dd = 0; s.hp = 0; });
     (sv.looted || []).forEach(id => CAMP.looted.add(id));
+  }
+  /* Ölümden sonra 'KAYITTAN DEVAM': sayfa yenilenmez → canavarlar (E, EP) olduğu gibi kalır, ses bağlamı açık kalır (müzik kesilmeden devam eder). */
+  function reviveFromSave() {
+    const sv = SAVED; if (!sv) return;
+    loadGame(sv);
+    DEATH.on = false; DEATH.t = 0; DEATH.snap = null; DEATH.btns.length = 0;
+    Object.assign(F, { death: -1, dp: 0, fall: 1, ds: null, kd: -1, kp: 0, stag: 0, lx: 0, ly: 0, slow: 0, broken: 0, pt: -1, buf: false, down: false, hold: 0, guarding: false, gw: 0, bw: 0, sw: 0, lunge: 0, drop: 0, tx: 0, ty: 0, off: 0, squint: false, flash: 0, wince: 0, fx: null, hp: 100, dur: 100, tired: false });
+    joy.id = null; joy.active = false; joy.dx = joy.dy = 0; for (const k in keys) keys[k] = false;
+    try { if (atk.down || atk.kb) { atk.down = false; atk.kb = false; relAtk(); } atk.id = null; BOW.id = null; BOW.down = false; BOW.kb = false; BEAM.id = null; BEAM.down = false; BEAM.kb = false; beamCancel(0); BOW.st = 'idle'; BOW.ch = 0; BOW.full = false; BOW.hold = 0; } catch (_) {}
+    HEAL.use = null; CAMP.in = false; CAMP.c = null;
+    for (const e of E) e.keep = true;   // canavarlar uzakta kalsa da silinmez (aşağıdaki mesafe temizliği 'keep' olanları atlar)
+    last = performance.now(); try { AU.sfx('pickup'); } catch (_) {}
   }
   function saveCamp(announce) {
     const c = CAMP.last; if (!c || MENU.on || F.death >= 0) return;
