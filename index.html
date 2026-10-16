@@ -913,7 +913,7 @@
   }
   function hitEnemy(e, dmg, ang, ranged) {
     if (e.st === 'die' || e.st === 'mel') return;   // eriyip kayan Mum'a vurulmaz
-    dmg *= skM('dmgDealt');   // beceri: verilen hasar çarpanı (kılıç · ok · bomba · ışın hepsi buradan geçer)
+    dmg *= skM('dmgDealt') * lvDmgMul();   // beceri: verilen hasar çarpanı (kılıç · ok · bomba · ışın hepsi buradan geçer)
     if (e.ward > 0) { wardAbsorb(e, dmg, ang, ranged); return; }   // mum ışığının zırhı: önce zırh kırılmadan can düşmez
     const dealt = dmg * (e.st === 'rec' || e.st === 'dz' || e.wk > 0 ? BELL.weakMul : 1) * (e.kind === 'mimic' && e.rage ? 1.3 : 1); e.hp -= dealt; e.flash = 0.12; e.hz = e.armor ? 0.5 : 1; e.ha = ang; dmgNum(e.x, e.y - 58, dealt, e.st === 'rec' || e.wk > 0);   // soluklanırken vurulursa fazla hasar
     if (!e.armor && ranged !== 'soft') { e.stun = e.kind === 'mum' ? 0.15 : 0.35; e.st = 'chase'; e.t = 0; e.atk = ''; e.cd = e.kind === 'mum' ? Math.min(e.cd, 0.2) : Math.max(e.cd, 0.5); e.kx = Math.cos(ang) * 300 * (dmg < 20 ? 0.55 : 1) * (e.kind === 'mum' ? 0.65 : 1); e.ky = Math.sin(ang) * 300 * (dmg < 20 ? 0.55 : 1) * (e.kind === 'mum' ? 0.65 : 1); }
@@ -1032,15 +1032,16 @@
      3:50      Eriyen Mum'lar gelmeye başlar: aynı anda birden fazla olabilir (WV.mumCap'e kadar)
      5:00      BOSS ← NOT / YAPILACAK: henüz yok. Şimdilik oyun kuralları değişmeden devam eder (hepsi gelmeye devam eder).
                Boss eklenince updateEnemies içindeki «TODO(BOSS)» yerine bağlanacak. */
-  const WV = { bellAt: 150, mumAt: 230, bossAt: 300, ghBase: 3, ghPerSec: 0.125, ghMax: 34, ghInt0: 5, ghIntMin: 0.6, ghIntDrop: 0.03, bellQuick: 0.8, bellLateT: 7, bellLateP: 0.35, mumCap: 3, mumStep: 28, mumInt: [9, 15], entCap: 56 };
+  const WV = { bellAt: 150, mumAt: 230, bossAt: 300, ghBase: 3, ghPerSec: 0.09, ghMax: 28, ghInt0: 5, ghIntMin: 0.6, ghIntDrop: 0.03, bellQuick: 0.8, bellLateT: 7, bellLateP: 0.35, mumCap: 3, mumStep: 28, mumInt: [9, 15], entCap: 56 };
   let NAT_CAP = 3;                  // doğal olarak dolaşan en çok hortlak
   let E_DMG = 1, E_HP = 1;   // seviye arttıkça büyür (lvApply)
   const E_SPD = 1, E_WIND = 1, E_ATKS = 2, E_AIM = 1.12;   // hız · hasar · uyarı süresi çarpanı (düşük = daha hızlı saldırır) · can · aynı anda saldıran sayısı · isabet payı (vuruş alanı çarpanı; eski zorluk = 1, şimdi bir tık yüksek)
   /* ---------- SEVİYE (XP): düşmanlardan düşen XP kristalleri toplandıkça seviye atlanır; seviye arttıkça düşmanlar sertleşir (hasar +%8 · can +%12 · doğal sayı +1 / 3 sv · heykel dalgaları büyür) ---------- */
   const LVL = { lv: 1, xp: 0, bar: 0, pop: 0, up: 0 }, LV_MAX = 50;
-  const XP_GHOST = 5, XP_MIMIC = 30, XP_EVIL = 60, XP_COL = '#5fe0c0';
-  const xpNeed = lv => Math.round(20 + 15 * lv + 3 * lv * lv);   // 1→2: 38 · 2→3: 62 · 5→6: 170 · 10→11: 470
-  function lvApply() { const n = LVL.lv - 1; E_DMG = 1 + 0.08 * n; E_HP = 1 + 0.12 * n; NAT_CAP = 3 + Math.floor(n / 3); }
+  const XP_GHOST = 7, XP_MIMIC = 30, XP_EVIL = 60, XP_COL = '#5fe0c0';
+  const xpNeed = lv => Math.round((20 + 15 * lv + 3 * lv * lv) * (lv <= 4 ? 0.8 : 1));   // 1→2: 38 · 2→3: 62 · 5→6: 170 · 10→11: 470
+  const lvDmgMul = () => 1 + 0.07 * (LVL.lv - 1);   // silah hasarı seviyeyle doğru orantılı: her seviyede +%7 (kılıç · ok · bomba · ışın)
+  function lvApply() { const n = LVL.lv - 1; E_DMG = 1 + 0.04 * n; E_HP = 1 + 0.06 * n; NAT_CAP = 3 + Math.floor(n / 3); }
   function lvReset(lv, xp) { statReset(); LVL.lv = clamp(lv | 0 || 1, 1, LV_MAX); LVL.xp = Math.max(0, xp | 0); LVL.bar = 0; lvApply(); }
   function levelUp() { lvApply(); LVL.up = 1; try { AU.sfx('keyGet'); } catch (_) {} sparks(player.x, player.y - 30, 20, 260, 0, TAU); ftext(player.x, player.y - 84, 'Seviye ' + LVL.lv + '!', GOLD); SK.pts++; SK.pop = 1; { const nw = performance.now(); LVL.tGain = (LVL.tAt && nw - LVL.tAt < 2600 ? LVL.tGain : 0) + 1; LVL.tAt = nw; } hitFx(0.06, 3); }
   function addXp(v) {
@@ -2787,7 +2788,7 @@
   }
   function hitEvil(s, sx, sy, ang) {
     if (s.shield > 0) { sparks(sx + clamp(player.x - sx, -26, 26), sy - rnd(30, 70), 5, 200, ang + PI, 0.8); AU.sfx('arrowTink', sx, sy - 40); hitFx(0.04, 2); return; }   // kalkan açıkken hasar almaz
-    s.hp -= 20 * wpnDmg(); dmgNum(sx, sy - 90, 20 * wpnDmg()); s.hits = Math.min(5, Math.ceil((1 - Math.max(0, s.hp) / EV_HP) * 5 - 1e-6)); s.flash = 0.14; s.flare = 1; s.pulse = 1; s.barT = 3;
+    const sdmg = 20 * wpnDmg() * lvDmgMul(); s.hp -= sdmg; dmgNum(sx, sy - 90, sdmg); s.hits = Math.min(5, Math.ceil((1 - Math.max(0, s.hp) / EV_HP) * 5 - 1e-6)); s.flash = 0.14; s.flare = 1; s.pulse = 1; s.barT = 3;
     s.rv += Math.cos(ang) * 1.1 + rnd(-0.15, 0.15);                  // darbeyle sallanır
     s.spawnT = Math.min(s.spawnT, 0.55);                             // öfkelenir: hemen yaratık yollar
     const hx = sx + clamp(player.x - sx, -24, 24), hy = sy - rnd(22, 56), gy = sy + rnd(4, 14);
@@ -3185,7 +3186,7 @@
       if (s.hint <= 0) { s.hint = 2.5; ftext(x, y - 58, 'Zincirli · altın anahtar gerek', GOLD); }
       return;
     }
-    const h0 = s.hits, dmg = 20 * wpnDmg(); s.hp -= dmg; dmgNum(x, y - 50, dmg);
+    const h0 = s.hits, dmg = 20 * wpnDmg() * lvDmgMul(); s.hp -= dmg; dmgNum(x, y - 50, dmg);
     s.hits = Math.min(CH_HITS, Math.ceil((1 - Math.max(0, s.hp) / CH_HP) * CH_HITS - 1e-6)); s.lv += 16; s.glow = 1;
     sparks(hx, hy, 7, 220, ang, 0.9);
     for (let i = 0; i < 3 + s.hits; i++) wood(hx, hy, Math.cos(ang) * rnd(60, 200) + rnd(-50, 50), -rnd(60, 200), y + rnd(2, 12), rnd(2, 4.5), rnd(1.6, 3), [0, 3, 1][i % 3]);   // taze kırık ahşap parçaları da saçılır
@@ -5120,11 +5121,15 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
 
   /* ---------- MOR PRİZMA SİLAHLARI (craft ile üretilir)
        Prizma Oku     : yayla atılır; isabette 2 kıymığa bölünüp en yakın 2 düşmanı vurur. Önce prizma oku harcanır.
-       Prizma Bombası : fırlatılır, 1 sn sonra mor halka patlar (hasar 14 · yarıçap 90 · iter ve sersemletir). Oyuncuyu iter, hasar vermez.
-       Prizma Işını   : basılı tut → 0.35 sn odak → hattaki herkesi deler (saniyede ~3 × 7). Dayanıklılığı yer; biterse ısınır. Yürürken yavaşlatır. ---------- */
-  const PR_COL = PRISM_COL, PARR_CAP = 20, PBOMB_CAP = 5, BOMB_FUSE = 1.0, BOMB_R = 90, BEAM_LEN = 320, BEAM_FOCUS = 0.35;
+       Prizma Bombası : fırlatılır, 1 sn sonra mor halka patlar (hasar 110 · yarıçap 90 · iter ve sersemletir). Oyuncuyu iter, hasar vermez.
+       Prizma Işını   : basılı tut → 0.35 sn odak → hattaki herkesi deler ve eritir. İlk başta zayıf (5), basılı tuttukça birikir: hasar ×5, ışın 1→2→3→5, uzar, genişler, savurur. Dayanıklılığı yer; biterse ısınır. Yürürken yavaşlatır. ---------- */
+  const PR_COL = PRISM_COL, PARR_CAP = 20, PBOMB_CAP = 5, BOMB_FUSE = 1.0, BOMB_R = 90, BEAM_LEN = 320, BEAM_FOCUS = 0.35, BOMB_DMG = 110;   // tek seferlik: patlama alanındaki herkese 110 (seviyeyle artar)
   const BM = [], PBX = [], BF = [];   // BM: bombalar · PBX: patlama halkaları · BF: ok kıymığı çizgileri
-  const BEAM = { down: false, kb: false, id: null, ch: 0, fire: false, cool: 0, latch: false, aim: 0, tick: 0, n: 0, w: 0, warn: 0 };
+  const BEAM = { down: false, kb: false, id: null, ch: 0, fire: false, cool: 0, latch: false, aim: 0, tick: 0, n: 0, w: 0, warn: 0, streak: 0, mt: 0 };
+  /* Işın BİRİKİR: ilk başta zayıf (darbe 6), basılı tutup sıktıkça güçlenir. u = ateş süresi / BEAM_RAMP (0–1): hasar ×1 → ×5, ışın genişler ve uzar, ışın sayısı 1 → 2 → 3 → 5 (yelpaze), vuruşlar sık gelir, tam güçte düşmanları savurur. */
+  const BEAM_DMG = 5, MELT_T = 1.5, MELT_DMG = 2.5, BEAM_S2 = 0.8, BEAM_S3 = 1.6, BEAM_S5 = 2.6, BEAM_RAMP = 3.2, BEAM_DRAIN = 28;
+  const beamU = st => Math.min(1, st / BEAM_RAMP), beamMul = st => 1 + 4 * beamU(st) * beamU(st), beamLen = st => BEAM_LEN + 110 * beamU(st), beamW = st => 18 + 16 * beamU(st);
+  const beamOffs = st => st >= BEAM_S5 ? [-0.52, -0.26, 0, 0.26, 0.52] : st >= BEAM_S3 ? [-0.28, 0, 0.28] : st >= BEAM_S2 ? [-0.14, 0.14] : [0];   // ara vermeden ateş süresine göre ışın sayısı (yelpaze)
   const PB = { bomb: { x: 0, y: 0, r: 24, v: 0 }, beam: { x: 0, y: 0, r: 24, v: 0 } };
   function beamCancel(cool) { BEAM.ch = 0; BEAM.fire = false; BEAM.cool = Math.max(BEAM.cool, cool || 0); BEAM.latch = true; }
   function prismSplit(e, a) {   // prizma oku: iki kıymık en yakın iki düşmana gider
@@ -5151,7 +5156,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const e of E.slice()) {
       if (e.em < 1 || e.st === 'die') continue;
       const dx = e.x - b.x, dy = e.y - b.y; if (Math.hypot(dx, dy / 0.8) > R) continue;
-      const ang = Math.atan2(dy, dx); hitEnemy(e, 14, ang);
+      const ang = Math.atan2(dy, dx); hitEnemy(e, BOMB_DMG, ang);
       if (E.includes(e)) {
         if (e.kind === 'sentinel') { e.st = 'rec'; e.t = 0; e.rd = 1.8; e.atk = ''; e.stun = 0.6; }
         else if (!e.armor) { e.stun = 0.8; e.kx = Math.cos(ang) * 380; e.ky = Math.sin(ang) * 300; e.st = 'chase'; e.atk = ''; }
@@ -5166,15 +5171,20 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function beamHit() {
     const P = BEAM, A = P.aim, ca = Math.cos(A), sa = Math.sin(A), line = (x, y) => { const dx = x - player.x, dy = y - player.y; return [dx * ca + dy * sa, -dx * sa + dy * ca]; };
     P.n++;
-    for (const e of E.slice()) {
+    const offs = beamOffs(P.streak), inBeam = (x, y, w, l0) => offs.some(o => { const dx = x - player.x, dy = y - player.y, c = Math.cos(A + o), s = Math.sin(A + o), al = dx * c + dy * s, pp = -dx * s + dy * c; return al > l0 && al < beamLen(P.streak) + 12 && Math.abs(pp) < w; });
+    for (const e of E.slice()) {   // deldiği herkes: darbe + erimeye başlar (ışın çekilse de bir süre erimeye devam eder); düşman başına tek darbe
       if (e.em < 1 || e.ghost || e.st === 'die') continue;
-      const [al, pp] = line(e.x, e.y); if (al > 8 && al < BEAM_LEN + 12 && Math.abs(pp) < 18) hitEnemy(e, 7 * wpnDmg(), A, 'soft');
+      if (inBeam(e.x, e.y, beamW(P.streak), 8)) {
+        e.melt = MELT_T; const big = P.streak >= BEAM_S3, ang = big ? Math.atan2(e.y - player.y, e.x - player.x) : A;
+        hitEnemy(e, BEAM_DMG * beamMul(P.streak) * wpnDmg(), ang, big ? undefined : 'soft');   // güçlenince vuruş sendeletir ve savurur: ortalık dağılır
+        if (P.streak >= BEAM_S5 && e.st !== 'die' && E.includes(e)) { e.kx += Math.cos(ang) * 260; e.ky += Math.sin(ang) * 260; }
+      }
     }
-    for (let i = EP.length - 1; i >= 0; i--) { const [al, pp] = line(EP[i].x, EP[i].y); if (al > 0 && al < BEAM_LEN && Math.abs(pp) < 14) { sparks(EP[i].x, EP[i].y - 22, 6, 160, A, 0.8); EP.splice(i, 1); } }
+    for (let i = EP.length - 1; i >= 0; i--) { if (inBeam(EP[i].x, EP[i].y, 14 + 10 * beamU(P.streak), 0)) { sparks(EP[i].x, EP[i].y - 22, 6, 160, A, 0.8); EP.splice(i, 1); } }
     if (P.n % 3 === 1) {   // heykel ve sandıklara her 0.9 sn'de bir
-      const x1 = player.x + ca * BEAM_LEN, y1 = player.y + sa * BEAM_LEN;
-      for (const [sx, sy, id, ev] of statuesIn(Math.min(player.x, x1) - 40, Math.min(player.y, y1) - 60, Math.max(player.x, x1) + 40, Math.max(player.y, y1) + 100)) { if (!ev) continue; const s = evState(id); if (s.dead || s.dying >= 0) continue; const [al, pp] = line(sx, sy); if (al > 0 && al < BEAM_LEN + 20 && Math.abs(pp) < 34) hitEvil(s, sx, sy, A); }
-      for (const [cx, cy, id, lk] of chestsIn(Math.min(player.x, x1) - 40, Math.min(player.y, y1) - 40, Math.max(player.x, x1) + 40, Math.max(player.y, y1) + 50)) { const s = chState(id, lk); if (s.dead || s.dying >= 0) continue; const [al, pp] = line(cx, cy); if (al > 0 && al < BEAM_LEN + 20 && Math.abs(pp) < 28) hitChest(s, cx, cy, A); }
+      const BL = beamLen(P.streak), x1 = player.x + ca * BL, y1 = player.y + sa * BL;
+      for (const [sx, sy, id, ev] of statuesIn(Math.min(player.x, x1) - 40, Math.min(player.y, y1) - 60, Math.max(player.x, x1) + 40, Math.max(player.y, y1) + 100)) { if (!ev) continue; const s = evState(id); if (s.dead || s.dying >= 0) continue; const [al, pp] = line(sx, sy); if (al > 0 && al < BL + 20 && Math.abs(pp) < 34) hitEvil(s, sx, sy, A); }
+      for (const [cx, cy, id, lk] of chestsIn(Math.min(player.x, x1) - 40, Math.min(player.y, y1) - 40, Math.max(player.x, x1) + 40, Math.max(player.y, y1) + 50)) { const s = chState(id, lk); if (s.dead || s.dying >= 0) continue; const [al, pp] = line(cx, cy); if (al > 0 && al < BL + 20 && Math.abs(pp) < 28) hitChest(s, cx, cy, A); }
     }
   }
   function updatePrism(dt) {
@@ -5198,7 +5208,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         if (F.dur > 12) { P.ch = Math.min(1, P.ch + dt / BEAM_FOCUS); if (P.ch >= 1) { P.fire = true; P.tick = 0.05; P.n = 0; try { AU.sfx('eBolt', player.x, player.y); } catch (_) {} } }
         else if (P.warn <= 0) { P.warn = 1.2; ftext(player.x, player.y - 62, 'Dayanıklılık yok', '#ff7a6b'); }
       } else {
-        F.dur -= 45 * dt * gearM('stamCost'); F.regenT = 0.45;
+        F.dur -= BEAM_DRAIN * dt * gearM('stamCost'); F.regenT = 0.45;
         if (F.dur <= 0) { F.dur = 0; P.fire = false; P.ch = 0; P.cool = 1.6; P.latch = true; ftext(player.x, player.y - 62, 'Prizma ısındı', '#ff7a6b'); smoke(player.x, player.y - 30, 4, 40, 8); }
       }
     }
@@ -5206,7 +5216,11 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       const t = nearestE(BEAM_LEN + 60) || nearestEvil(BEAM_LEN + 60), A = t ? Math.atan2(t.y - player.y, t.x - player.x) : hero.face;
       P.aim += wrap(A - P.aim) * dmp(P.fire ? 12 : 20, dt); hero.face += wrap(P.aim - hero.face) * dmp(16, dt);
     }
-    if (P.fire) { P.tick -= dt; if (P.tick <= 0) { P.tick = 0.3; beamHit(); } }
+    if (P.fire) { P.streak += dt; P.tick -= dt; if (P.tick <= 0) { P.tick = 0.3 - 0.12 * beamU(P.streak); beamHit(); if (P.streak > BEAM_S3) hitFx(0, 0.8 + 2.4 * beamU(P.streak)); } } else P.streak = 0;   // ateş kesilince ışın sayısı sıfırlanır
+    for (const e of E) if (e.melt > 0) {   // erime: mor damlalar süzülür, 0.3 sn'de bir hasar
+      e.melt -= dt; if (Math.random() < dt * 16) sparks(e.x + rnd(-8, 8), e.y - rnd(8, 34), 1, 40, PI / 2, 0.6);
+    }
+    P.mt -= dt; if (P.mt <= 0) { P.mt = 0.3; for (const e of E.slice()) if (e.melt > 0 && e.st !== 'die' && !e.ghost) hitEnemy(e, MELT_DMG * beamMul(P.streak) * wpnDmg(), PI / 2, 'soft'); }
   }
   function drawPrismFx(fg) {
     for (const b of BM) {   // bombalar
@@ -5238,8 +5252,11 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + FX.t * 4, r = (1 - u) * 20 + 4; ctx.fillStyle = `rgba(226,201,255,${0.4 + 0.5 * u})`; ctx.beginPath(); ctx.arc(hx + Math.cos(a) * r, hy + Math.sin(a) * r, 1.3, 0, TAU); ctx.fill(); }
         drawItemIcon('pbeam', hx, hy, 0.6 + 0.4 * u);
       } else {
-        const x1 = player.x + ca * BEAM_LEN, y1 = player.y + sa * BEAM_LEN - 22, fl = 0.85 + 0.15 * Math.sin(FX.t * 90);
-        for (const [w, c] of [[14, `rgba(185,131,255,${0.22 * fl})`], [7, `rgba(185,131,255,${0.55 * fl})`], [2.4, `rgba(245,232,255,${0.95 * fl})`]]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(x1, y1); ctx.stroke(); }
+        const fl = 0.85 + 0.15 * Math.sin(FX.t * 90), offs = beamOffs(P.streak), bu = beamU(P.streak), bw = 1 + 0.9 * bu, BL = beamLen(P.streak);
+        for (const o of offs) {   // ara vermeden ateşte ışın sayısı artar: yelpaze
+          const x1 = player.x + Math.cos(A + o) * BL, y1 = player.y + Math.sin(A + o) * BL - 22, k = o === 0 ? 1 : 0.8;
+          for (const [w, c] of [[14, `rgba(185,131,255,${0.22 * fl * k})`], [7, `rgba(185,131,255,${0.55 * fl * k})`], [2.4, `rgba(245,232,255,${0.95 * fl * k})`]]) { ctx.strokeStyle = c; ctx.lineWidth = w * (o === 0 ? 1 : 0.8) * bw; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(x1, y1); ctx.stroke(); }
+        }
         ctx.fillStyle = `rgba(185,131,255,0.35)`; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, TAU); ctx.fill(); drawItemIcon('pbeam', hx, hy, 0.9);
       }
       ctx.restore();
@@ -6362,7 +6379,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
      YENİ SİLAH: RH_WEAPONS'a giriş (kind: 'sword' | 'bow') + rhDrawW'de sahne + RH_WD'de süre. YENİ KARAKTER: RH_CHARS'a giriş (kind: 'hero').
      YENİ HEYKEL: RH_STATUES'a giriş (kind: 'statue' | 'evil' | 'rubble') + rhDrawW'de sahne. YENİ KIYAFET: RH_OUTFITS'a giriş (kind: 'gear', gear: GEAR anahtarı). YENİ ZIRH: RH_ARMOR'a giriş.
      YENİ KATEGORİ: RH_CATS satırındaki 'on' değerini true yap, RH_LIST'e liste ekle. Sekme etiketi uzunsa girişe 'tab' alanı ver. */
-  const RH_CATS = [['play', 'Oynanış', 'dalgalar', true], ['enemies', 'Düşmanlar', '5 kayıt', true], ['weapons', 'Silahlar', '2 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true], ['items', 'Eşyalar', '8 kayıt', true]];
+  const RH_CATS = [['play', 'Oynanış', 'dalgalar', true], ['enemies', 'Düşmanlar', '5 kayıt', true], ['weapons', 'Silahlar', '5 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true], ['items', 'Eşyalar', '5 kayıt', true]];
   const RH_RED = '224,88,74';
   const RH_ENEMIES = [
     { name: 'Çırak Büyücü', sub: 'HORTLAK  ·  SIRADAN DÜŞMAN', mode: 'rage', atkTitle: 'SALDIRILAR',
@@ -6564,27 +6581,28 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         ['Bulma', 'Kötücül heykel kırılınca şansa bağlı çıkar; her seferinde birkaç parça yere saçılır. Sandıklardan düşmez.', '—', '%55  ·  2–4 parça'],
         ['Kullanım', 'Kamptaki craft tezgâhında Prizma Oku, Prizma Bombası ve Prizma Işını üretmek için harcanır.', '—', 'craft  ·  1 / 2 / 8 prizma']],
       tips: ['Heykeli kırınca yerdeki prizmaları toplamayı unutma; yaratıklar dağılmadan önce ganimeti al.', 'Kayıtta saklanır: kamptan sonra kaybolmaz.'] });
-  RH_ITEMS.push({ kind: 'item', item: 'parr', name: 'Prizma Oku', tab: 'P. Ok', sub: 'SİLAH  ·  YAY MERMİSİ', atkTitle: 'KULLANIM', noplay: true,
+  RH_WEAPONS.push({ kind: 'item', item: 'parr', name: 'Prizma Oku', tab: 'P. Ok', sub: 'SİLAH  ·  YAY MERMİSİ', atkTitle: 'KULLANIM', noplay: true,
       lore: 'Ucuna mor kristal takılmış ok. Yayla atılır; isabet edince iki kıymığa bölünüp yandaki düşmanlara da gider. Önce prizma oku harcanır, bitince normal oklara dönülür.',
       stats: [['Üretim', '1 prizma = 2 ok'], ['Taşıma', 'en çok 20'], ['Hasar', 'normal okun × 1.2'], ['Kıymık', '2 adet  ·  %35 hasar'], ['Kıymık menzili', '130 birim'], ['Gereken', 'yay']],
       atks: [
         ['Atış', 'Yayı normal gerersin; çekiş, hız ve delme aynı kalır. Ok mor parlar ve yere düşünce toplanmaz.', '×1.2', 'çekiş 0.75 sn'],
         ['Bölünme', 'İlk isabette ok iki kıymığa ayrılır; en yakın iki düşmana gider. Kıymıklar delme sayısına dahil değildir.', '%35 × 2', 'menzil 130']],
       tips: ['Düşmanlar yan yanayken en iyi işi görür.', 'Prizma oku varken yayın düğmesinde mor bir sayı görünür.', 'Craft: Prizma Oku tarifi.'] });
-  RH_ITEMS.push({ kind: 'item', item: 'pbomb', name: 'Prizma Bombası', tab: 'Bomba', sub: 'SİLAH  ·  FIRLATMA', atkTitle: 'KULLANIM', noplay: true,
+  RH_WEAPONS.push({ kind: 'item', item: 'pbomb', name: 'Prizma Bombası', tab: 'Bomba', sub: 'SİLAH  ·  FIRLATMA', atkTitle: 'KULLANIM', noplay: true,
       lore: 'Yüzeyli mor bir taş. Fırlatınca yere düşer, bir saniye bekler ve mor bir halkayla patlar. Düşmanları iter ve sersemletir; kendi bombandan hasar almazsın, yalnızca itilirsin.',
-      stats: [['Üretim', '2 prizma + 1 reçine'], ['Taşıma', 'en çok 5'], ['Hasar', '14'], ['Yarıçap', '90 birim'], ['Fitil', '1 sn'], ['Sersemletme', '0.8 sn']],
+      stats: [['Üretim', '2 prizma + 1 reçine'], ['Taşıma', 'en çok 5'], ['Hasar', '110'], ['Yarıçap', '90 birim'], ['Fitil', '1 sn'], ['Sersemletme', '0.8 sn']],
       atks: [
         ['Fırlatma', 'Yeşil düğmeye dokununca en yakın düşmana, yoksa baktığın yöne fırlatılır. Yerde mor bir alan patlayacak yeri gösterir.', '—', 'menzil 280'],
-        ['Patlama', 'Alandaki düşmanlara hasar verir, iter ve sersemletir. Kara küreleri siler; heykellere ve sandıklara da vurur.', '14', 'sersem 0.8 sn']],
+        ['Patlama', 'Alandaki düşmanlara hasar verir, iter ve sersemletir. Kara küreleri siler; heykellere ve sandıklara da vurur.', '110', 'sersem 0.8 sn']],
       tips: ['Nöbetçiyi bombayla açıkta bırakabilirsin.', 'Alanın dışına çık: itilirsin ama hasar almazsın.', 'Kötücül heykelin doğurduğu kalabalığı dağıtmak için iyidir.'] });
-  RH_ITEMS.push({ kind: 'item', item: 'pbeam', name: 'Prizma Işını', tab: 'Işın', sub: 'SİLAH  ·  IŞIN', atkTitle: 'KULLANIM', noplay: true,
-      lore: 'Basılı tutunca kısa bir odaktan sonra mor bir ışın çıkar ve hattaki herkesi deler. Dayanıklılığı yer; biterse prizma ısınır ve bir süre kullanılamaz. Işın açıkken yavaşlarsın.',
-      stats: [['Üretim', '8 prizma + 3 külçe'], ['Odak', '0.35 sn'], ['Menzil', '320 birim'], ['Hasar', 'saniyede ~3 × 7'], ['Dayanıklılık', '45 / sn'], ['Soğuma', '1.6 sn'], ['Yürürken', '× 0.5']],
+  RH_WEAPONS.push({ kind: 'item', item: 'pbeam', name: 'Prizma Işını', tab: 'Işın', sub: 'SİLAH  ·  IŞIN', atkTitle: 'KULLANIM', noplay: true,
+      lore: 'Basılı tutunca kısa bir odaktan sonra mor bir ışın çıkar, hattaki herkesi deler ve eritmeye başlar. İlk başta zayıftır; ama bırakmadan sıktıkça prizma birikir: ışın güçlenir, yelpazeye dönüşür ve ortalığı dağıtır. Dayanıklılığı yer; biterse prizma ısınır ve bir süre kullanılamaz. Işın açıkken yavaşlarsın.',
+      stats: [['Üretim', '8 prizma + 3 külçe'], ['Odak', '0.35 sn'], ['Menzil', '320 birim'], ['Hasar', '5  →  25  (3.2 sn’de tam güç)'], ['Erime', '1.5 sn  ·  2.5  →  12'], ['Işın sayısı', '1 · 2 · 3 · 5'], ['Dayanıklılık', '28 / sn'], ['Soğuma', '1.6 sn']],
       atks: [
         ['Odaklanma', 'Düğmeyi basılı tutunca elde prizma parlar. Bu sırada kılıç kullanılamaz; vurulursan odak kaçar.', '—', '0.35 sn'],
-        ['Işın', 'En yakın düşmana yönelir ve hattaki herkese vurur. Kara küreleri keser. Dayanıklılık biterse prizma ısınır.', '7 × 3 / sn', 'dayanıklılık 45 / sn']],
-      tips: ['Sıralı düşmanlarda çok etkilidir.', 'Dayanıklılığı bitirmeden bırak: siper için biraz sakla.', 'Işın düşmanı sendeletmez; saldırılarını kesmez.'] });
+        ['Işın', 'En yakın düşmana yönelir ve hattaki herkese vurur; vurulan düşman erimeye başlar ve ışın çekilse de bir süre erir. Kara küreleri keser. Dayanıklılık biterse prizma ısınır.', '5 → 25', 'erime 1.5 sn'],
+        ['Birikim', 'Bırakmadan sıktıkça hasar beş katına çıkar, ışın uzar ve genişler. 0.8 sn’de 2, 1.6 sn’de 3, 2.6 sn’de 5 ışına bölünür; tam güçte düşmanları savurur. Bırakırsan her şey sıfırlanır.', '× 1 → × 5', '3.2 sn tam güç']],
+      tips: ['Sıralı düşmanlarda çok etkilidir.', 'Düğmeyi bırakma: ne kadar uzun tutarsan o kadar güçlenir.', 'Dayanıklılığı bitirmeden bırak: siper için biraz sakla.', 'Işın düşmanı sendeletmez; saldırılarını kesmez.'] });
   RH_ITEMS.push({ kind: 'item', item: 'gold', name: 'Altın', tab: 'Altın', sub: 'EŞYA  ·  PARA', atkTitle: 'KULLANIM', noplay: true,
       lore: 'İki hâlli tek maden. Altın tozu sandıklardan ve kötücül heykellerden saçılan ince parıltıdır; eritme kabında toz külçeye dönüşür. Külçe ise oyunun gerçek parasıdır ve kıyafet dükkânında harcanır.',
       stats: [['Altın tozu', 'sandık  ·  kötücül heykel  ·  harabe'], ['Eritme oranı', '10 toz = 1 külçe'], ['Eritme süresi', '3,5 sn + külçe başına 1 sn'], ['Taşıma', 'sınırsız'], ['Harcama', 'kıyafet dükkânı']],
