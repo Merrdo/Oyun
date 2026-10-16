@@ -1208,7 +1208,7 @@
           e.thk = 0.18; const r = Math.random();
           if (d < 66) enemyAttack(e, 'claw');
           else if (d < 150) { if (r < 0.4) enemyAttack(e, 'lunge'); }
-          else if (d < 450) { if (r < 0.3) enemyAttack(e, 'bolt'); else if (d > 130 && r < 0.75) enemyAttack(e, 'vanish'); }   // dalış: gölgede kayıp altından yükselir
+          else if (d < 450) { if (r < 0.3) { if (LVL.lv >= 6) enemyAttack(e, 'bolt'); } else if (d > 130 && r < 0.75) enemyAttack(e, 'vanish');  /*seviye 6'ya kadar kara küre yok*/  }   // dalış: gölgede kayıp altından yükselir
         }
         if (e.sT <= 0) { e.sT = rnd(2.4, 4.8); if (d < 560) AU.sfx('eIdle', e.x, e.y, e); }
       } else if (e.st === 'wind') {   // uyarı: kılıç kolu kalkar, yerde kırmızı alan belirir — bu sırada kaçabilir ya da siper alabilirsin
@@ -7180,7 +7180,9 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   addEventListener('resize', resize);
   addEventListener('orientationchange', resize);
   resize();
-  try { const a = sessionStorage.getItem('hlk_auto'); if (a) { sessionStorage.removeItem('hlk_auto'); menuStart(a === 'c'); } } catch (_) {}   // ölüm ekranından 'kayıttan devam / yeni oyun'
+  try { const a = sessionStorage.getItem('hlk_auto'); if (a) { sessionStorage.removeItem('hlk_auto');   // yeniden yüklemeden sonra tarayıcı sesi bir dokunuş olmadan açmaz: oyun, ilk dokunuş/tuşla (ses kilidi açılırken) başlar
+    const go = () => { removeEventListener('pointerdown', go, true); removeEventListener('keydown', go, true); try { AU.unlock(); } catch (_) {} if (MENU.on && MENU.st === 'idle') menuStart(a === 'c'); };
+    addEventListener('pointerdown', go, true); addEventListener('keydown', go, true); } } catch (_) {}   // ölüm ekranından 'kayıttan devam / yeni oyun'
   requestAnimationFrame(frame);
 })();
 </script>
