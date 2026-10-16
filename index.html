@@ -74,8 +74,8 @@
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    // yatay: kamerayı biraz uzaklaştır (görüş yüksekliği ~460 birim; eskiden 520, biraz yakınlaştırıldı); dikey: eskisi gibi 1:1
-    ZT = W > H ? clamp(H / 460, 0.7, 1) : 1; ZOOM = ZT;
+    // kamera uzaklığı yatayda da dikeyle aynı: 1:1 (eskiden yatayda clamp(H / 460, 0.7, 1) ile uzaklaştırılıyordu)
+    ZT = 1; ZOOM = ZT;
     // HUD: sol panel ile sağ düğme aynı kenar boşluğunda (çentik/yuvarlak köşe güvenli alanı dahil), yatayda üst boşluk küçük
     const cs = getComputedStyle(probe), sal = parseFloat(cs.paddingLeft) || 0, sar = parseFloat(cs.paddingRight) || 0;
     HUD_M = Math.max(12, sal, sar); HUD_Y = W > H ? 38 : 66; HUD_S = W > H ? clamp(H / 300, 1.25, 1.6) : 1;   // yatayda HUD yazıları/panelleri büyütülür
