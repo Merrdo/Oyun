@@ -31,12 +31,7 @@
     addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
   }
 
-  /* ---------- ARAYÜZ KURALI (her yeni arayüzde geçerli) ----------
-     Safe area KULLANILMIYOR. Bunun yerine ekranın en üstündeki UI_TOP (px) bandı (saat, pil, sinyal,
-     Dynamic Island / çentik) TAMAMEN BOŞ bırakılır: bu bandın içine buton, geri/sıfırla düğmesi, hap (pill),
-     başlık ya da okunması gereken hiçbir yazı KONMAZ. Yeni ekran/sayfa tasarlarken en üstteki butonların
-     üst kenarı en az UI_TOP değerinde başlamalı (y >= UI_TOP). Dikey (portre) için geçerli; yatayda üst bant yok. */
-  const UI_TOP = 68;
+  /* ---------- ARAYÜZ KURALI: oyun yalnızca YATAY çalışır. Dikey düzen yok. ---------- */
 
   /* ---------- Canvas ---------- */
   const cv = document.getElementById('c');
@@ -54,8 +49,6 @@
   }
   let W = 0, H = 0, DPR = 1;
   let SAS = 0;   // yatay güvenli alan payı (çentik / dinamik ada / yuvarlak köşe): sayfa içerikleri ve sağ düğmeler bu kadar içeriden başlar
-  const PORT = { ok: false, btn: null };   // PORT.ok: Ayarlar > Dikey mod · kapalıyken dikey tutulan telefonda "yatay çevir" ekranı çıkar
-  try { PORT.ok = localStorage.getItem('hlk_portrait') === '1'; } catch (_) {}
   let SEED = 0;   // harita tohumu: her yeni oyunda rastgele; hashN ile üretilen her şey (heykel, sandık, kamp, harabe) buna bağlıdır
   const cam = { x: 0, y: 0 };
   let ZT = 1, ZOOM = 1;   // dünya yakınlaştırması: ZT hedef (yatayda <1 = uzak kamera), ZOOM o an kullanılan (ana menüde 1)
@@ -81,7 +74,7 @@
     ZT = 1; ZOOM = ZT;
     // HUD: sol panel ile sağ düğme aynı kenar boşluğunda (çentik/yuvarlak köşe güvenli alanı dahil), yatayda üst boşluk küçük
     const cs = getComputedStyle(probe), sal = parseFloat(cs.paddingLeft) || 0, sar = parseFloat(cs.paddingRight) || 0;
-    SAS = W > H ? Math.max(sal, sar) : 0; HUD_M = Math.max(12, sal, sar); HUD_Y = W > H ? 38 : 66; HUD_S = W > H ? clamp(H / 360, 1, 1.25) : 1;   // yatayda HUD biraz büyür (eskisinden ~%17 küçük: profil paneli, duraklatma, çanta, saat)
+    SAS = Math.max(sal, sar); HUD_M = Math.max(12, sal, sar); HUD_Y = 38; HUD_S = clamp(H / 360, 1, 1.25);   // yatayda HUD biraz büyür (eskisinden ~%17 küçük: profil paneli, duraklatma, çanta, saat)
     cam.x = player.x - camCX(); cam.y = player.y - camCY();
   }
 
@@ -969,13 +962,27 @@
   function drawAxeIcon(x, y, sc, rot, fg, bgc) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc); ctx.translate(-8.5, -4); ctx.lineJoin = 'round'; ctx.lineWidth = 1.1; ctx.strokeStyle = bgc; ctx.fillStyle = `rgb(${fg})`; ctx.stroke(AXP); ctx.fill(AXP); ctx.restore();
   }
+  /* ---------- SAĞ ALT EYLEM KÜMESİ (yatay): tüm oyun düğmeleri tek yerden yerleşir, üst üste binmez ----------
+     ana saldırı düğmesi sağ-alt köşede · yay onun solunda (biraz aşağıda) · alet değiştirme yayın üstünde ·
+     şifa düğmeleri sağ kenarda, saldırının üstünde dikey sütun · prizma düğmeleri onun solunda ikinci sütun. */
+  const HLO = { key: '' };
+  function hudLo() {
+    const k = W + ',' + H + ',' + SAS; if (HLO.key === k) return HLO; HLO.key = k;
+    const aR = W - SAS - 20, aB = H - 18, r1 = 42, r2 = 34, rs = 24, step = 52;
+    HLO.ax = aR - r1; HLO.ay = aB - r1;                                   // ana düğme (kılıç / yay tek başına)
+    HLO.bx = HLO.ax - r1 - r2 - 12; HLO.by = HLO.ay + 6;                  // yay: kılıçla birlikteyken yanında
+    HLO.sx = HLO.bx - 8; HLO.sy = HLO.by - r2 - 22 - 10;                  // alet değiştirme (r = 22)
+    HLO.hx = aR - rs; HLO.px = HLO.hx - 2 * rs - 6;                       // sütun x'leri: şifa · prizma
+    HLO.cy0 = HLO.ay - r1 - 12 - rs; HLO.step = step;                     // sütunların ilk (en alttaki) düğmesinin y'si
+    return HLO;
+  }
   /* ----- alet değiştirme düğmesi: saldırı düğmesinin sol üstünde, ÖTEKİ aletin simgesini gösterir ----- */
   const SWB = { x: 0, y: 0, r: 22, v: 0, pop: 0 };
   function drawSwapBtn(fg, dt) {
     const show = G.hs && G.ha && G.eq >= 1 && !CAMP.in && F.death < 0 && atk.vis > 0.6;
     SWB.v += ((show ? 1 : 0) - SWB.v) * (1 - Math.exp(-12 * dt)); SWB.pop = Math.max(0, SWB.pop - dt * 3);
     if (SWB.v < 0.01) { SWB.v = 0; return; }
-    SWB.x = W - SAS - 142; SWB.y = H - 176;
+    { const L = hudLo(); SWB.x = L.sx; SWB.y = L.sy; }
     const bgc = light ? '#f2f2f2' : '#0a0a0a', k = eob(clamp(SWB.v, 0, 1)) * (1 + (SWB.pop > 0 ? 0.18 * Math.sin(PI * (1 - SWB.pop)) : 0)), r = SWB.r;
     ctx.save(); ctx.globalAlpha = clamp(SWB.v * 1.4, 0, 1) * (F.pt >= 0 ? 0.5 : 1); ctx.translate(SWB.x, SWB.y); ctx.scale(k, k);
     ctx.fillStyle = bgc; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); ctx.fillStyle = `rgba(${fg},0.12)`; ctx.fill();
@@ -1313,28 +1320,7 @@
     sec('TOPLANANLAR'); row('Altın tozu', g.dust); row('Altın külçesi', g.ingot);
     [['keys', 'Altın anahtar'], ['prism', 'Mor prizma'], ['band', HEAL_NAME.band], ['medk', HEAL_NAME.medk], ['herb', HEAL_NAME.herb], ['resin', HEAL_NAME.resin], ['arrows', 'Ok']].forEach(([k, n]) => { if (g[k] > 0) row(n, g[k]); });
     if (g.bow) row('Yay', 'bulundu'); g.charms.forEach(n => row('Tılsım', n));
-    if (W > H * 1.05) { deathLand(L, A, T, fg, red); ctx.restore(); return; }   // yatay: iki sütunlu düzen
-    const u = clamp(Math.min(W / 390, H / 760), 0.62, 1.3), cx = W / 2, pw = Math.min(W - 40, 340 * u + 20), x0 = cx - pw / 2;
-    const hasSave = !!SAVED, nb = 2, bh = 40 * u, bgap = 10 * u, btop = H - 22 - nb * bh - (nb - 1) * bgap;
-    const ty = Math.max(34, H * 0.075), top = ty + 54 * u, avail = btop - 14 - top;
-    const nr = L.filter(q => !q.h).length, nh = L.length - nr, need = nr * 22 * u + nh * 32 * u, k = Math.min(1, avail / need), lh = 22 * u * k, hh = 32 * u * k, fs = Math.max(9.5, 13 * u * k);
-    // başlık
-    ctx.globalAlpha = A; ctx.font = `300 ${34 * u}px ${UIF}`; ctx.textBaseline = 'middle'; ctx.fillStyle = `rgba(${red},0.95)`;
-    { const ch = [...'ÖLDÜN'], gap = 9 * u, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + gap, -gap); let lx = cx - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, ty); lx += ctx.measureText(c).width + gap; } }
-    ctx.strokeStyle = `rgba(${red},0.35)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - 28 * u, ty + 24 * u); ctx.lineTo(cx + 28 * u, ty + 24 * u); ctx.stroke();
-    // satırlar: sırayla belirir
-    let y = top, i = 0;
-    for (const q of L) {
-      const a = clamp((T - 0.9 - i * 0.07) * 3, 0, 1) * A; i++; ctx.globalAlpha = a;
-      if (q.h) { y += hh * 0.5; ctx.font = `600 ${fs * 0.78}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.45)`; { let lx = x0; for (const c of [...q.h]) { ctx.fillText(c, lx, y); lx += ctx.measureText(c).width + 1.6; } } ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.moveTo(x0, y + lh * 0.45); ctx.lineTo(x0 + pw, y + lh * 0.45); ctx.stroke(); y += hh * 0.5 + lh * 0.3; }
-      else { ctx.font = `500 ${fs}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.62)`; ctx.fillText(q.l, x0, y); ctx.textAlign = 'right'; ctx.font = `600 ${fs}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.96)`; ctx.fillText(q.v, x0 + pw, y); y += lh; }
-    }
-    // düğmeler
-    const ba = clamp((T - 1.8) / 0.5, 0, 1) * A; DEATH.btns.length = 0; ctx.globalAlpha = 1;
-    const bw = Math.min(pw, 260 * u + 20), bx = cx - bw / 2, bs = [];
-    bs.push(...deathActions(hasSave));
-    bs.forEach(([lb, strong, fn], j) => { const by = btop + j * (bh + bgap); menuPill(bx, by, bw, bh, lb, ba, strong, T, strong ? undefined : red); DEATH.btns.push({ x: bx, y: by, w: bw, h: bh, fn }); });
-    ctx.restore();
+    deathLand(L, A, T, fg, red); ctx.restore();
   }
   const DUST_CHANCE = 0.4;   // görünmez düşmanın iz bırakma şansı (ileride şans sistemine bağlanacak)
   const EDUST = [];          // görünmez düşmanların bıraktığı az, silik toz
@@ -1823,7 +1809,7 @@
     if (a.vis <= 0.01) { a.rip = 0; a.was = false; return; }            // silah yok → buton hiç çizilmez
     const on = a.down || a.kb;
     if (spec) a.r = spec.r;
-    a.x = W - SAS - 64; a.y = H - 140;
+    { const L = hudLo(); a.x = L.ax; a.y = L.ay; }
     if (on && !a.was) a.rip = 1; a.was = on; a.rip = Math.max(0, a.rip - dt * 2.4);
     const pp = F.pt >= 0 ? clamp(F.pt / ST, 0, 1) : 0, k = (on ? 0.94 : 1) * eob(clamp(a.vis, 0, 1));
     ctx.save(); ctx.globalAlpha = clamp(a.vis * 1.4, 0, 1); ctx.translate(a.x, a.y);
@@ -5456,7 +5442,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     ['band', 'medk', 'elix'].forEach((k, i) => {
       const b = HEAL.btn[k], using = HEAL.use && HEAL.use.k === k; b.v += (((INV[k] > 0 || using) ? 1 : 0) - b.v) * (1 - Math.exp(-12 * dt));
       if (b.v < 0.01) { b.v = 0; return; }
-      b.r = 24; b.x = W - SAS - 40; b.y = H - 236 - 58 * i;
+      { const L = hudLo(); b.r = 24; b.x = L.hx; b.y = L.cy0 - L.step * i; }
       const full = (k === 'elix' ? F.hp >= ELIX_HP - 0.01 : F.hp >= 100) && !using, ks = (using ? 0.94 : 1) * eob(clamp(b.v, 0, 1)) * (1 + 0.22 * HEAL.pop[k]);
       ctx.save(); ctx.globalAlpha = clamp(b.v * 1.4, 0, 1) * (full ? 0.5 : 1); ctx.translate(b.x, b.y); ctx.scale(ks, ks);
       ctx.fillStyle = bgc; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill(); ctx.fillStyle = `rgba(${fg},${using ? 0.24 : 0.12})`; ctx.fill();
@@ -5523,7 +5509,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawBowBtn(fg, dt) {
     const B = BOW; B.vv += ((B.has && !CAMP.in ? 1 : 0) - B.vv) * (1 - Math.exp(-12 * dt));
     if (B.vv < 0.01) { B.vv = 0; B.was = false; return; }
-    B.r = lerp(42, 34, B.slot); B.bx = W - 64 - 86 * B.slot; B.by = H - 140 + 44 * B.slot;   // kılıç yoksa ana konumda, varsa onun yanında
+    B.r = lerp(42, 34, B.slot); { const L = hudLo(); B.bx = lerp(L.ax, L.bx, B.slot); B.by = lerp(L.ay, L.by, B.slot); }   // kılıç yoksa ana konumda, varsa onun yanında
     const r = B.r, on = B.down || B.kb, bgc = light ? '#f2f2f2' : '#0a0a0a', red = light ? '214,40,40' : '255,64,56';
     const low = B.ammo <= 3 && INV.parr <= 0, empty = B.ammo <= 0 && INV.parr <= 0, full = B.st === 'draw' && B.full;
     if (on && !B.was) B.rip = 1; B.was = on;
@@ -5852,7 +5838,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     ['bomb', 'beam'].forEach((k, i) => {
       const b = PB[k], own = k === 'bomb' ? INV.pbomb > 0 : INV.pbeam > 0;
       b.v += (((own && !CAMP.in) ? 1 : 0) - b.v) * (1 - Math.exp(-12 * dt)); if (b.v < 0.01) { b.v = 0; return; }
-      b.r = 24; b.x = W - SAS - 100; b.y = H - 236 - 58 * i;
+      { const L = hudLo(); b.r = 24; b.x = L.px; b.y = L.cy0 - L.step * i; }
       const on = k === 'beam' && (BEAM.down || BEAM.kb), hot = k === 'beam' && BEAM.cool > 0.4, ks = (on ? 0.94 : 1) * eob(clamp(b.v, 0, 1));
       ctx.save(); ctx.globalAlpha = clamp(b.v * 1.4, 0, 1) * (hot ? 0.55 : 1); ctx.translate(b.x, b.y); ctx.scale(ks, ks);
       ctx.fillStyle = bgc; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill(); ctx.fillStyle = `rgba(${fg},${on ? 0.24 : 0.12})`; ctx.fill();
@@ -5951,7 +5937,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawMenu(dt) {
     MENU.t += dt; MENU.fl = Math.max(0, MENU.fl - dt * 2.4);
     const t = MENU.t, fg = light ? '0,0,0' : '255,255,255', bgCol = light ? '#f2f2f2' : '#0a0a0a', bgRGB = light ? '242,242,242' : '10,10,10';
-    const land = W > H, u = land ? clamp(H / 400, 0.7, 1.3) : clamp(Math.min(W / 390, H / 760), 0.62, 1.35), cx = W / 2, ease = v => 1 - Math.pow(1 - clamp(v, 0, 1), 3), act = MENU.st === 'go', stab = act && MENU.mode === 'stab', zoom = act && MENU.mode === 'zoom';
+    const u = clamp(H / 400, 0.7, 1.3), cx = W / 2, ease = v => 1 - Math.pow(1 - clamp(v, 0, 1), 3), act = MENU.st === 'go', stab = act && MENU.mode === 'stab', zoom = act && MENU.mode === 'zoom';
     if (act) MENU.sT += dt; const sT = MENU.sT;
     try { AU.setMode(!act ? 'menu' : zoom ? (sT > 0.5 ? 'game' : 'menu') : (sT >= 0.47 ? (sT >= 1.3 ? 'game' : 'none') : 'menu'), stab && sT >= 0.47 && sT < 0.6); } catch (_) {}   // yakınlaşmada müzik kararırken değişir · saplanmada müzik sert kesilir
     // ---- sahne bitti: ani karartma, sonra oyun ----
@@ -5962,7 +5948,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       return;
     }
     // ---- durumlar ----
-    const hy = land ? H * 0.5 : H < 520 ? H * 0.22 : H * 0.285, R = 62 * u, hcx = land ? W * 0.3 : cx;   // yatayda kafa solda, yazı ve düğmeler sağ sütunda
+    const hy = H * 0.5, R = 62 * u, hcx = W * 0.3;   // yatayda kafa solda, yazı ve düğmeler sağ sütunda
     // bakış: dokunulan/imleç yönü, yoksa ara sıra rastgele göz gezdirme
     MENU.gT -= dt; if (MENU.gT <= 0) { MENU.gT = rnd(2.2, 4.5); MENU.tgx = Math.random() < 0.35 ? 0 : rnd(-0.7, 0.7); MENU.tgy = Math.random() < 0.4 ? 0 : rnd(-0.4, 0.4); }
     let tgx = MENU.tgx, tgy = MENU.tgy; if (t - MENU.pt < 3) { tgx = clamp((MENU.px - hcx) / (W * 0.4), -1, 1); tgy = clamp((MENU.py - hy) / (H * 0.35), -1, 1); }
@@ -5983,7 +5969,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     // ---- arka plan ----
     ctx.fillStyle = bgCol; ctx.fillRect(-30, -30, W + 60, H + 60);
     const ocam = { x: cam.x, y: cam.y }; cam.x = player.x - W / 2 + t * 9; cam.y = player.y - H / 2 + Math.sin(t * 0.13) * 40; drawWorld(fg); cam.x = ocam.x; cam.y = ocam.y;   // yavaşça kayan zemin
-    const vg = ctx.createRadialGradient(hcx, land ? H * 0.5 : H * 0.4, Math.min(W, H) * 0.12, hcx, land ? H * 0.5 : H * 0.4, Math.max(W, H) * 0.78); vg.addColorStop(0, `rgba(${bgRGB},0.35)`); vg.addColorStop(1, `rgba(${bgRGB},0.97)`); ctx.fillStyle = vg; ctx.fillRect(-30, -30, W + 60, H + 60);
+    const vg = ctx.createRadialGradient(hcx, H * 0.5, Math.min(W, H) * 0.12, hcx, H * 0.5, Math.max(W, H) * 0.78); vg.addColorStop(0, `rgba(${bgRGB},0.35)`); vg.addColorStop(1, `rgba(${bgRGB},0.97)`); ctx.fillStyle = vg; ctx.fillRect(-30, -30, W + 60, H + 60);
     for (const m of MENU.mote) { const y = ((m.y - t * m.v) % 1 + 1) % 1, x = m.x + Math.sin(t * 0.4 + m.ph) * 0.012; ctx.fillStyle = `rgba(${fg},${m.a * (0.5 + 0.5 * Math.sin(t * 0.9 + m.ph)) * Math.min(1, t / 1.5) * Math.sin(y * Math.PI)})`; ctx.beginPath(); ctx.arc(x * W, y * H, m.r * u, 0, TAU); ctx.fill(); }
     // ---- şafak ışığı ----
     const hin = ease(t / 1.2), pu = 0.85 + 0.15 * Math.sin(t * 1.1), hr = (150 + 30 * egg) * u * pu, bob = Math.sin(t * 1.3) * 5 * u;
@@ -6019,17 +6005,17 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const uiA = act ? 1 - clamp(sT / 0.25, 0, 1) : 1;
     if (uiA > 0.002) {
       ctx.save(); ctx.globalAlpha = uiA;
-      const hs0 = !!SAVED, colX = W * 0.66, colW = Math.min(W * 0.4, 420), Bh = (hs0 ? 248 : 202) * u, top0 = (H - Bh) / 2, tcx = land ? colX : cx;   // yatay: sağ sütun dikeyde ortalı
-      ctx.font = `300 100px ${UIF}`; const L = [...GAME_TITLE], w100 = L.reduce((q, c) => q + ctx.measureText(c).width + 20, -20), size = land ? Math.min(46 * u, colW * 0.92 / w100 * 100) : Math.min(60 * u + 8, (W * 0.86) / w100 * 100);
-      ctx.font = `300 ${size}px ${UIF}`; const sp = size * 0.2, ws = L.map(c => ctx.measureText(c).width), tot = ws.reduce((q, w) => q + w + sp, -sp), ty = land ? top0 + 38 * u : H * 0.5; let lx = tcx - tot / 2;
+      const hs0 = !!SAVED, colX = W * 0.66, colW = Math.min(W * 0.4, 420), Bh = (hs0 ? 248 : 202) * u, top0 = (H - Bh) / 2, tcx = colX;   // yatay: sağ sütun dikeyde ortalı
+      ctx.font = `300 100px ${UIF}`; const L = [...GAME_TITLE], w100 = L.reduce((q, c) => q + ctx.measureText(c).width + 20, -20), size = Math.min(46 * u, colW * 0.92 / w100 * 100);
+      ctx.font = `300 ${size}px ${UIF}`; const sp = size * 0.2, ws = L.map(c => ctx.measureText(c).width), tot = ws.reduce((q, w) => q + w + sp, -sp), ty = top0 + 38 * u; let lx = tcx - tot / 2;
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       L.forEach((c, i) => { const e = ease((t - 0.5 - i * 0.07) / 0.9), sh = 0.9 + 0.1 * Math.sin(t * 0.9 - i * 0.4); ctx.fillStyle = `rgba(${fg},${e * sh})`; ctx.fillText(c, lx, ty + (1 - e) * 10 * u); lx += ws[i] + sp; });
-      const le = ease((t - 1.3) / 1.0), ly = ty + (land ? 20 : 26) * u, lw = Math.min(land ? colW * 0.6 : W * 0.5, 190 * u) * le;
+      const le = ease((t - 1.3) / 1.0), ly = ty + 20 * u, lw = Math.min(colW * 0.6, 190 * u) * le;
       ctx.strokeStyle = `rgba(${fg},0.28)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tcx - lw / 2, ly); ctx.lineTo(tcx - 5, ly); ctx.moveTo(tcx + 5, ly); ctx.lineTo(tcx + lw / 2, ly); ctx.stroke();
       ctx.fillStyle = `rgba(240,194,74,${0.85 * le})`; ctx.save(); ctx.translate(tcx, ly); ctx.rotate(PI / 4); ctx.fillRect(-2.2, -2.2, 4.4, 4.4); ctx.restore();
-      const se = ease((t - 1.6) / 1.0); ctx.font = `400 ${12 * u + 1}px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.5 * se})`; ctx.fillText(GAME_SUB, tcx, ly + (land ? 24 : 28) * u);
-      MENU.btns.length = 0; const hs = !!SAVED, be = ease((t - 1.9) / 0.9), by = H * 0.655 + (1 - be) * 12 - (hs ? 40 : 0), bw = Math.min(W * 0.64, 250), bh = 54, ow = Math.min(W * 0.4, 128), oh = 38, og = 10, oy = by + bh + 22 + (hs ? 56 : 0);
-      if (land) {   // YATAY: sağ sütunda ana düğme(ler) + yazısız ikonlar; köşelerde geliştirici / ayarlar
+      const se = ease((t - 1.6) / 1.0); ctx.font = `400 ${12 * u + 1}px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.5 * se})`; ctx.fillText(GAME_SUB, tcx, ly + 24 * u);
+      MENU.btns.length = 0; const hs = !!SAVED, be = ease((t - 1.9) / 0.9);
+      {   // sağ sütunda ana düğme(ler) + yazısız ikonlar; köşelerde geliştirici / ayarlar
         const k = u, pbw = Math.min(colW * 0.78, 230 * k), pbh = 44 * k, pry = ly + 44 * k + (1 - be) * 12, bx = colX - pbw / 2; let yy = pry + pbh;
         menuPill(bx, pry, pbw, pbh, hs ? 'DEVAM' : 'BAŞLA', be, true, t, null, k); MENU.btns.push({ x: bx, y: pry - 4, w: pbw, h: pbh + 8, fn: () => menuStart(hs) });
         if (hs) { const ny = pry + pbh + 10 * k, nh = 36 * k; menuPill(bx, ny, pbw, nh, 'BAŞLA', be, false, t, null, k); MENU.btns.push({ x: bx, y: ny - 3, w: pbw, h: nh + 6, fn: () => menuStart(false) }); yy = ny + nh; }
@@ -6038,21 +6024,10 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         const m = Math.max(14, HUD_M), r2 = 17, cy2 = Math.max(14, HUD_Y - 14) + r2;
         menuIcon(m + r2, cy2, r2, 'dev', be); MENU.btns.push({ x: m - 6, y: cy2 - r2 - 6, w: r2 * 2 + 12, h: r2 * 2 + 12, fn: devEnterFromMenu });
         menuIcon(W - m - r2, cy2, r2, 'gear', be); MENU.btns.push({ x: W - m - r2 * 2 - 6, y: cy2 - r2 - 6, w: r2 * 2 + 12, h: r2 * 2 + 12, fn: settingsEnterFromMenu });
-      } else {
-      if (hs) {   // kayıt varsa: DEVAM (son kamptan) + BAŞLA (yeni tohumlu, sıfırdan yeni harita)
-        menuPill(cx - bw / 2, by, bw, bh, 'DEVAM', be, true, t); MENU.btns.push({ x: cx - bw / 2, y: by - 6, w: bw, h: bh + 12, fn: () => menuStart(true) });
-        const ny = by + bh + 12; menuPill(cx - bw / 2, ny, bw, 44, 'BAŞLA', be, false, t); MENU.btns.push({ x: cx - bw / 2, y: ny - 4, w: bw, h: 52, fn: () => menuStart(false) });
-      } else { menuPill(cx - bw / 2, by, bw, bh, 'BAŞLA', be, true, t); MENU.btns.push({ x: cx - bw / 2, y: by - 6, w: bw, h: bh + 12, fn: () => menuStart(false) }); }
-      menuPill(cx - ow - og / 2, oy, ow, oh, 'KIYAFET', be, false, t); MENU.btns.push({ x: cx - ow - og / 2, y: oy - 4, w: ow, h: oh + 8, fn: wdEnterFromMenu });
-      menuPill(cx + og / 2, oy, ow, oh, 'REHBER', be, false, t); MENU.btns.push({ x: cx + og / 2, y: oy - 4, w: ow, h: oh + 8, fn: rehberEnterFromMenu });
-      { const m = 14, r2 = 18, cy2 = UI_TOP + 4 + r2;   // üst sıra: solda GELİŞTİRİCİ (barışçıl başlar) · sağda AYARLAR (ses) · yalnızca simge
-        menuIcon(m + r2, cy2, r2, 'dev', be); MENU.btns.push({ x: m - 6, y: cy2 - r2 - 6, w: r2 * 2 + 12, h: r2 * 2 + 12, fn: devEnterFromMenu });
-        menuIcon(W - m - r2, cy2, r2, 'gear', be); MENU.btns.push({ x: W - m - r2 * 2 - 6, y: cy2 - r2 - 6, w: r2 * 2 + 12, h: r2 * 2 + 12, fn: settingsEnterFromMenu }); }
       }
       if (be < 0.45) MENU.btns.length = 0;   // düğmeler yeterince belirmeden basılamaz
-      if (land && H > 300) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', colX, H - 14); }
-      if (!land && oy + oh + 14 < H - 40) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', cx, H - 26); }
-      if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', land ? hcx : cx, land ? Math.min(H - 16, hy + R * 1.22 + 36 * u) : Math.min(H - 52, oy + oh + 36)); }
+      if (H > 300) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', colX, H - 14); }
+      if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', hcx, Math.min(H - 16, hy + R * 1.22 + 36 * u)); }
       ctx.restore();
     } else MENU.btns.length = 0;
     ctx.restore();
@@ -6133,7 +6108,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const str = clockStr(), prev = TM.str;
     if (str !== prev) { for (let i = 1; i <= str.length; i++) { const c = str[str.length - i], o = prev ? prev[prev.length - i] : ''; if (c !== o) { TM.old[i] = o || ''; TM.rc[i] = 1; } } TM.str = str; }
     ctx.save(); ctx.font = `500 ${17 * HUD_S}px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = BAG.x - BAG.r * HUD_S - 14 * HUD_S; const y = HUD_Y + 29 * (HUD_S - 1) + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
+    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = BAG.x - BAG.r * HUD_S - 30 * HUD_S; const y = HUD_Y + 29 * (HUD_S - 1) + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
     ctx.shadowColor = `rgba(${bgc},0.9)`; ctx.shadowBlur = 5;
     for (let i = 1; i <= str.length; i++) {
       const c = str[str.length - i], col = c === ':', w = col ? cw : dw, cx = x - w / 2; x -= w;
@@ -6241,36 +6216,39 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawDevPage(u, cx, dt, fg, bgRGB, over) {   // sade tasarım: tek renk (oyunun beyaz silüet dili), kart yok, ince ayırıcı çizgiler, küçük harfli yazı
     if (!over) { DEVP.t += dt; FX.t += dt; }
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
-    const cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = UI_TOP + 8, hh = 38, BG = `rgb(${bgRGB})`;
+    const LW = clamp(W * 0.3, 210, 260), hy = 12, hh = 38, hx = 22, BG = `rgb(${bgRGB})`;   // yatay: solda sabit sütun (geri · başlık · sekmeler · başla), sağda kayan içerik ortalı
+    const cw = Math.min(W - LW - 48, 520), x0 = LW + (W - LW - cw) / 2;
     const hair = (y, a) => { ctx.strokeStyle = `rgba(${fg},${a || 0.1})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x0 + cw, Math.round(y) + 0.5); ctx.stroke(); };
     const ease = t => t * t * (3 - 2 * t);
     if (!over) DEVP.ina = Math.min(1, DEVP.ina + dt / 0.45);
     const ie = ease(DEVP.ina); ctx.save(); ctx.globalAlpha *= ie; ctx.translate(0, (1 - ie) * 6);
-    // ---- üst: < · GELİŞTİRİCİ (en başta, belirgin) · başla
-    backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 48, h: hh + 12, fn: devBack });
-    const tw0 = dvText('Geliştirici', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
-    ctx.fillStyle = `rgb(${GOLDC})`; ctx.beginPath(); ctx.arc(x0 + 28 + tw0 + 9, hy + hh / 2 + 7, 2.6, 0, TAU); ctx.fill();
-    dvText(PAUSE.fromMenu ? 'başla' : 'devam', x0 + cw, hy + hh / 2, 15, 500, fg, 0.85, 0, 'right'); PAUSE.btns.push({ x: x0 + cw - 84, y: hy - 8, w: 96, h: hh + 16, fn: devStart });
-    // ---- sekmeler: düz yazı, seçili olanın altında yumuşakça kayan ince çizgi
-    const ty = hy + hh + 14, th = 34; let tx = x0, ut = -1, uw2 = 0;
+    // ---- sol sütun: < · GELİŞTİRİCİ · dikey sekmeler · başla
+    backChev(hx + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: hx - 14, y: hy - 6, w: 48, h: hh + 12, fn: devBack });
+    const tw0 = dvText('Geliştirici', hx + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
+    ctx.fillStyle = `rgb(${GOLDC})`; ctx.beginPath(); ctx.arc(hx + 28 + tw0 + 9, hy + hh / 2 + 7, 2.6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(${fg},0.1)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(LW + 0.5, 14); ctx.lineTo(LW + 0.5, H - 14); ctx.stroke();   // sütun ayracı
+    // sekmeler: düz yazı, seçili olanın solunda yumuşakça kayan ince çizgi
+    const ty = hy + hh + 22, th = 40; let ut = -1;
     DEV_TABS.forEach((nm, i) => {
-      const on = DEVP.want === i; ctx.font = `500 15px ${UIF}`; const tw = ctx.measureText(nm).width;
+      const on = DEVP.want === i, ry = ty + i * th;
       DEVP['tv' + i] = (DEVP['tv' + i] || 0) + ((on ? 1 : 0) - (DEVP['tv' + i] || 0)) * dmp(9, dt);
-      dvText(nm, tx, ty + th / 2 - 2, 15, 500, fg, 0.38 + 0.62 * DEVP['tv' + i], 0, 'left');
-      if (on) { ut = tx; uw2 = tw; }
-      PAUSE.btns.push({ x: tx - 12, y: ty - 6, w: tw + 24, h: th + 10, fn: () => { if (DEVP.want !== i) { DEVP.want = i; DEVP.dn = null; } } }); tx += tw + 30;
+      dvText(nm, hx + 16, ry + th / 2, 16, 500, fg, 0.38 + 0.62 * DEVP['tv' + i], 0, 'left');
+      if (on) ut = ry;
+      PAUSE.btns.push({ x: hx - 12, y: ry, w: LW - hx - 6, h: th, fn: () => { if (DEVP.want !== i) { DEVP.want = i; DEVP.dn = null; } } });
     });
-    if (DEVP.ux < 0) { DEVP.ux = ut; DEVP.uw = uw2; } else { const k = dmp(10, dt); DEVP.ux += (ut - DEVP.ux) * k; DEVP.uw += (uw2 - DEVP.uw) * k; }
-    ctx.fillStyle = `rgba(${fg},0.9)`; rr(DEVP.ux, ty + th - 2, DEVP.uw, 1.6, 0.8); ctx.fill();
-    hair(ty + th + 1, 0.1);
-    // ---- kayan içerik
-    const ctop = ty + th + 8, cbot = H - 10;
+    if (DEVP.ux < 0) DEVP.ux = ut; else DEVP.ux += (ut - DEVP.ux) * dmp(10, dt);
+    ctx.fillStyle = `rgba(${fg},0.9)`; rr(hx, DEVP.ux + 10, 2.2, th - 20, 1.1); ctx.fill();
+    { const bw = LW - hx - 20, bh = 40, bx = hx, by2 = H - 14 - bh;   // başla / devam: tek ana eylem (dolu beyaz)
+      rr(bx, by2, bw, bh, 10); ctx.fillStyle = `rgb(${fg})`; ctx.fill(); dvText(PAUSE.fromMenu ? 'başla' : 'devam', bx + bw / 2, by2 + bh / 2 + 0.5, 14, 600, bgRGB, 1, 0, 'center');
+      PAUSE.btns.push({ x: bx - 4, y: by2 - 4, w: bw + 8, h: bh + 8, fn: devStart }); }
+    // ---- kayan içerik (sağ alan)
+    const ctop = 12, cbot = H - 10;
     if (DEVP.tab !== DEVP.want) { DEVP.ta -= dt / 0.14; if (DEVP.ta <= 0) { DEVP.ta = 0; DEVP.tab = DEVP.want; DEVP.scroll = DEVP.tg = DEVP.vel = 0; } } else DEVP.ta = Math.min(1, DEVP.ta + dt / 0.28);
     const tae = ease(clamp(DEVP.ta, 0, 1)); DEVP.tg = clamp(DEVP.tg, 0, DEVP.max);
     if (!DEVP.dn || !DEVP.dn.mv) DEVP.scroll += (DEVP.tg - DEVP.scroll) * dmp(11, dt);   // yumuşak, gecikmeli takip
     DEVP.scroll = clamp(DEVP.scroll, 0, DEVP.max); if (Math.abs(DEVP.tg - DEVP.scroll) < 0.05) DEVP.scroll = DEVP.tg;
     const btn = (x, y, w, h, fn) => { const sy = y - DEVP.scroll, y0 = Math.max(sy, ctop), y1 = Math.min(sy + h, cbot); if (y1 - y0 < 8) return; PAUSE.btns.push({ x, y: y0, w, h: y1 - y0, fn }); };
-    ctx.save(); ctx.beginPath(); ctx.rect(0, ctop, W, cbot - ctop); ctx.clip(); ctx.globalAlpha *= tae; ctx.translate(0, -DEVP.scroll + (1 - tae) * 10);
+    ctx.save(); ctx.beginPath(); ctx.rect(LW + 1, ctop, W - LW - 1, cbot - ctop); ctx.clip(); ctx.globalAlpha *= tae; ctx.translate(0, -DEVP.scroll + (1 - tae) * 10);
     const sec = (str, y) => { dvText(str, x0, y + 12, 12, 500, fg, 0.36, 0, 'left'); return y + 32; };
     const tog = (key, on, xr, yc) => {   // küçük anahtar: açıkken dolu beyaz
       const v = DEVP.sw[key] = (DEVP.sw[key] || 0) + ((on ? 1 : 0) - (DEVP.sw[key] || 0)) * dmp(10, dt), w = 40, h = 22;
@@ -6380,12 +6358,12 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     DEVP.max = Math.max(0, y + 24 - cbot);
     if (DEVP.max > 1) {
       const gb = ease(clamp((DEVP.max - DEVP.scroll) / 40, 0, 1)), gt = ease(clamp(DEVP.scroll / 40, 0, 1));
-      if (gb > 0.01) { const g = ctx.createLinearGradient(0, cbot - 30, 0, cbot); g.addColorStop(0, `rgba(${bgRGB},0)`); g.addColorStop(1, `rgba(${bgRGB},${0.95 * gb})`); ctx.fillStyle = g; ctx.fillRect(0, cbot - 30, W, 30); }
-      if (gt > 0.01) { const g = ctx.createLinearGradient(0, ctop, 0, ctop + 22); g.addColorStop(0, `rgba(${bgRGB},${0.95 * gt})`); g.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = g; ctx.fillRect(0, ctop, W, 22); }
+      if (gb > 0.01) { const g = ctx.createLinearGradient(0, cbot - 30, 0, cbot); g.addColorStop(0, `rgba(${bgRGB},0)`); g.addColorStop(1, `rgba(${bgRGB},${0.95 * gb})`); ctx.fillStyle = g; ctx.fillRect(LW + 1, cbot - 30, W - LW - 1, 30); }
+      if (gt > 0.01) { const g = ctx.createLinearGradient(0, ctop, 0, ctop + 22); g.addColorStop(0, `rgba(${bgRGB},${0.95 * gt})`); g.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = g; ctx.fillRect(LW + 1, ctop, W - LW - 1, 22); }
       const mvg = Math.abs(DEVP.tg - DEVP.scroll) > 0.5 || (DEVP.dn && DEVP.dn.mv); DEVP.sa += ((mvg ? 1 : 0) - DEVP.sa) * dmp(mvg ? 14 : 3, dt);
       if (DEVP.sa > 0.01) { const tr = cbot - ctop - 16, bh = Math.max(28, tr * (cbot - ctop) / (DEVP.max + cbot - ctop)), by = ctop + 8 + (tr - bh) * (DEVP.scroll / DEVP.max); ctx.fillStyle = `rgba(${fg},${0.28 * DEVP.sa})`; rr(x0 + cw + 10, by, 2.4, bh, 1.2); ctx.fill(); }
     }
-    if (DEVP.toast) { const T = DEVP.toast; T.t += over ? 0 : dt; const a = T.t < 0.2 ? T.t / 0.2 : T.t > 1.8 ? Math.max(0, 1 - (T.t - 1.8) / 0.3) : 1; if (T.t > 2.1) DEVP.toast = null; else { ctx.font = `500 12.5px ${UIF}`; const tw2 = ctx.measureText(T.msg).width + 36; ctx.save(); ctx.globalAlpha *= a; rr(W / 2 - tw2 / 2, H - 74 - (1 - a) * 8, tw2, 36, 18); ctx.fillStyle = `rgb(${bgRGB})`; ctx.fill(); ctx.strokeStyle = `rgba(${fg},0.3)`; ctx.lineWidth = 1; ctx.stroke(); dvText(T.msg, W / 2, H - 74 + 18 - (1 - a) * 8, 12.5, 500, fg, 1, 0, 'center'); ctx.restore(); } }
+    if (DEVP.toast) { const T = DEVP.toast; T.t += over ? 0 : dt; const a = T.t < 0.2 ? T.t / 0.2 : T.t > 1.8 ? Math.max(0, 1 - (T.t - 1.8) / 0.3) : 1; if (T.t > 2.1) DEVP.toast = null; else { ctx.font = `500 12.5px ${UIF}`; const tw2 = ctx.measureText(T.msg).width + 36; ctx.save(); ctx.globalAlpha *= a; rr((LW + W) / 2 - tw2 / 2, H - 74 - (1 - a) * 8, tw2, 36, 18); ctx.fillStyle = `rgb(${bgRGB})`; ctx.fill(); ctx.strokeStyle = `rgba(${fg},0.3)`; ctx.lineWidth = 1; ctx.stroke(); dvText(T.msg, (LW + W) / 2, H - 74 + 18 - (1 - a) * 8, 12.5, 500, fg, 1, 0, 'center'); ctx.restore(); } }
     ctx.restore();
   }
 
@@ -6436,7 +6414,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function wdStageUi(st, scx, P, t, dt, pvk) {   // sahnenin üstünde: bakiye hapı · alttan süzülen satın al / bilgi hapı · efektler
     {   // --- bakiye hapı (sol üst) ---
       const txt = String(Math.max(0, Math.round(WDR.dv))); ctx.save(); ctx.font = `700 15px ${UIF}`;
-      const tw = ctx.measureText(txt).width, h = 32, w = 20 + 16 + tw + 18, bx = st.x + (WDR.land ? 66 : 16), by = st.y + 14, bs = 1 + 0.12 * WDR.bump, sk = Math.sin(WDR.shake * 22) * 4 * WDR.shake;
+      const tw = ctx.measureText(txt).width, h = 32, w = 20 + 16 + tw + 18, bx = st.x + 66, by = st.y + 14, bs = 1 + 0.12 * WDR.bump, sk = Math.sin(WDR.shake * 22) * 4 * WDR.shake;
       ctx.translate(bx + w / 2 + sk, by + h / 2); ctx.scale(bs, bs); ctx.translate(-w / 2, -h / 2);
       rr(0, 0, w, h, h / 2); ctx.fillStyle = P.p2; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = WDR.shake > 0.05 ? '#e0584a' : P.ln2; ctx.stroke();
       drawIngot(21, 18, 0.82, 0.26 + 0.18 * Math.sin(t * 1.8));
@@ -6521,16 +6499,15 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawWardrobePage(u, cxW, fg) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(), t = nowMs / 1000, dt = WDR.last ? Math.min(0.05, (nowMs - WDR.last) / 1000) : 0.016; WDR.last = nowMs; WDR.mt = Math.max(0, WDR.mt - dt); wdTick(dt);
-    const P = wdPal(), land = W > H * 1.05 || H < 520, hdr = land ? 0 : UI_TOP + 36, gC = 12, chipsH = land && H < 360 ? 32 : 58, padT = land ? 14 : 20;
+    const P = wdPal(), gC = 12, chipsH = H < 360 ? 32 : 58, padT = 14;
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
     if (!WDR.drag) { WDR.yaw += WDR.vel * dt; WDR.vel *= Math.exp(-3.2 * dt); if (Math.abs(WDR.vel) < 0.02) WDR.vel = 0; WDR.idle += dt; if (WDR.idle > 4 && WDR.vel === 0) { const tg = Math.round(WDR.yaw / TAU) * TAU; WDR.yaw += (tg - WDR.yaw) * (1 - Math.exp(-4 * dt)); if (Math.abs(tg - WDR.yaw) < 0.002) WDR.yaw = tg; } }
     // --- yerleşim ---
     const opts = [null, ...Object.keys(GEAR).filter(k => GEAR[k].slot === WDR.sel && (!GEAR[k].dev || DEV.on))], nO = opts.length;
     let pr, st, cw;
-    if (!land) { cw = H < 700 ? 68 : 84; const ph = padT + 28 + 16 + 26 + chipsH + 12 + cw + 26 + 22; pr = { x: 0, y: H - ph, w: W, h: ph }; st = { x: 0, y: hdr, w: W, h: pr.y - hdr }; }
-    else { cw = 62; const pw = clamp(W * 0.44, 280, 380); pr = { x: W - pw - 12, y: 12, w: pw, h: H - 24 }; st = { x: 0, y: 0, w: pr.x, h: H }; }   // yatay: başlık bandı yok · panel dört kenardan 12 boşlukla, düğmeler sahnenin köşesinde yüzer
+    cw = 62; const pw = clamp(W * 0.44, 280, 380); pr = { x: W - pw - 12, y: 12, w: pw, h: H - 24 }; st = { x: 0, y: 0, w: pr.x, h: H };   // başlık bandı yok · panel dört kenardan 12 boşlukla, düğmeler sahnenin köşesinde yüzer
     cw = Math.min(cw, (pr.w - 32 - gC * (nO - 1)) / nO); WDR.stage = st;
-    const scx = st.x + st.w / 2, sc = clamp(Math.min((st.h - 70 - (land ? 42 : 0)) / 51, (st.w / 2 - 14) / 15, (st.w / 2 - 78) / 8.8), 2.2, 7.6), gy = st.y + st.h - (4 * sc + 62);
+    const scx = st.x + st.w / 2, sc = clamp(Math.min((st.h - 112) / 51, (st.w / 2 - 14) / 15, (st.w / 2 - 78) / 8.8), 2.2, 7.6), gy = st.y + st.h - (4 * sc + 62);
     // --- sahne: opak radyal zemin, platform, karakter ---
     { ctx.save(); ctx.beginPath(); ctx.rect(st.x, st.y, st.w, st.h); ctx.clip(); const R = Math.max(st.w * 0.6, 170), gr = ctx.createRadialGradient(scx, gy - 22 * sc, 0, scx, gy - 22 * sc, R); gr.addColorStop(0, P.m(0.07)); gr.addColorStop(1, P.bg); ctx.fillStyle = gr; ctx.fillRect(st.x, st.y, st.w, st.h); ctx.restore(); }
     ctx.beginPath(); ctx.ellipse(scx, gy, 15 * sc, 4 * sc, 0, 0, TAU); ctx.fillStyle = P.p2; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.ln; ctx.stroke();
@@ -6548,13 +6525,13 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.fillStyle = P.gold; ctx.textBaseline = 'middle'; wdLetters(lab, lx + lw / 2, ay + 0.5, 2.4, 'c');
     }
     WDR.geo.tx = an ? scx + an[0] * sc : scx; WDR.geo.ty = an ? gy + an[1] * sc : gy - 22 * sc;
-    WDR.land = land; wdStageUi(st, scx, P, t, dt, pvk);
+    wdStageUi(st, scx, P, t, dt, pvk);
     if (WDR.hint * (1 - WDR.bt) > 0.03) { ctx.font = `400 10px ${UIF}`; ctx.textBaseline = 'middle'; ctx.fillStyle = P.m(WDR.hint * (1 - WDR.bt) * (0.36 + 0.1 * Math.sin(t * 2))); wdLetters('sürükleyerek döndür', scx, gy + 4 * sc + 20, 1.8, 'c'); }
     // --- başlık + düğmeler ---
-    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx; if (!land) wdLetters('KIYAFET', cxW, UI_TOP + 19, 6, 'c');   // yatayda başlık yok
+    ctx.textBaseline = 'middle'; ctx.font = `600 13px ${UIF}`; ctx.fillStyle = P.tx;
     const any = GEAR_SLOTS.some(([sl]) => OUTFIT[sl]);
     const round = (x, y, en, ico) => { ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = en ? P.ln2 : P.ln; ctx.stroke(); ctx.strokeStyle = en ? P.tx : P.ln2; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ico(x, y); };
-    const by = land ? 30 : UI_TOP + 19, rx = land ? pr.x - 34 : W - 34;   // portre: düğmeler UI_TOP bandının altında · yatay: sol üstte geri, sahnenin sağ üstünde sıfırla (panelin üstüne binmez)
+    const by = 30, rx = pr.x - 34;   // sol üstte geri, sahnenin sağ üstünde sıfırla (panelin üstüne binmez)
     round(34, by, true, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 2.5, y - 6.5); ctx.lineTo(x - 3.5, y); ctx.lineTo(x + 2.5, y + 6.5); ctx.stroke(); });
     PAUSE.btns.push({ x: 8, y: by - 26, w: 52, h: 52, fn: wdBack });
     round(rx, by, any, (x, y) => { const r = 6.6, a0 = -PI / 2 + 0.55, a1 = -PI / 2 - 0.55 + TAU, px = x + r * Math.cos(a1), py = y + r * Math.sin(a1), tx = -Math.sin(a1), ty = Math.cos(a1), nx = Math.cos(a1), ny = Math.sin(a1);
@@ -6562,7 +6539,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.beginPath(); ctx.moveTo(px + tx * 3.4, py + ty * 3.4); ctx.lineTo(px - tx * 1.2 + nx * 3.4, py - ty * 1.2 + ny * 3.4); ctx.lineTo(px - tx * 1.2 - nx * 3.4, py - ty * 1.2 - ny * 3.4); ctx.closePath(); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); });
     if (any) PAUSE.btns.push({ x: rx - 26, y: by - 26, w: 52, h: 52, fn: () => { for (const [sl] of GEAR_SLOTS) OUTFIT[sl] = null; saveOutfit(); try { AU.sfx('sheath'); } catch (_) {} } });
     // --- panel ---
-    ctx.save(); if (land) rr(pr.x, pr.y, pr.w, pr.h, 22); else rr(-2, pr.y, W + 4, pr.h + 40, 26); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = P.ln; ctx.stroke(); ctx.restore();
+    ctx.save(); rr(pr.x, pr.y, pr.w, pr.h, 22); ctx.fillStyle = P.p1; ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = P.ln; ctx.stroke(); ctx.restore();
     const pcx = pr.x + pr.w / 2; let y = pr.y + padT;
     ctx.textBaseline = 'middle'; ctx.font = `600 10px ${UIF}`;
     { const w0 = GEAR_SLOTS.map(([, lb]) => wdW(lb, 2.4)), tg = 6, tpad = clamp((pr.w - 20 - tg * (w0.length - 1) - w0.reduce((q, v) => q + v, 0)) / w0.length, 14, 34), tabs = GEAR_SLOTS.map(([sl, lb], i) => ({ sl, lb, w: w0[i] + tpad })), th = 28; let x = pcx - tabs.reduce((q, o) => q + o.w + tg, -tg) / 2;
@@ -6618,8 +6595,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (PAUSE.page === 'skills') { pg(c => drawSkillsPage(u, c, dt, fg, bgRGB, over)); ctx.restore(); return; }
     if (PAUSE.page === 'powers') { pg(c => drawPowersPage(u, c, dt, fg, bgRGB, over)); ctx.restore(); return; }
     if (PAUSE.page === 'settings') { pg(c => drawSettingsPage(u, c, fg)); ctx.restore(); return; }
-    const land = W > H * 1.05;   // YATAY: sol sütunda başlık + süre, sağ sütunda düğmeler (dikey ekranda eski tek sütun düzeni)
-    if (land) {
+    {   // sol sütunda başlık + süre, sağ sütunda düğmeler
       const ls = clamp(H / 390, 0.8, 1.3), M = Math.max(HUD_M, 16), colW = W / 2 - M, cxL = M + colW / 2, cxR = W / 2 + colW / 2;
       const top = 16 + 19 * 2 + 8;   // sağ üstteki simge düğmelerinin altı
       let bh = 46 * ls, oh = 38 * ls, g1 = 14 * ls, g2 = 8 * ls, g3 = 18 * ls;
@@ -6653,28 +6629,9 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         y += oh + g3; menuPill(bx0, y, bw, oh, cf ? 'EMİN MİSİN?' : 'ANA MENÜ', 1, false, 0, '224,88,74');
         PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); location.reload(); }
            else PAUSE.cfT = 2.5; } }); }
-    } else {
-    const total = 316 * u + 52; let y = Math.max(UI_TOP, (H - total) / 2 - H * 0.03);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
-    const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cx - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
-    y += 18 * u + 14 * u; ctx.textAlign = 'center'; ctx.font = `200 ${54 * u}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(PLAY.t), cx, y + 44 * u);
-    y += 54 * u + 4 * u; ctx.font = `400 ${11 * u + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('oynanan süre', cx, y + 12 * u);
-    y += 12 * u + 28 * u; PAUSE.btns.length = 0; PAUSE.sl.length = 0;
-    const bw = Math.min(W * 0.74, 280), bh = 52, og = 10, ow = (bw - og) / 2, oh = 40, bx0 = cx - bw / 2;   // tüm düğmeler aynı genişlikte hizalı
-    menuPill(bx0, y, bw, bh, 'DEVAM ET', 1, true, performance.now() / 1000); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: bh + 8, fn: resumeGame });
-    y += bh + 22 * u;
-    menuPill(bx0, y, ow, oh, 'ENVANTER', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: ow, h: oh + 8, fn: () => invEnter('main') });
-    menuPill(bx0 + ow + og, y, ow, oh, 'KIYAFET', 1, false, 0); PAUSE.btns.push({ x: bx0 + ow + og, y: y - 4, w: ow, h: oh + 8, fn: wdEnter });   // craft yalnızca kamp tezgahında
-    y += oh + 12; menuPill(bx0, y, bw, oh, 'GÜÇLENDİRMELER', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: powersEnter });
-    if (DEV.anycraft) { y += oh + 12; menuPill(bx0, y, bw, oh, 'CRAFT', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: craftEnter }); }   // geliştirici: her yerde üret
-    // geliştirici ayarları: dikeyde sol üstteki simge düğmesinden açılır (aşağıda)
-    { const cf = (PAUSE.cfT || 0) > 0;   // ANA MENÜ: kırmızı, en altta ayrı · yanlışlıkla basılmasın diye ilk dokunuş onay ister (2,5 sn), ikincisi menüye döner
-      y += oh + 30 * u; menuPill(bx0, y, bw, oh, cf ? 'EMİN MİSİN?' : 'ANA MENÜ', 1, false, 0, '224,88,74');
-      PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); location.reload(); }   // çıkarken kaydet: devam, bu oyunun kaldığı kamptan açılır
-         else PAUSE.cfT = 2.5; } }); }
-    }   // /dikey düzen
+    }
     {   // sağ üst: küçük simge düğmeleri · solda bilgi (Rehber), sağda ayarlar (ses)
-      const ir = 19, iy = land ? 16 + ir : UI_TOP + 24, sx2 = W - (land ? Math.max(HUD_M, 16) : 16) - ir, ix2 = sx2 - 2 * ir - 10;
+      const ir = 19, iy = 16 + ir, sx2 = W - Math.max(HUD_M, 16) - ir, ix2 = sx2 - 2 * ir - 10;
       const icon = (x, kind, fn) => {
         ctx.save(); ctx.translate(x, iy); ctx.beginPath(); ctx.arc(0, 0, ir, 0, TAU); ctx.fillStyle = `rgba(${fg},0.06)`; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = kind === 'dev' ? 'rgba(240,194,74,0.6)' : `rgba(${fg},0.28)`; ctx.stroke();
         ctx.strokeStyle = `rgba(${fg},0.88)`; ctx.fillStyle = `rgba(${fg},0.88)`; ctx.lineCap = 'round';
@@ -6684,7 +6641,6 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         ctx.restore(); PAUSE.btns.push({ x: x - ir - 6, y: iy - ir - 6, w: ir * 2 + 12, h: ir * 2 + 12, fn });
       };
       icon(ix2, 'info', rehberEnter); icon(sx2, 'gear', settingsEnter);
-      if (!land && DEV.on) icon(16 + ir, 'dev', () => { PAUSE.page = 'dev'; });   // dikey: yalnızca simge, solda
     }
     ctx.restore();
   }
@@ -6694,35 +6650,20 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function settingsEnterFromMenu() { PAUSE.page = 'settings'; PAUSE.fromMenu = true; PAUSE.on = true; PAUSE.a = 0; PAUSE.drag = null; PAUSE.snap = null; }
   function settingsEnter() { PAUSE.page = 'settings'; PAUSE.drag = null; }   // duraklatma menüsünden
   function settingsBack() { if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; } PAUSE.page = 'main'; PAUSE.drag = null; }
-  function drawSettingsPage(u, cx, fg) {   // dikey: tek sütun · yatay: solda başlık sütunu, sağda ses paneli
+  function drawSettingsPage(u, cx, fg) {   // yatay: sol üstte geri + başlık · ses paneli ekranın tam ortasında
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
-    const land = W > H * 1.05 || H < 520, hh = 38, tint = c => `rgba(${fg},${c})`;
-    const controls = (px, py, pw, lx0, lw) => {   // ses kontrolleri: etiket · iki kaydırıcı · aç/kapa hapı (lx0, lw: etiket ve ayırıcı çizginin aralığı)
-      let y = py; dvText('SES', lx0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20;
-      ctx.strokeStyle = tint(0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx0, Math.round(y) + 0.5); ctx.lineTo(lx0 + lw, Math.round(y) + 0.5); ctx.stroke();
-      y += 34; const slw = pw - 88 - 38, sx = px + 88;
-      pauseSlider(sx, y, slw, 'MÜZİK', 'mus', 1, fg); PAUSE.sl.push({ k: 'mus', x: sx, y, w: slw });
-      y += 40; pauseSlider(sx, y, slw, 'EFEKT', 'sfx', 1, fg); PAUSE.sl.push({ k: 'sfx', x: sx, y, w: slw });
-      y += 34; const bw = Math.min(pw, 250), bh = 42, bx = px + (pw - bw) / 2;
-      menuPill(bx, y, bw, bh, AU.muted ? 'SES  KAPALI' : 'SES  AÇIK', 1, false, 0); PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn: () => AU.toggleMute() });
-      y += bh + 12; menuPill(bx, y, bw, bh, PORT.ok ? 'DİKEY MOD  AÇIK' : 'DİKEY MOD  KAPALI', 1, false, 0); PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn: togglePortrait });
-    };
-    if (!land) {
-      const cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = UI_TOP + 8;
-      backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 56, h: hh + 12, fn: settingsBack });
-      dvText('Ayarlar', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
-      const sw = Math.min(W * 0.78, 300);
-      controls(cx - sw / 2, hy + hh + 28, sw, x0, cw);
-      return;
-    }
-    // --- yatay: sol sütun (geri · başlık · kısa not) + sağ sütunda yuvarlak köşeli ses paneli ---
-    const LW = clamp(W * 0.4, 250, 380), lx = 22, hy = 12;
+    const hh = 38, lx = 22, hy = 12, tint = c => `rgba(${fg},${c})`;
     backChev(lx + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: lx - 14, y: hy - 6, w: 56, h: hh + 12, fn: settingsBack });
     dvText('Ayarlar', lx + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
-    dvText('Ses ve ekran yönünü', lx, H * 0.5 - 10, 13.5, 400, fg, 0.5, 0, 'left'); dvText('buradan ayarlayabilirsin.', lx, H * 0.5 + 12, 13.5, 400, fg, 0.5, 0, 'left');
-    const pw = Math.min(W - LW - 48, 440), ph = 24 + 20 + 34 + 40 + 34 + 42 + 54 + 24, px = LW + (W - LW - pw) / 2, py = (H - ph) / 2;
+    const pw = Math.min(W - 48, 440), ph = 24 + 20 + 34 + 40 + 34 + 42 + 24, px = (W - pw) / 2, py = (H - ph) / 2, ix = px + 28, iw = pw - 56;
     rr(px, py, pw, ph, 22); ctx.fillStyle = tint(0.035); ctx.fill(); ctx.lineWidth = 1.25; ctx.strokeStyle = tint(0.14); ctx.stroke();
-    controls(px + 28, py + 24, pw - 56, px + 28, pw - 56);
+    let y = py + 24; dvText('SES', px + pw / 2, y + 7, 11, 500, fg, 0.4, 3, 'center'); y += 20;   // ses kontrolleri: ortalı etiket · iki kaydırıcı · aç/kapa hapı
+    ctx.strokeStyle = tint(0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ix, Math.round(y) + 0.5); ctx.lineTo(ix + iw, Math.round(y) + 0.5); ctx.stroke();
+    y += 34; const slw = iw - 88 - 38, sx = ix + 88;
+    pauseSlider(sx, y, slw, 'MÜZİK', 'mus', 1, fg); PAUSE.sl.push({ k: 'mus', x: sx, y, w: slw });
+    y += 40; pauseSlider(sx, y, slw, 'EFEKT', 'sfx', 1, fg); PAUSE.sl.push({ k: 'sfx', x: sx, y, w: slw });
+    y += 34; const bw = Math.min(iw, 250), bh = 42, bx = px + (pw - bw) / 2;
+    menuPill(bx, y, bw, bh, AU.muted ? 'SES  KAPALI' : 'SES  AÇIK', 1, false, 0); PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn: () => AU.toggleMute() });
   }
   /* ---------- ÇANTA (ENVANTER): duraklatma menüsünden, craft masasından ya da 'I' tuşuyla açılır (PAUSE.page = 'inv') ·
        slotlu ızgara: her eşyanın sabit bir gözü var (bulunmayanlar sönük) · kategori sekmeleri · dokununca altta (yatayda sağda) ayrıntı kartı ---------- */
@@ -6779,7 +6720,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (!over) INVP.t += dt;
     const T = INVP.t, bgc = `rgb(${bgRGB})`, items = invItems();
     ctx.fillStyle = bgc; ctx.fillRect(0, 0, W, H);
-    const wide = W >= 640 && W > H * 1.1, cwT = Math.min(W - 32, wide ? 920 : 520), x0 = (W - cwT) / 2, gw = wide ? Math.round(cwT * 0.56) : cwT, hy = (wide ? 20 : UI_TOP) + 8, hh = 38;
+    const wide = W >= 640 && W > H * 1.1, cwT = Math.min(W - 32, wide ? 920 : 520), x0 = (W - cwT) / 2, gw = wide ? Math.round(cwT * 0.56) : cwT, hy = 12, hh = 38;
     // başlık
     backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 56, h: hh + 12, fn: invBack });
     dvText('Çanta', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
@@ -6925,16 +6866,19 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawSmeltPage(u, cx, dt, fg, bgRGB, over) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0; smeltTick(dt);
     ctx.fillStyle = `rgb(${bgRGB})`; ctx.fillRect(0, 0, W, H);
-    const cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = UI_TOP + 8, hh = 38, bgc = `rgb(${bgRGB})`, tint = c => `rgba(${fg},${c})`, busy = smeltBusy();
+    // yatay: solda geri + başlık + ocak sahnesi, sağda bilgi ve düğmeler (dikeyde ortalı)
+    const hy = 12, hh = 38, hx = 22, LW = Math.round(W * 0.46), bgc = `rgb(${bgRGB})`, tint = c => `rgba(${fg},${c})`, busy = smeltBusy();
+    const cw = Math.min(W - LW - 56, 360), x0 = LW + (W - LW - cw) / 2; cx = x0 + cw / 2;
     const hair = (y, a) => { ctx.strokeStyle = tint(a || 0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x0 + cw, Math.round(y) + 0.5); ctx.stroke(); };
-    backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 56, h: hh + 12, fn: smeltBack });
-    dvText('Eritme Ocağı', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
-    const sc = clamp(Math.min(cw / 300, (H * 0.27) / 168), 0.62, 1.1); let y = hy + hh + 18 + 150 * sc;
-    drawSmeltScene(cx - 14 * sc, y, sc, fg, bgc); y += 20;
-    hair(y, 0.09); y += 12;
+    backChev(hx + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: hx - 14, y: hy - 6, w: 56, h: hh + 12, fn: smeltBack });
+    dvText('Eritme Ocağı', hx + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
+    ctx.strokeStyle = tint(0.1); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(LW + 0.5, 14); ctx.lineTo(LW + 0.5, H - 14); ctx.stroke();
+    const sc = clamp(Math.min((LW - 40) / 300, (H - 110) / 170), 0.55, 1.15), sTop = hy + hh + (H - hy - hh - 170 * sc) / 2;
+    drawSmeltScene(LW / 2 - 14 * sc, sTop + 150 * sc, sc, fg, bgc);
+    let y = Math.max(14, (H - 285) / 2);
     const row = (label, val, a) => { dvText(label, x0, y + 12, 14, 400, fg, a || 0.7, 0.2, 'left'); dvText(val, x0 + cw, y + 12, 14.5, 500, fg, 0.95, 0.3, 'right'); y += 26; };
     row('Kaptaki toz', String(SM.run ? SM.n * SM_RATE : SM.load)); row('Envanterdeki toz', String(INV.dust)); row('Altın külçesi', String(INV.ingot)); hair(y, 0.07); y += 12;
-    const bw = (cw - 24) / 4, bh = 38, q = (i, label, fn) => { const bx = x0 + i * (bw + 8); menuPill(bx, y, bw, bh, label, busy ? 0.4 : 1, false, 0); if (!busy) PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn }); };
+    const bw = (cw - 24) / 4, bh = 36, q = (i, label, fn) => { const bx = x0 + i * (bw + 8); menuPill(bx, y, bw, bh, label, busy ? 0.4 : 1, false, 0); if (!busy) PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn }); };
     q(0, '−10', () => smeltTake(10)); q(1, '−1', () => smeltTake(1)); q(2, '+1', () => smeltAdd(1)); q(3, '+10', () => smeltAdd(10)); y += bh + 8;
     { const hw = (cw - 8) / 2; menuPill(x0, y, hw, bh, 'HEPSİNİ EKLE', busy ? 0.4 : 1, false, 0); menuPill(x0 + hw + 8, y, hw, bh, 'HEPSİNİ ÇIKAR', busy ? 0.4 : 1, false, 0);
       if (!busy) { PAUSE.btns.push({ x: x0, y: y - 4, w: hw, h: bh + 8, fn: () => smeltAdd(INV.dust) }); PAUSE.btns.push({ x: x0 + hw + 8, y: y - 4, w: hw, h: bh + 8, fn: () => smeltTake(SM.load) }); } y += bh + 14; }
@@ -6973,28 +6917,31 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawCraftPage(u, cx, dt, fg, bgRGB, over) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0; CR.flash = Math.max(0, CR.flash - dt * 1.4); CR.mt = Math.max(0, CR.mt - dt);
     ctx.fillStyle = `rgb(${bgRGB})`; ctx.fillRect(0, 0, W, H);
-    const cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = UI_TOP + 8, hh = 38, rh = clamp(H * 0.066, 44, 54), tint = c => `rgba(${fg},${c})`;
-    const hair = (y, a) => { ctx.strokeStyle = tint(a || 0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x0 + cw, Math.round(y) + 0.5); ctx.stroke(); };
+    // yatay: solda geri + başlık + tarif listesi, sağda seçili tarifin malzemeleri ve ÜRET
+    const tw = Math.min(W - 48, 780), gx = 40, lw = Math.round((tw - gx) * 0.46), x0 = (W - tw) / 2, rx = x0 + lw + gx, rw = tw - lw - gx, hy = 12, hh = 38, rh = clamp((H - 150) / 4, 40, 54), tint = c => `rgba(${fg},${c})`;
+    cx = rx + rw / 2;
+    const hairAt = (xa, wa, y, a) => { ctx.strokeStyle = tint(a || 0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xa, Math.round(y) + 0.5); ctx.lineTo(xa + wa, Math.round(y) + 0.5); ctx.stroke(); };
     backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 56, h: hh + 12, fn: craftBack });
     dvText('Craft', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
-    { const iw = 112, ih = 32, ix = x0 + cw - iw, iy = hy + (hh - ih) / 2; menuPill(ix, iy, iw, ih, 'ENVANTER', 1, false, 0); PAUSE.btns.push({ x: ix, y: iy - 4, w: iw, h: ih + 8, fn: () => invEnter('craft') }); }
-    let y = hy + hh + 22;
-    dvText('TARİFLER', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09);
+    { const iw = 112, ih = 32, ix = x0 + tw - iw, iy = hy + (hh - ih) / 2; menuPill(ix, iy, iw, ih, 'ENVANTER', 1, false, 0); PAUSE.btns.push({ x: ix, y: iy - 4, w: iw, h: ih + 8, fn: () => invEnter('craft') }); }
+    ctx.strokeStyle = tint(0.1); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rx - gx / 2 + 0.5, hy + hh + 14); ctx.lineTo(rx - gx / 2 + 0.5, H - 14); ctx.stroke();
+    let y = hy + hh + 18, ry = y;
+    dvText('TARİFLER', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hairAt(x0, lw, y, 0.09);
     RECIPES.forEach((r, i) => {
       const sel = i === CR.sel;
       if (sel) { ctx.fillStyle = `rgba(${GOLDC},0.9)`; ctx.fillRect(x0, y + 9, 2.5, rh - 18); }
       drawItemIcon(r.k, x0 + 26, y + rh / 2 + 1, 1.15);
-      dvText(r.name, x0 + 52, y + rh / 2 - 1, 16.5, sel ? 600 : 500, fg, sel ? 1 : 0.6, 0.2, 'left'); dvText(r.have(), x0 + cw, y + rh / 2, 13.5, 500, fg, sel ? 0.8 : 0.45, 0.3, 'right');
-      PAUSE.btns.push({ x: x0, y, w: cw, h: rh, fn: () => { CR.sel = i; CR.out = ''; CR.flash = 0; CR.mt = 0; } });
-      y += rh; hair(y, 0.07);
+      dvText(r.name, x0 + 52, y + rh / 2 - 1, 16.5, sel ? 600 : 500, fg, sel ? 1 : 0.6, 0.2, 'left'); dvText(r.have(), x0 + lw, y + rh / 2, 13.5, 500, fg, sel ? 0.8 : 0.45, 0.3, 'right');
+      PAUSE.btns.push({ x: x0, y, w: lw, h: rh, fn: () => { CR.sel = i; CR.out = ''; CR.flash = 0; CR.mt = 0; } });
+      y += rh; hairAt(x0, lw, y, 0.07);
     });
     const R = RECIPES[CR.sel], need = (k, n) => INV[k] >= n ? fg : RH_RED;
-    y += 20; dvText('MALZEMELER', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09);
-    dvText(R.desc, x0, y + 16, 12, 400, fg, 0.55, 0.2, 'left'); y += 34;
-    for (const [k, n] of R.ing) { dvText(n + ' × ' + ING_NAME[k], x0, y + 14, 14, 400, fg, 0.7, 0.2, 'left'); dvText(INV[k] + ' / ' + n, x0 + cw, y + 14, 14, 500, need(k, n), 0.95, 0.2, 'right'); y += 28; }
-    hair(y, 0.07);
-    y += 18; { const why = craftBlock(), bw = Math.min(cw, 250), bh = 48, bx = cx - bw / 2;
-      menuPill(bx, y, bw, bh, 'ÜRET', why ? 0.4 : 1, !why, performance.now() / 1000); PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn: craftDo }); y += bh + 16;
+    y = ry; dvText('MALZEMELER', rx, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hairAt(rx, rw, y, 0.09);
+    ctx.font = `400 12px ${UIF}`; y += 8; for (const ln of invWrap(R.desc, rw)) { dvText(ln, rx, y + 8, 12, 400, fg, 0.55, 0.2, 'left'); y += 17; } y += 8;
+    for (const [k, n] of R.ing) { dvText(n + ' × ' + ING_NAME[k], rx, y + 14, 14, 400, fg, 0.7, 0.2, 'left'); dvText(INV[k] + ' / ' + n, rx + rw, y + 14, 14, 500, need(k, n), 0.95, 0.2, 'right'); y += 28; }
+    hairAt(rx, rw, y, 0.07);
+    y += 16; { const why = craftBlock(), bw = Math.min(rw, 250), bh = 46, bx = cx - bw / 2;
+      menuPill(bx, y, bw, bh, 'ÜRET', why ? 0.4 : 1, !why, performance.now() / 1000); PAUSE.btns.push({ x: bx, y: y - 4, w: bw, h: bh + 8, fn: craftDo }); y += bh + 14;
       const msg = CR.mt > 0 ? CR.msg : (why && why !== 'Malzeme yetersiz' ? why : '');
       if (CR.flash > 0.01) dvText(CR.out, cx, y + 8, 13, 600, '79,176,108', Math.min(1, CR.flash * 2), 0.6, 'center'); else if (msg) dvText(msg, cx, y + 8, 12.5, 500, RH_RED, 0.95, 0.4, 'center'); }
   }
@@ -7040,7 +6987,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawSkillsPage(u, cx, dt, fg, bgRGB, over) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0; if (!over) SK.at += dt; SK.flash = Math.max(0, SK.flash - dt * 1.1); SK.mt = Math.max(0, SK.mt - dt); SK.pgl += ((SK.pts > 0 ? 1 : 0) - SK.pgl) * Math.min(1, dt * 3);
     ctx.fillStyle = `rgb(${bgRGB})`; ctx.fillRect(0, 0, W, H);
-    const t = SK.at, cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = UI_TOP + 8, hh = 38, bgc = `rgb(${bgRGB})`, tint = c => `rgba(${fg},${c})`, teal = light ? '10,150,120' : '95,224,192';
+    const t = SK.at, cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = 12, hh = 38, bgc = `rgb(${bgRGB})`, tint = c => `rgba(${fg},${c})`, teal = light ? '10,150,120' : '95,224,192';
     const hair = (y, a) => { ctx.strokeStyle = tint(a || 0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x0 + cw, Math.round(y) + 0.5); ctx.stroke(); };
     backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 56, h: hh + 12, fn: skillsBack });
     dvText('Beceri Ağacı', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
@@ -7099,7 +7046,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function drawPowersPage(u, cx, dt, fg, bgRGB, over) {
     PAUSE.btns.length = 0; PAUSE.sl.length = 0; if (!over) PW.at += dt;
     ctx.fillStyle = `rgb(${bgRGB})`; ctx.fillRect(0, 0, W, H);
-    const cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = UI_TOP + 8, hh = 38, bgc = `rgb(${bgRGB})`, tint = c => `rgba(${fg},${c})`, teal = light ? '10,150,120' : '95,224,192', nr = 22;
+    const cw = Math.min(W - 40, 420), x0 = (W - cw) / 2, hy = 12, hh = 38, bgc = `rgb(${bgRGB})`, tint = c => `rgba(${fg},${c})`, teal = light ? '10,150,120' : '95,224,192', nr = 22;
     backChev(x0 + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: x0 - 14, y: hy - 6, w: 56, h: hh + 12, fn: () => { PAUSE.page = 'main'; } });
     dvText('Güçlendirmeler', x0 + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left');
     const own = Object.keys(SK.own).filter(id => SK.own[id]).map(id => SKILLS.find(q => q.id === id)).filter(Boolean);   // açılış sırasıyla
@@ -7759,8 +7706,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const nowMs = performance.now(); dt = RH.last ? Math.min(0.05, (nowMs - RH.last) / 1000) : 0.016; RH.last = nowMs;
     ctx.fillStyle = `rgb(${bgRGB})`; ctx.fillRect(0, 0, W, H);
-    const land = W > H * 1.05 || H < 520, LW = land ? clamp(W * 0.4, 250, 380) : 0, hh = 38, hy = land ? 12 : UI_TOP + 8;   // yatay: solda sabit sütun (başlık + önizleme), sağda kayan içerik
-    const cw = land ? Math.min(W - LW - 48, 460) : Math.min(W - 40, 420), x0 = land ? LW + 24 : (W - cw) / 2, fx0 = land ? LW : 0, hx = land ? 22 : x0;
+    const LW = clamp(W * 0.4, 250, 380), hh = 38, hy = 12, solo = RH.view === 'home' || RH.view === 'play';   // detay sayfaları: solda sabit sütun (başlık + önizleme), sağda kayan içerik · ana liste ve Oynanış sayfası ekranın ortasında
+    const cw = solo ? Math.min(W - 80, 540) : Math.min(W - LW - 48, 460), x0 = solo ? (W - cw) / 2 : LW + 24, fx0 = solo ? 0 : LW, hx = 22;
     // --- geçiş: görünüm / düşman değişince içerik yumuşakça solar, sonra yeni içerik belirir
     if (!over) {
       if (RH.view !== RH.tv || RH.ei !== RH.tei) { RH.ca -= dt / 0.17; if (RH.ca <= 0) { RH.ca = 0; RH.view = RH.tv; RH.ei = RH.tei; RH.scroll = RH.tg = RH.vel = 0; RH.ina = 0; rhScene(); } }
@@ -7769,14 +7716,14 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       if (!RH.dn || !RH.dn.mv) RH.scroll += (RH.tg - RH.scroll) * dmp(12, dt);
     }
     const CA = RH.ca, tint = c => `rgba(${fg},${c})`;
+    if (!solo) { ctx.save(); ctx.globalAlpha *= CA; ctx.strokeStyle = tint(0.08); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(LW + 0.5, 14); ctx.lineTo(LW + 0.5, H - 14); ctx.stroke(); ctx.restore(); }   // sol sütun ile içerik arasında ince ayraç
     // --- başlık: < · Rehber / Düşmanlar
     backChev(hx + 5, hy + hh / 2, fg); PAUSE.btns.push({ x: hx - 14, y: hy - 6, w: 56, h: hh + 12, fn: rehberBack });
     ctx.save(); ctx.globalAlpha *= CA; dvText(RH.view === 'home' ? 'Rehber' : RH_CATS.find(c => c[0] === RH.view)[1], hx + 28, hy + hh / 2, 25, 600, fg, 1, 0.5, 'left'); ctx.restore();
     let bi = 0; const begin = () => { const r = sstep(bi * 0.055, bi * 0.055 + 0.38, RH.ina); bi++; ctx.save(); ctx.globalAlpha *= r * CA; ctx.translate(0, (1 - r) * 9); }, end = () => ctx.restore();
     const hair = (y, a) => { ctx.strokeStyle = tint(a || 0.09); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x0 + cw, Math.round(y) + 0.5); ctx.stroke(); };
     if (RH.view === 'home') {
-      const vt = land ? 14 : hy + hh + 20; let y = vt; const rh = land ? 54 : 66;
-      if (land) { ctx.save(); ctx.globalAlpha *= CA; rhPara('Düşmanlar, silahlar, kıyafetler ve eşyalar burada.', hx, H * 0.5 - 22, 13.5, 400, fg, 0.5, LW - 56, 21); ctx.restore(); }
+      const vt = hy + hh + 12; let y = vt; const rh = 54;
       ctx.save(); ctx.beginPath(); ctx.rect(fx0, vt - 4, W - fx0, H - vt + 4); ctx.clip(); ctx.translate(0, -RH.scroll);
       hair(y, 0.09);
       RH_CATS.forEach((c, i) => {
@@ -7798,7 +7745,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       RH.tmax = 0; RH.tby0 = RH.tby1 = -99;
       if (!RH.pv) { RH.pv = { ghost: newEnemy(0, 0, undefined, 1), bellman: newBellman(0, 0, 1), mum: newMum(0, 0, 1) }; for (const k in RH.pv) { RH.pv[k].em = 1; RH.pv[k].face = 0.1; } RH.pv.mum.face = PI - 0.1; RH.pv.mum.lg = 1; }
       for (const k in RH.pv) RH.pv[k].ph += dt * 1.6;
-      const vt = land ? 14 : hy + hh + 14, mm = t => Math.floor(t / 60) + ':' + String(Math.round(t % 60)).padStart(2, '0'), T1 = WV.bossAt;
+      const vt = hy + hh + 12, mm = t => Math.floor(t / 60) + ':' + String(Math.round(t % 60)).padStart(2, '0'), T1 = WV.bossAt;
       const STG = [
         [0, 'Çırak Büyücüler', 'ghost', 'Başta yalnızca çırak büyücüler gelir. Geçen her saniye hem daha sık gelirler hem sahadaki sayıları artar; ' + mm(WV.bellAt) + ' civarında sürü kalabalıktır.', 'SÜRÜ  ·  SANİYE BAŞI ARTAR'],
         [WV.bellAt, 'Çancı', 'bellman', 'Çancı sahaya girer. Aynı anda yalnızca bir tane olur; ölünce hemen yenisi gelir, şansın iyiyse ' + WV.bellLateT + ' sn sonra. Çanı çaldığında yakındakilerin hepsi değil, bir kısmı türüne göre orantılı kudurur.', 'AYNI ANDA 1'],
@@ -7831,17 +7778,17 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       begin(); y += 28; dvText('NOTLAR', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09); y += 6; end();
       ['Dalga zamanı, oynanan süreyle aynıdır (duraklatma ve menüde ilerlemez) ve kampta da akar. Ekrandaki saat yalnızca oyun içi saattir.', 'Doğuşlar kampın içinde olmaz; kamptan çıkınca baskı kaldığı yerden sürer.', 'Çan çalındığında kimin daireye atılacağı belli olmaz: yakındakilerden her türe orantılı pay düşer.', 'Eriyen mum kayarken vurulamaz; yeniden şekillendiği an alev üfleyebilir.'].forEach(t => { begin(); y += 10; ctx.fillStyle = tint(0.5); ctx.beginPath(); ctx.arc(x0 + 3, y + 11, 1.7, 0, TAU); ctx.fill(); y = rhPara(t, x0 + 16, y, 13.5, 400, fg, 0.64, cw - 16, 20.5) + 8; end(); });
       y += 40; ctx.restore(); RH.max = Math.max(0, y - H);
-      { const f1 = ctx.createLinearGradient(0, vt, 0, vt + 26); f1.addColorStop(0, `rgba(${bgRGB},1)`); f1.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = f1; ctx.fillRect(fx0, vt, W - fx0, 26);
-        const f2 = ctx.createLinearGradient(0, H - 34, 0, H); f2.addColorStop(0, `rgba(${bgRGB},0)`); f2.addColorStop(1, `rgba(${bgRGB},1)`); ctx.fillStyle = f2; ctx.fillRect(fx0, H - 34, W - fx0, 34); }
+      { const f1 = ctx.createLinearGradient(0, vt, 0, vt + 26); f1.addColorStop(0, `rgba(${bgRGB},1)`); f1.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = f1; ctx.fillRect(fx0 + 2, vt, W - fx0 - 2, 26);
+        const f2 = ctx.createLinearGradient(0, H - 34, 0, H); f2.addColorStop(0, `rgba(${bgRGB},0)`); f2.addColorStop(1, `rgba(${bgRGB},1)`); ctx.fillStyle = f2; ctx.fillRect(fx0 + 2, H - 34, W - fx0 - 2, 34); }
       if (RH.tg > RH.max) RH.tg = RH.max;
       return;
     }
     // ================= DÜŞMANLAR =================
-    const LST = RH_LIST[RH.view], EN = LST[RH.ei], isEn = RH.view === 'enemies', ty = land ? 14 : hy + hh + 14, th = 34; let vt = ty + th + 10;
+    const LST = RH_LIST[RH.view], EN = LST[RH.ei], isEn = RH.view === 'enemies', ty = 14, th = 34; let vt = ty + th + 10;
     // --- sekmeler: düz yazı, seçili olanın altında kayan ince çizgi
     { const fs = cw < 300 ? 13 : 15; ctx.font = `500 ${fs}px ${UIF}`; const ws = LST.map(n => ctx.measureText(n.tab || n.name).width), sum = ws.reduce((a, b) => a + b, 0), fit = sum + 12 * (LST.length - 1) <= cw;
       const gap = fit ? clamp((cw - sum) / (LST.length - 1 || 1), 12, 28) : 24, total = sum + gap * (LST.length - 1), tmax = fit ? 0 : total - cw;
-      RH.tmax = tmax; RH.tby0 = ty - 8; RH.tby1 = ty + th + 6; RH.tbx0 = land ? x0 - 14 : 0;
+      RH.tmax = tmax; RH.tby0 = ty - 8; RH.tby1 = ty + th + 6; RH.tbx0 = x0 - 14;
       // kaydırma: sürükleme (RH.dn.mode 't') · bırakınca eylemsizlik · seçili sekme görünür alana yumuşakça gelir
       const tdrag = RH.dn && RH.dn.mode === 't';
       if (!tdrag) { if (Math.abs(RH.tsv) > 1) { RH.tsx += RH.tsv * dt; RH.tsv *= Math.exp(-4.5 * dt); } else RH.tsv = 0; }
@@ -7863,20 +7810,20 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       }
       ctx.restore(); hair(ty + th + 1.5, 0.07); }
     // --- önizleme: SABİT (liste altında kayar, açıklamayı okurken animasyon görünür kalır) · oyunun gerçek çizimi, yumuşak zemin ışığı
-    { const pY = land ? hy + hh + 14 : vt, phF = land ? Math.round(clamp(H - pY - 20, 150, 340)) : Math.round(clamp(H * 0.235, 150, 205)), pcx = land ? LW / 2 + 4 : W / 2, pw0 = land ? LW - 28 : cw, gy = pY + phF * ((isEn && RH.ei === 2) || EN.kind === 'evil' ? 0.86 : 0.8), kS = clamp(phF / 220, 0.68, 1), sc = RH.sc;
+    { const pY = hy + hh + 14, phF = Math.round(clamp(H - pY - 20, 150, 340)), pcx = LW / 2 + 4, pw0 = LW - 28, gy = pY + phF * ((isEn && RH.ei === 2) || EN.kind === 'evil' ? 0.86 : 0.8), kS = clamp(phF / 220, 0.68, 1), sc = RH.sc;
       const S = !isEn ? (EN.kind === 'hero' || EN.kind === 'armor' || EN.kind === 'gear' ? clamp(phF * 0.0175, 2.9, 4.6) : EN.kind === 'evil' ? clamp(phF * 1.1 / 215, 0.7, 1.05) : Math.min(clamp(pw0 / 270, 1.1, 1.7), (phF * 0.8 - 10) / 98)) : RH.ei === 0 ? 1.5 * kS : RH.ei === 1 ? 1.8 * kS : clamp(phF * 1.1 / 215, 0.7, 1.05);
-      ctx.save(); ctx.beginPath(); ctx.rect(0, pY, land ? LW : W, phF); ctx.clip(); ctx.globalAlpha *= CA;
-      const R = Math.max(pw0 * 0.55, 150), g = ctx.createRadialGradient(pcx, gy - phF * 0.25, 0, pcx, gy - phF * 0.25, R); g.addColorStop(0, tint(0.075)); g.addColorStop(1, tint(0)); ctx.fillStyle = g; ctx.fillRect(0, pY, land ? LW : W, phF);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, pY, LW, phF); ctx.clip(); ctx.globalAlpha *= CA;
+      const R = Math.max(pw0 * 0.55, 150), g = ctx.createRadialGradient(pcx, gy - phF * 0.25, 0, pcx, gy - phF * 0.25, R); g.addColorStop(0, tint(0.075)); g.addColorStop(1, tint(0)); ctx.fillStyle = g; ctx.fillRect(0, pY, LW, phF);
       ctx.save(); ctx.translate(pcx, gy + 4); ctx.scale(1, 0.16); ctx.strokeStyle = tint(0.1); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, pw0 * 0.36, 0, TAU); ctx.stroke(); ctx.restore();
       if (sc) { if (isEn) rhDraw(sc, pcx, gy, S, fg); else rhDrawW(sc, pcx, gy, S, fg, bgRGB); if (sc.cap !== RH.capS) { RH.capA -= dt / 0.14; if (RH.capA <= 0) { RH.capA = 0; RH.capS = sc.cap; } } else RH.capA = Math.min(1, RH.capA + dt / 0.2); }
       ctx.save(); ctx.globalAlpha *= RH.capA; dvText(RH.capS, pcx, pY + phF - 8, 12, 500, fg, 0.55, 1.2, 'center'); ctx.restore();
       // mod düğmesi: öfke aç/kapat · heykelde hasar kademesi
-      if (isEn || EN.kind === 'evil') { const bw = 108, bh = 28, bx = land ? pcx + pw0 / 2 - bw : x0 + cw - bw, byy = pY + 4, rageOn = RH.rage, label = isEn && EN.mode === 'rage' ? (rageOn ? 'ÖFKE  AÇIK' : 'ÖFKE  KAPALI') : 'HASAR  ' + RH.hits + ' / 4';
+      if (isEn || EN.kind === 'evil') { const bw = 124, bh = 28, bx = pcx + pw0 / 2 - bw, byy = pY + 4, rageOn = RH.rage, label = isEn && EN.mode === 'rage' ? (rageOn ? 'ÖFKE  AÇIK' : 'ÖFKE  KAPALI') : 'HASAR  ' + RH.hits + ' / 4';
         menuPill(bx, byy, bw, bh, label, 1, false, 0, isEn && EN.mode === 'rage' ? (rageOn ? RH_RED : undefined) : (RH.hits > 0 ? RH_RED : undefined));
         PAUSE.btns.push({ x: bx - 6, y: byy - 6, w: bw + 12, h: bh + 12, fn: () => {
           if (!RH.sc) return; if (isEn && EN.mode === 'rage') { RH.rage = !RH.rage; RH.sc.e.rage = RH.sc.e.rg = RH.rage; if (RH.sc.play) { const k = RH.sc.play.k; rhPlay(k); } }
           else { RH.hits = (RH.hits + 1) % 5; const s = RH.sc.s; s.hits = RH.hits; s.hp = EV_HP * (1 - RH.hits / 5); s.flash = 0.14; s.flare = 0.8; s.pulse = 0.6; s.rv += 0.9; } } }); }
-      ctx.restore(); if (!land) { hair(pY + phF, 0.07); vt = pY + phF + 1; } }   // yatayda önizleme solda: içerik sağ sütunun tepesinden başlar
+      ctx.restore(); }   // önizleme solda: içerik sağ sütunun tepesinden başlar
     ctx.save(); ctx.beginPath(); ctx.rect(fx0, vt, W - fx0, H - vt); ctx.clip(); ctx.translate(0, -RH.scroll);
     let y = vt + 4;
     // --- ad · alt başlık · açıklama
@@ -7900,8 +7847,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     begin(); y += 28; dvText('İPUÇLARI', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09); y += 6; end();
     EN.tips.forEach(t => { begin(); y += 10; ctx.fillStyle = tint(0.5); ctx.beginPath(); ctx.arc(x0 + 3, y + 11, 1.7, 0, TAU); ctx.fill(); y = rhPara(t, x0 + 16, y, 13.5, 400, fg, 0.64, cw - 16, 20.5) + 8; end(); });
     y += 40; ctx.restore(); RH.max = Math.max(0, y - H);
-    { const f1 = ctx.createLinearGradient(0, vt, 0, vt + 26); f1.addColorStop(0, `rgba(${bgRGB},1)`); f1.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = f1; ctx.fillRect(fx0, vt, W - fx0, 26);
-      const f2 = ctx.createLinearGradient(0, H - 34, 0, H); f2.addColorStop(0, `rgba(${bgRGB},0)`); f2.addColorStop(1, `rgba(${bgRGB},1)`); ctx.fillStyle = f2; ctx.fillRect(fx0, H - 34, W - fx0, 34); }
+    { const f1 = ctx.createLinearGradient(0, vt, 0, vt + 26); f1.addColorStop(0, `rgba(${bgRGB},1)`); f1.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = f1; ctx.fillRect(fx0 + 2, vt, W - fx0 - 2, 26);
+      const f2 = ctx.createLinearGradient(0, H - 34, 0, H); f2.addColorStop(0, `rgba(${bgRGB},0)`); f2.addColorStop(1, `rgba(${bgRGB},1)`); ctx.fillStyle = f2; ctx.fillRect(fx0 + 2, H - 34, W - fx0 - 2, 34); }
     if (RH.tg > RH.max) RH.tg = RH.max;
   }
 
@@ -7924,7 +7871,6 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const dt = Math.min((now - last) / 1000, 0.05); last = now;
     ZOOM = MENU.on ? 1 : ZT;   // ana menü 1:1 çizilir (kılıç/zemin ekran koordinatıyla çiziliyor)
     trnWatch();
-    if (portBlock()) { drawRotate(now / 1000); requestAnimationFrame(frame); return; }   // dikey tutulmuş + dikey mod kapalı: oyun donar, "yatay çevir" ekranı
     if (MENU.on && PAUSE.on) { try { AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
     if (MENU.on) { drawMenu(dt); trnDraw(dt); try { AU.update(dt, 0); } catch (_) {} requestAnimationFrame(frame); return; }
     if (PAUSE.on) { try { AU.setMode('menu'); AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
@@ -8031,27 +7977,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   }
 
 
-  /* ---------- YATAY ÖNCELİK: dönüş uyarısı · dikey mod ayarı · güvenli alan dokunma ofseti ---------- */
-  const portBlock = () => !PORT.ok && H > W;
-  function applyOrient() { try { const o = screen.orientation; if (!o) return; if (PORT.ok) { if (o.unlock) o.unlock(); } else if (o.lock) o.lock('landscape').catch(() => {}); } catch (_) {} }   // Android / tam ekran PWA'da kilitler · iOS web sayfalarında desteklenmez (uyarı ekranı devreye girer)
-  function togglePortrait() { PORT.ok = !PORT.ok; try { localStorage.setItem('hlk_portrait', PORT.ok ? '1' : '0'); } catch (_) {} applyOrient(); try { AU.sfx('sheath'); } catch (_) {} }
-  function drawRotate(t) {
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const fg = light ? '0,0,0' : '255,255,255', bg = light ? '#f2f2f2' : '#0a0a0a', cx = W / 2, cy = H * 0.4, u = clamp(Math.min(W / 390, H / 760), 0.7, 1.3);
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-    const ph = (t % 3.2) / 3.2, k = ph < 0.25 ? 0 : ph < 0.6 ? (ph - 0.25) / 0.35 : 1, e = 1 - Math.pow(1 - k, 3), a = -Math.PI / 2 * e;   // telefon simgesi dikeyden yataya döner
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.lineWidth = 3; ctx.strokeStyle = `rgba(${fg},0.85)`; rr(-34 * u, -58 * u, 68 * u, 116 * u, 12 * u); ctx.stroke();
-    ctx.fillStyle = `rgba(${fg},0.85)`; rr(-10 * u, -49 * u, 20 * u, 5 * u, 2.5 * u); ctx.fill(); ctx.restore();
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${19 * u}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText('Telefonu yatay çevir', cx, cy + 108 * u);
-    ctx.font = `400 ${13 * u}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.5)`; ctx.fillText('Oyun yatay oynanmak üzere tasarlandı.', cx, cy + 134 * u);
-    const bw = Math.min(W * 0.6, 220), bh = 40, bx = cx - bw / 2, by = Math.min(H - 70, cy + 168 * u);
-    menuPill(bx, by, bw, bh, 'DİKEY OYNA', 1, false, 0); PORT.btn = { x: bx, y: by - 4, w: bw, h: bh + 8 };
-  }
-  addEventListener('pointerdown', e => {   // dikey uyarı ekranı: yalnızca "DİKEY OYNA" çalışır, başka dokunuş oyuna geçmez
-    if (!portBlock()) return;
-    const b = PORT.btn; if (b && e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h) togglePortrait();
-    e.stopImmediatePropagation(); e.preventDefault();
-  }, true);
+  /* ---------- YATAY KİLİT · güvenli alan dokunma ofseti ---------- */
+  function applyOrient() { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (_) {} }   // yatay kilit (Android / tam ekran PWA)
   const SHIFT_PAGES = ['wardrobe', 'dev', 'guide', 'craft', 'inv', 'smelt', 'skills', 'powers', 'settings'];
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(tp => addEventListener(tp, e => {   // kaydırılmış sayfalarda dokunuş x'i de aynı payla kaydırılır
     if (SAS > 0 && PAUSE.on && SHIFT_PAGES.includes(PAUSE.page)) { const x = e.clientX - SAS; try { Object.defineProperty(e, 'clientX', { value: x, configurable: true }); } catch (_) {} }
