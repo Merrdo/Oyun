@@ -81,7 +81,7 @@
     ZT = 1; ZOOM = ZT;
     // HUD: sol panel ile sağ düğme aynı kenar boşluğunda (çentik/yuvarlak köşe güvenli alanı dahil), yatayda üst boşluk küçük
     const cs = getComputedStyle(probe), sal = parseFloat(cs.paddingLeft) || 0, sar = parseFloat(cs.paddingRight) || 0;
-    SAS = W > H ? Math.max(sal, sar) : 0; HUD_M = Math.max(12, sal, sar); HUD_Y = W > H ? 38 : 66; HUD_S = W > H ? clamp(H / 300, 1.25, 1.6) : 1;   // yatayda HUD yazıları/panelleri büyütülür
+    SAS = W > H ? Math.max(sal, sar) : 0; HUD_M = Math.max(12, sal, sar); HUD_Y = W > H ? 38 : 66; HUD_S = W > H ? clamp(H / 360, 1, 1.25) : 1;   // yatayda HUD biraz büyür (eskisinden ~%17 küçük: profil paneli, duraklatma, çanta, saat)
     cam.x = player.x - camCX(); cam.y = player.y - camCY();
   }
 
@@ -133,7 +133,7 @@
     if (MENU.on && PAUSE.on) { pauseDown(e); return; }   // ana menüden açılan kıyafet sayfası
     if (MENU.on) { menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
     if (PAUSE.on) { pauseDown(e); return; }   // duraklatılmışken dokunuşlar yalnızca menüye gider
-    if (Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y) < AU.btn.r * HUD_S + 14) { togglePause(); return; }   // duraklatma düğmesi
+    { const dpz = Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y), dbg = bagHit(e.clientX, e.clientY), rh = AU.btn.r * HUD_S + 14; if (dbg < rh && dbg < dpz) { openBag(); return; } if (dpz < rh) { togglePause(); return; } }   // çanta / duraklatma düğmesi (yakın olan)
     if (SWB.v > 0.6 && Math.hypot(e.clientX - SWB.x, e.clientY - SWB.y) < SWB.r + 12) { swapTool(); return; }   // alet değiştir
     if (atk.id === null && atkActive() && Math.hypot(e.clientX - atk.x, e.clientY - atk.y) < atk.r + 14) {   // buton joystick'ten önceliklidir
       atk.id = e.pointerId; atk.down = true; pressAtk();
@@ -181,7 +181,7 @@
 
   /* ---------- Klavye (masaüstü testi) ---------- */
   const keys = {};
-  addEventListener('keydown', e => { if (MENU.on) { if ((e.key === 'Enter' || e.key === ' ' || e.key === 'j') && MENU.t > 2.4 && !PAUSE.on) menuStart(!!SAVED); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } if (e.key === 'Escape' && PAUSE.on && PAUSE.page !== 'main') { if (PAUSE.page === 'guide') rehberBack(); else if (PAUSE.page === 'craft') craftBack(); else if (PAUSE.page === 'inv') invBack(); else if (PAUSE.page === 'smelt') smeltBack(); else if (PAUSE.page === 'skills') skillsBack(); else PAUSE.page = 'main'; return; } if ((e.key.toLowerCase() === 'p' || e.key === 'Escape') && !e.repeat) { togglePause(); return; } if (PAUSE.on) { if (e.key === 'Enter' && !e.repeat) resumeGame(); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } keys[e.key.toLowerCase()] = true; if (!e.repeat) { const hk = e.key.toLowerCase(); if (hk === 'b') healStart('band'); else if (hk === 'v') healStart('medk'); else if (hk === 'i' && !PAUSE.on) { togglePause(); if (PAUSE.on) invEnter('main'); } } if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
+  addEventListener('keydown', e => { if (MENU.on) { if ((e.key === 'Enter' || e.key === ' ' || e.key === 'j') && MENU.t > 2.4 && !PAUSE.on) menuStart(!!SAVED); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } if (e.key === 'Escape' && PAUSE.on && PAUSE.page !== 'main') { if (PAUSE.page === 'guide') rehberBack(); else if (PAUSE.page === 'craft') craftBack(); else if (PAUSE.page === 'inv') invBack(); else if (PAUSE.page === 'smelt') smeltBack(); else if (PAUSE.page === 'skills') skillsBack(); else PAUSE.page = 'main'; return; } if ((e.key.toLowerCase() === 'p' || e.key === 'Escape') && !e.repeat) { togglePause(); return; } if (PAUSE.on) { if (e.key === 'Enter' && !e.repeat) resumeGame(); if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); return; } keys[e.key.toLowerCase()] = true; if (!e.repeat) { const hk = e.key.toLowerCase(); if (hk === 'b') healStart('band'); else if (hk === 'v') healStart('medk'); else if (hk === 'i' && !PAUSE.on) openBag(); } if (e.key.toLowerCase() === 'm' && !e.repeat) AU.toggleMute(); });
   addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if ((e.key === 'j' || e.key === ' ') && atk.kb) { atk.kb = false; relAtk(); } });
   addEventListener('keydown', e => { if (!MENU.on && !PAUSE.on && (e.key === 'j' || e.key === ' ') && !e.repeat && !atk.kb) { atk.kb = true; pressAtk(); } });
   addEventListener('keydown', e => { if (MENU.on || PAUSE.on || e.repeat) return; const k = e.key.toLowerCase(); if (k === 'k') BOW.kb = true; else if (k === 'b') { if (!BOW.has) bowGive(); else BOW.ammo = Math.min(BOW_MAX, BOW.ammo + 6); } });   // K = yay (masaüstü) · B = test: yay ver / +6 ok
@@ -1159,7 +1159,7 @@
       }
     }
     if (F.death >= 0) {   // ölüm: diz çök, yana yıkıl, kılıç elden düşer; sonra ayağa kalk
-      const t0 = F.death; F.death += dt; if (!DEATH.snap) DEATH.snap = { time: TM.t, lv: LVL.lv };
+      const t0 = F.death; F.death += dt; if (!DEATH.snap) DEATH.snap = { time: TM.t, play: PLAY.t, lv: LVL.lv };
       F.pt = -1; F.buf = false; F.guarding = false; F.broken = 0; F.squint = true; F.off = 0; F.tx = F.ty = 0;
       const k = dmp(14, dt); F.sw -= F.sw * k; F.lunge -= F.lunge * k; F.wind -= F.wind * k; F.drop -= F.drop * k; F.gw -= F.gw * k; F.bw -= F.bw * k;
       if (!F.ds && F.death > 0.22) F.ds = { x: G.px, y: G.py, a: G.pa, sc: G.ps, vx: F.fall * 38, vy: -90, vr: F.fall * 7, rest: false };
@@ -1260,17 +1260,60 @@
   }
   const DEATH = { on: false, t: 0, snap: null, btns: [] };
   function deathTap(px, py) { if (DEATH.t < 1.8) return; for (const b of DEATH.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return; } }
+  function deathActions(hasSave) {   // ölüm ekranı düğmeleri (dikey ve yatay düzen ortak)
+    return [[hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} location.reload(); }],
+      ['ANA MENÜ', false, () => { location.reload(); }]];
+  }
+  function deathLand(L, A, T, fg, red) {   // YATAY düzen: solda ÖLDÜN + süre / seviye + düğmeler, sağda istatistikler sütunlar halinde (güvenli alan içinde)
+    const s = clamp(H / 390, 0.72, 1.2), M = Math.max(HUD_M, 22), gap = 26 * s, LW = clamp(W * 0.36, 210, 310), rx0 = M + LW + gap, rw = W - M - rx0, hasSave = !!SAVED;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    // sol sütun
+    const bh = 40 * s, bgp = 10 * s, titleH = 34 * s, statH = 48 * s, total = titleH + 26 * s + 2 * statH + 16 * s + 2 * bh + bgp;
+    let y = Math.max(14, (H - total) / 2);
+    ctx.globalAlpha = A; ctx.font = `300 ${34 * s}px ${UIF}`; ctx.fillStyle = `rgba(${red},0.95)`;
+    { let lx = M; for (const c of [...'ÖLDÜN']) { ctx.fillText(c, lx, y + titleH / 2); lx += ctx.measureText(c).width + 9 * s; } }
+    ctx.strokeStyle = `rgba(${red},0.35)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(M, y + titleH + 8 * s); ctx.lineTo(M + 56 * s, y + titleH + 8 * s); ctx.stroke();
+    y += titleH + 26 * s;
+    L.slice(0, 2).forEach((q, i) => {
+      ctx.globalAlpha = clamp((T - 0.7 - i * 0.12) * 3, 0, 1) * A;
+      ctx.font = `600 ${10 * s}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; { let lx = M; for (const c of [...q.l.toLocaleUpperCase('tr')]) { ctx.fillText(c, lx, y + 7 * s); lx += ctx.measureText(c).width + 1.8; } }
+      ctx.font = `500 ${22 * s}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.96)`; ctx.fillText(q.v, M, y + 29 * s); y += statH;
+    });
+    y += 16 * s;
+    const ba = clamp((T - 1.8) / 0.5, 0, 1) * A; DEATH.btns.length = 0; ctx.globalAlpha = 1;
+    deathActions(hasSave).forEach(([lb, strong, fn], j) => { const by = y + j * (bh + bgp); menuPill(M, by, LW, bh, lb, ba, strong, T, strong ? undefined : red); DEATH.btns.push({ x: M, y: by, w: LW, h: bh, fn }); });
+    // ayraç
+    ctx.globalAlpha = A; ctx.strokeStyle = `rgba(${fg},0.1)`; ctx.beginPath(); ctx.moveTo(M + LW + gap / 2, H * 0.1); ctx.lineTo(M + LW + gap / 2, H * 0.9); ctx.stroke();
+    // sağ: istatistikler (bölümler sütunlara dizilir; sığmazsa yazı küçülür)
+    const items = L.slice(2), blocks = []; for (const q of items) { if (q.h) blocks.push({ h: q.h, rows: [] }); else if (blocks.length) blocks[blocks.length - 1].rows.push(q); }
+    const topR = Math.max(16, H * 0.07), colH = H - topR * 2, nc = rw >= 400 ? 2 : 1, cg = 24 * s, cw = (rw - cg * (nc - 1)) / nc;
+    const place = (k, lim) => { lim = lim || colH; const lh = 21 * s * k, hh = 30 * s * k, out = []; let col = 0, yy = 0;
+      for (const b of blocks) { const bH = hh + b.rows.length * lh; if (yy > 0 && yy + bH > lim && bH <= lim) { col++; yy = 0; } out.push({ h: b.h, col, y: yy, hd: true }); yy += hh;
+        for (const r of b.rows) { if (yy + lh > lim) { col++; yy = 0; } out.push({ r, col, y: yy }); yy += lh; } }
+      return { out, cols: col + 1, lh, hh, k }; };
+    let P; for (let k = 1; k >= 0.58; k -= 0.04) { P = place(k); if (P.cols <= nc) break; }
+    if (P.cols < nc) { const tot = blocks.reduce((q, b) => q + P.hh + b.rows.length * P.lh, 0); for (let lim = tot / nc; lim <= colH; lim += 6 * s) { const Q = place(P.k, lim); if (Q.cols <= nc) { P = Q; break; } } }   // geniş ekranda sütunlar dengelenir
+    const fs = Math.max(9, 12.5 * s * P.k);
+    P.out.forEach((o, i) => {
+      ctx.globalAlpha = clamp((T - 0.9 - i * 0.06) * 3, 0, 1) * A;
+      const x0 = rx0 + o.col * (cw + cg), yy = topR + o.y;
+      if (o.hd) { ctx.font = `600 ${fs * 0.78}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.45)`; let lx = x0; for (const c of [...o.h]) { ctx.fillText(c, lx, yy + P.hh * 0.55); lx += ctx.measureText(c).width + 1.6; }
+        ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.moveTo(x0, yy + P.hh * 0.88); ctx.lineTo(x0 + cw, yy + P.hh * 0.88); ctx.stroke(); }
+      else { ctx.font = `500 ${fs}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.62)`; ctx.fillText(o.r.l, x0, yy + P.lh / 2); ctx.textAlign = 'right'; ctx.font = `600 ${fs}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.96)`; ctx.fillText(o.r.v, x0 + cw, yy + P.lh / 2); }
+    });
+  }
   function drawDeath(dt, fg) {
     DEATH.t += dt; const T = DEATH.t, A = clamp(T / 1.1, 0, 1), red = '224,88,74', sum = o => Object.values(o).reduce((a, b) => a + b, 0);
     ctx.save(); ctx.fillStyle = light ? `rgba(242,242,242,${0.985 * A})` : `rgba(0,0,0,${0.985 * A})`; ctx.fillRect(0, 0, W, H);
-    const sn = DEATH.snap || { time: TM.t, lv: LVL.lv }, g = STAT.got, L = [];
+    const sn = DEATH.snap || { time: TM.t, play: PLAY.t, lv: LVL.lv }, g = STAT.got, L = [];
     const sec = h => L.push({ h }), row = (l, v) => L.push({ l, v: String(v) });
-    row('Ulaşılan süre', fmtTime(sn.time)); row('Ulaşılan seviye', sn.lv);
+    row('Oynanan süre', fmtPlay(sn.play)); row('Ulaşılan seviye', sn.lv);
     sec('ÖLDÜRÜLEN DÜŞMANLAR'); row('Toplam', sum(STAT.kills)); for (const k in STAT.kills) if (STAT.kills[k] > 0) row('· ' + (KILL_NAME[k] || k), STAT.kills[k]);
     sec('YIKILAN HEYKELLER'); row('Toplam', sum(STAT.statues)); for (const k in STAT.statues) if (STAT.statues[k] > 0) row('· ' + (STATUE_NAME[k] || k), STAT.statues[k]);
     sec('TOPLANANLAR'); row('Altın tozu', g.dust); row('Altın külçesi', g.ingot);
     [['keys', 'Altın anahtar'], ['prism', 'Mor prizma'], ['band', HEAL_NAME.band], ['medk', HEAL_NAME.medk], ['herb', HEAL_NAME.herb], ['resin', HEAL_NAME.resin], ['arrows', 'Ok']].forEach(([k, n]) => { if (g[k] > 0) row(n, g[k]); });
     if (g.bow) row('Yay', 'bulundu'); g.charms.forEach(n => row('Tılsım', n));
+    if (W > H * 1.05) { deathLand(L, A, T, fg, red); ctx.restore(); return; }   // yatay: iki sütunlu düzen
     const u = clamp(Math.min(W / 390, H / 760), 0.62, 1.3), cx = W / 2, pw = Math.min(W - 40, 340 * u + 20), x0 = cx - pw / 2;
     const hasSave = !!SAVED, nb = 2, bh = 40 * u, bgap = 10 * u, btop = H - 22 - nb * bh - (nb - 1) * bgap;
     const ty = Math.max(34, H * 0.075), top = ty + 54 * u, avail = btop - 14 - top;
@@ -1289,8 +1332,7 @@
     // düğmeler
     const ba = clamp((T - 1.8) / 0.5, 0, 1) * A; DEATH.btns.length = 0; ctx.globalAlpha = 1;
     const bw = Math.min(pw, 260 * u + 20), bx = cx - bw / 2, bs = [];
-    bs.push([hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} location.reload(); }]);
-    bs.push(['ANA MENÜ', false, () => { location.reload(); }]);
+    bs.push(...deathActions(hasSave));
     bs.forEach(([lb, strong, fn], j) => { const by = btop + j * (bh + bgap); menuPill(bx, by, bw, bh, lb, ba, strong, T, strong ? undefined : red); DEATH.btns.push({ x: bx, y: by, w: bw, h: bh, fn }); });
     ctx.restore();
   }
@@ -1670,7 +1712,60 @@
     ctx.restore();
     if (G.has && (F.guarding || F.dur < 100)) { const sx = (player.x - cam.x) * ZOOM, sy = (player.y - cam.y) * ZOOM + 13 * ZOOM; ctx.fillStyle = `rgba(${fg},0.15)`; ctx.fillRect(sx - 15, sy, 30, 3); ctx.fillStyle = `rgba(${fg},0.8)`; ctx.fillRect(sx - 15, sy, 30 * clamp(F.dur / 100, 0, 1), 3); }
   }
-  function drawPauseBtn(fg, dt) {   // sağ üst: duraklatma düğmesi; çevresindeki ince yay saniyeleri süpürür
+  /* ---------- ÇANTA düğmesi: duraklatma düğmesinin solunda · basınca oyun durur, envanter açılır; geri dönünce oyun kaldığı yerden sürer ---------- */
+  const BAG = { x: 0, y: 0, r: 20, pop: 0 };
+  function bagPlace() { const b = AU.btn, S = HUD_S; BAG.r = b.r; BAG.x = W - HUD_M - b.r * S * 3 - 10 * S; BAG.y = HUD_Y + 29 * (S - 1); }
+  function openBag() { if (PAUSE.on || MENU.on || DEATH.on) return; BAG.pop = 1; try { AU.sfx('sheath'); } catch (_) {} pauseGame(); if (PAUSE.on) invEnter('bag'); }
+  function bagArt(tw) {   // maceracı sırt çantası: kalın koyu dış çizgi, 3/4 perspektif, deri + yatak bohçası + altın toka (birim: düğme yarıçapı 20)
+  const OL='#2a1608';
+  ctx.lineCap=ctx.lineJoin='round';
+  // gölge
+  ctx.fillStyle='rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(0.8,15.4,11.5,2.5,0,0,TAU); ctx.fill();
+  // taşıma sapı (bohçanın arkasında)
+  ctx.strokeStyle=OL; ctx.lineWidth=4.6; ctx.beginPath(); ctx.moveTo(-3.7,-11.5); ctx.bezierCurveTo(-3.7,-19,3.7,-19,3.7,-11.5); ctx.stroke();
+  ctx.strokeStyle='#8a4f22'; ctx.lineWidth=2.3; ctx.stroke();
+  // gövde
+  const body=()=>{ctx.beginPath();ctx.moveTo(-11.5,-7);ctx.lineTo(11.5,-7);ctx.bezierCurveTo(13.6,-3,14.2,6,12.6,11);ctx.quadraticCurveTo(12,14.8,8.5,15);ctx.lineTo(-8.5,15);ctx.quadraticCurveTo(-12,14.8,-12.6,11);ctx.bezierCurveTo(-14.2,6,-13.6,-3,-11.5,-7);ctx.closePath();};
+  let g=ctx.createLinearGradient(-12,-7,12,15); g.addColorStop(0,'#e68f3c'); g.addColorStop(1,'#9a501b');
+  body(); ctx.fillStyle=g; ctx.fill(); ctx.lineWidth=1.9; ctx.strokeStyle=OL; ctx.stroke();
+  // yan yüz gölgesi (perspektif)
+  ctx.save(); body(); ctx.clip(); ctx.fillStyle='rgba(50,18,2,0.38)'; ctx.beginPath(); ctx.moveTo(8.4,-8); ctx.bezierCurveTo(9.6,0,9.6,8,8.2,16); ctx.lineTo(16,16); ctx.lineTo(16,-8); ctx.closePath(); ctx.fill(); ctx.restore();
+  // ön cep
+  ctx.beginPath(); ctx.moveTo(-8.8,5); ctx.lineTo(8.2,5); ctx.lineTo(8.8,12.4); ctx.quadraticCurveTo(8.6,13.9,7,13.9); ctx.lineTo(-7,13.9); ctx.quadraticCurveTo(-8.6,13.9,-8.9,12.4); ctx.closePath();
+  g=ctx.createLinearGradient(0,5,0,14); g.addColorStop(0,'#f0b56a'); g.addColorStop(1,'#c07f3e'); ctx.fillStyle=g; ctx.fill(); ctx.lineWidth=1.5; ctx.stroke();
+  ctx.save(); ctx.setLineDash([1.5,1.3]); ctx.strokeStyle='rgba(95,45,10,0.7)'; ctx.lineWidth=0.7; rr(-7.2,8.6,14.4,4,1.4); ctx.stroke(); ctx.restore();
+  // kapak
+  ctx.beginPath(); ctx.moveTo(-12.3,-6.4); ctx.lineTo(12.3,-6.4); ctx.bezierCurveTo(12.8,-2.6,12.4,1.6,11.2,4.2); ctx.quadraticCurveTo(0,9.6,-11.2,4.2); ctx.bezierCurveTo(-12.4,1.6,-12.8,-2.6,-12.3,-6.4); ctx.closePath();
+  g=ctx.createLinearGradient(-12,-6,12,8); g.addColorStop(0,'#b8612a'); g.addColorStop(1,'#7a3b14'); ctx.fillStyle=g; ctx.fill(); ctx.lineWidth=1.9; ctx.strokeStyle=OL; ctx.stroke();
+  ctx.save(); ctx.setLineDash([1.6,1.4]); ctx.strokeStyle='rgba(255,215,150,0.65)'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(-9.8,2.4); ctx.quadraticCurveTo(0,7.2,9.8,2.4); ctx.stroke(); ctx.restore();
+  // kayışlar + altın tokalar
+  for(const sx of [-5.2,5.2]){
+    ctx.beginPath(); ctx.moveTo(sx-1.4,-1); ctx.lineTo(sx+1.4,-1); ctx.lineTo(sx+1.4,10.6); ctx.lineTo(sx,11.8); ctx.lineTo(sx-1.4,10.6); ctx.closePath();
+    ctx.fillStyle='#5a2d10'; ctx.fill(); ctx.lineWidth=1.1; ctx.strokeStyle=OL; ctx.stroke();
+    rr(sx-2.3,4.6,4.6,3.6,1); ctx.fillStyle='#f6cf58'; ctx.fill(); ctx.lineWidth=1.1; ctx.stroke();
+    ctx.fillStyle=OL; ctx.fillRect(sx-0.5,5.6,1,1.6);
+  }
+  // yatak bohçası (üstte)
+  g=ctx.createLinearGradient(0,-13.6,0,-6); g.addColorStop(0,'#63cfc6'); g.addColorStop(1,'#2a7a84');
+  rr(-11.6,-13.6,22.4,7.8,3.8); ctx.fillStyle=g; ctx.fill(); ctx.lineWidth=1.8; ctx.strokeStyle=OL; ctx.stroke();
+  for(const bx of [-6.4,3.6]){ rr(bx-1.2,-13.9,2.4,8.4,0.9); ctx.fillStyle='#7a3f16'; ctx.fill(); ctx.lineWidth=1; ctx.stroke(); }
+  ctx.beginPath(); ctx.ellipse(10.6,-9.7,2.5,3.9,0,0,TAU); ctx.fillStyle='#23666f'; ctx.fill(); ctx.lineWidth=1.6; ctx.stroke();
+  ctx.strokeStyle='#8fe6da'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.arc(10.6,-9.7,1.5,0.3,5.2); ctx.stroke();
+  // parlak vurgular
+  ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.1; ctx.beginPath(); ctx.moveTo(-9.4,-12.2); ctx.lineTo(-7.6,-12.2); ctx.moveTo(-3.4,-12.2); ctx.lineTo(1.4,-12.2); ctx.stroke();
+  ctx.strokeStyle='rgba(255,230,180,0.5)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(-10.6,-3.4); ctx.quadraticCurveTo(-11,0.4,-10.2,2.4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-7.2,9.2); ctx.lineTo(-7.5,12.2); ctx.stroke();
+  // parıltı
+  if(tw>0.02){ const k=tw,x=12.6,y=-15.6; ctx.fillStyle='#fff3b0'; ctx.strokeStyle='#e0a82a'; ctx.lineWidth=0.7; ctx.beginPath(); ctx.moveTo(x,y-3.2*k); ctx.quadraticCurveTo(x+0.5*k,y-0.5*k,x+3.2*k,y); ctx.quadraticCurveTo(x+0.5*k,y+0.5*k,x,y+3.2*k); ctx.quadraticCurveTo(x-0.5*k,y+0.5*k,x-3.2*k,y); ctx.quadraticCurveTo(x-0.5*k,y-0.5*k,x,y-3.2*k); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+}
+  function drawBagBtn(fg, dt) {
+    bagPlace(); BAG.pop = Math.max(0, BAG.pop - dt * 2.6);
+    const sc = 1 + 0.16 * BAG.pop * Math.sin((1 - BAG.pop) * 10), tw = Math.max(0, Math.sin(TM.t * 2.1 + 1) * 1.6 - 0.6);   // parıltı birkaç saniyede bir yanıp söner
+    ctx.save(); ctx.translate(BAG.x, BAG.y + 1.5 * HUD_S); ctx.scale(sc * HUD_S, sc * HUD_S);
+    bagArt(Math.min(1, tw)); ctx.restore();
+  }
+  function bagHit(px, py) { return Math.hypot(px - BAG.x, py - BAG.y); }
+  function drawPauseBtn(fg, dt) {   // sağ üst: duraklatma düğmesi
     const b = AU.btn; b.x = W - HUD_M - b.r * HUD_S; b.y = HUD_Y + 29 * (HUD_S - 1);
     b.pop = Math.max(0, b.pop - dt * 2.2); b.ring = Math.max(0, b.ring - dt * 2.2);
     const u = 1 - b.pop, sc = 1 + 0.2 * b.pop * Math.sin(u * 10);
@@ -1679,7 +1774,6 @@
     ctx.scale(sc * HUD_S, sc * HUD_S); ctx.globalAlpha = 0.6 + 0.35 * b.pop;
     ctx.fillStyle = `rgba(${fg},0.07)`; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.fill();
     ctx.strokeStyle = `rgba(${fg},0.2)`; ctx.lineWidth = 1.2; ctx.stroke();
-    const sw = (TM.t % 60) / 60; if (sw > 0.002) { ctx.strokeStyle = `rgba(${fg},0.6)`; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, 0, b.r, -PI / 2, -PI / 2 + TAU * sw); ctx.stroke(); }
     ctx.fillStyle = `rgba(${fg},0.92)`; rr(-6.2, -7, 4, 14, 1.6); ctx.fill(); rr(2.2, -7, 4, 14, 1.6); ctx.fill();   // iki çubuk
     ctx.restore();
   }
@@ -5984,7 +6078,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     BASE0.k.forEach((a, i) => baseCamps.push([a[0] * mx + j(i + 40, 60), a[1] * my + j(i + 50, 60), ...a.slice(2)]));
     EV.clear(); CST.clear(); chestCache.clear(); TST.clear(); treeCache.clear(); LV.length = TP.length = 0; AX.on = false; CAMP.seen.clear(); CAMP.looted.clear(); CAMP.shield.clear(); CAMP.stones.clear(); CAMP.lt = 0; CAMP.list = []; CAMP.ruins = []; CAMP.last = null;
   }
-  function newGame() { applySeed(1 + Math.floor(Math.random() * 900000)); lvReset(1, 0); skReset(); for (const k in OWN) delete OWN[k]; gearSanitize(); }   // yeni oyun: kıyafetler de sıfırlanır   // BAŞLA: her seferinde yeni tohum = tamamen yeni harita (eski kayıt, ilk kampa girilene dek durur)
+  function newGame() { applySeed(1 + Math.floor(Math.random() * 900000)); TM.t = 0; PLAY.t = 0; GCLK.f = 8 / 24; lvReset(1, 0); skReset(); for (const k in OWN) delete OWN[k]; gearSanitize(); }   // yeni oyun: kıyafetler de sıfırlanır   // BAŞLA: her seferinde yeni tohum = tamamen yeni harita (eski kayıt, ilk kampa girilene dek durur)
   function loadGame(sv) {
     applySeed(sv.seed);
     for (const k of Object.keys(sv.inv)) if (k in INV && isFinite(sv.inv[k])) INV[k] = Math.max(0, sv.inv[k] | 0);
@@ -5994,7 +6088,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     AX.on = G.ha && (!!sv.ax || !G.hs);
     if (sv.bow >= 0) { BOW.has = true; BOW.ammo = Math.min(BOW_MAX, sv.bow | 0); }
     player.x = sv.x; player.y = sv.y; player.vx = player.vy = 0; cam.x = player.x - camCX(); cam.y = player.y - camCY(); G.px = player.x; G.py = player.y - 15;
-    F.hp = 100; F.hpMax = 100; F.dur = 100; TM.t = isFinite(sv.t) ? sv.t : 0;   // kampta dinlenilmiş sayılır: can dolu
+    F.hp = 100; F.hpMax = 100; F.dur = 100; TM.t = isFinite(sv.t) ? sv.t : 0; PLAY.t = isFinite(sv.pt) ? sv.pt : TM.t; GCLK.f = isFinite(sv.ck) ? clamp(sv.ck, 0, 0.99999) : 8 / 24;   // kampta dinlenilmiş sayılır: can dolu
     (sv.evDead || []).forEach(id => { const s = evState(id); s.dead = true; s.dying = -1; s.hp = 0; });
     INV.wood = isFinite(sv.inv.wood) ? Math.max(0, sv.inv.wood | 0) : 0;
     (sv.trDead || []).forEach(id => { const s = tState(id); s.dead = true; s.hits = TREE_HITS; s.dying = -1; s.hp = 0; });
@@ -6019,21 +6113,27 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       const dead = m => { const a = []; m.forEach((s, id) => { if (s.dead) a.push(id); }); return a; };
       const inv = {}; for (const k of ['dust', 'ingot', 'keys', 'band', 'medk', 'elix', 'herb', 'resin', 'prism', 'parr', 'pbomb', 'pbeam', 'wood', 'moss']) inv[k] = INV[k] | 0;
       inv.dust += (SM.load | 0) + ((SM.run || SM.stage === 'pour') ? (SM.n | 0) * SM_RATE : 0);   // eritme kabındaki toz kaybolmaz: kayıtta toz olarak saklanır
-      const sv = { v: SAVE_V, seed: SEED, x: c.x - c.fl * 10, y: c.y + 100, inv, own: Object.keys(OWN).filter(k => OWN[k]), lv: LVL.lv, xp: LVL.xp | 0, tp: SK.pts | 0, sk: Object.keys(SK.own).filter(k => SK.own[k]), sword: !!G.has, hs: !!G.hs, ha: !!G.ha, ax: AX.on ? 1 : 0, bow: BOW.has ? BOW.ammo | 0 : -1, t: TM.t, evDead: dead(EV), chDead: dead(CST), trDead: dead(TST), looted: [...CAMP.looted], ts: Date.now() };
+      const sv = { v: SAVE_V, seed: SEED, x: c.x - c.fl * 10, y: c.y + 100, inv, own: Object.keys(OWN).filter(k => OWN[k]), lv: LVL.lv, xp: LVL.xp | 0, tp: SK.pts | 0, sk: Object.keys(SK.own).filter(k => SK.own[k]), sword: !!G.has, hs: !!G.hs, ha: !!G.ha, ax: AX.on ? 1 : 0, bow: BOW.has ? BOW.ammo | 0 : -1, t: TM.t, pt: PLAY.t, ck: GCLK.f, evDead: dead(EV), chDead: dead(CST), trDead: dead(TST), looted: [...CAMP.looted], ts: Date.now() };
       localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); SAVED = sv;
       if (announce) ftext(player.x, player.y - 66, 'Kaydedildi', GOLD);
     } catch (_) {}
   }
 
-  /* ---------- Kronometre + duraklatma ---------- */
-  const TM = { t: 0, str: '', rc: [], old: [] };
+  /* ---------- Oyun saati + oynanan süre + duraklatma ---------- */
+  const TM = { t: 0, str: '', rc: [], old: [] };   // TM.t: dalga planının oyun saati (zorluk / canavar doğuşu buna bağlı)
+  const PLAY = { t: 0 };   // OYNANAN SÜRE: oyun başlayınca arka planda sayar (menü ve duraklatma hariç) · her yeni oyunda sıfırlanır · kampta kaydedilir · ölüm ekranında gösterilir
+  const GCLK = { f: 8 / 24, DAY: 1200 };   // OYUN SAATİ: f = günün kesri (0–1), başlangıç 08:00 · 1 gün = 20 gerçek dk (gece-gündüz güncellemesi için hazırlık, şimdilik yalnızca saat)
+  const clockStr = () => { const m = Math.floor(GCLK.f * 1440) % 1440; return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); };
+  const isDayClock = () => { const h = GCLK.f * 24; return h >= 6 && h < 18; };
+  function fmtPlay(t) { const q = Math.floor(t), h = Math.floor(q / 3600), m = Math.floor(q / 60) % 60, ss = q % 60; return h ? h + ' sa ' + m + ' dk ' + ss + ' sn' : m + ' dk ' + ss + ' sn'; }
   const pad2 = n => (n < 10 ? '0' : '') + n;
   function fmtTime(t) { const q = Math.floor(t), h = Math.floor(q / 3600), m = Math.floor(q / 60) % 60, ss = q % 60; return h ? h + ':' + pad2(m) + ':' + pad2(ss) : pad2(m) + ':' + pad2(ss); }
-  function drawTimer(fg, dt) {   // her rakam değişirken yukarı kayarak yenilenir, iki nokta saniyede bir nabız atar
-    const str = fmtTime(TM.t), prev = TM.str;
+  function drawTimer(fg, dt) {   // OYUN SAATİ (HH:MM): çanta düğmesinin solunda · dakika rakamı yukarı kayarak yenilenir, iki nokta nabız atar · solunda gün/gece simgesi
+    bagPlace();
+    const str = clockStr(), prev = TM.str;
     if (str !== prev) { for (let i = 1; i <= str.length; i++) { const c = str[str.length - i], o = prev ? prev[prev.length - i] : ''; if (c !== o) { TM.old[i] = o || ''; TM.rc[i] = 1; } } TM.str = str; }
     ctx.save(); ctx.font = `500 ${17 * HUD_S}px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = AU.btn.x - AU.btn.r * HUD_S - 16 * HUD_S; const y = HUD_Y + 29 * (HUD_S - 1) + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
+    const dw = ctx.measureText('0').width + 0.5, cw = dw * 0.5; let x = BAG.x - BAG.r * HUD_S - 14 * HUD_S; const y = HUD_Y + 29 * (HUD_S - 1) + 0.5, bgc = fg === '0,0,0' ? '242,242,242' : '0,0,0';
     ctx.shadowColor = `rgba(${bgc},0.9)`; ctx.shadowBlur = 5;
     for (let i = 1; i <= str.length; i++) {
       const c = str[str.length - i], col = c === ':', w = col ? cw : dw, cx = x - w / 2; x -= w;
@@ -6041,6 +6141,15 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       if (col) { const fr = TM.t % 1, al = 0.35 + 0.55 * (1 - sstep(0, 0.9, fr)); ctx.fillStyle = `rgba(${fg},${al})`; ctx.fillText(':', cx, y - 1); continue; }
       if (rc > 0.001 && TM.old[i]) { ctx.fillStyle = `rgba(${fg},${0.9 * (1 - p)})`; ctx.fillText(TM.old[i], cx, y - p * 8); ctx.fillStyle = `rgba(${fg},${0.9 * p})`; ctx.fillText(c, cx, y + (1 - p) * 8); }
       else { ctx.fillStyle = `rgba(${fg},${0.9 * (rc > 0.001 ? p : 1)})`; ctx.fillText(c, cx, y + rc * 8); }
+    }
+    const ix = x - 13 * HUD_S, R = 5 * HUD_S; ctx.shadowBlur = 0;   // gün (güneş) / gece (ay) simgesi
+    if (isDayClock()) {
+      ctx.fillStyle = 'rgb(242,200,76)'; ctx.beginPath(); ctx.arc(ix, y, R * 0.62, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(242,200,76,0.85)'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const a = k * PI / 4; ctx.moveTo(ix + Math.cos(a) * R * 0.95, y + Math.sin(a) * R * 0.95); ctx.lineTo(ix + Math.cos(a) * R * 1.3, y + Math.sin(a) * R * 1.3); }
+      ctx.stroke();
+    } else {
+      ctx.save(); ctx.beginPath(); ctx.arc(ix, y, R, 0, TAU); ctx.clip(); ctx.fillStyle = 'rgb(188,204,255)'; ctx.beginPath(); ctx.rect(ix - 20, y - 20, 40, 40); ctx.arc(ix + R * 0.5, y - R * 0.3, R * 0.85, 0, TAU); ctx.fill('evenodd'); ctx.restore();
     }
     ctx.restore();
   }
@@ -6523,8 +6632,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       let ty = midY - blockH / 2;
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * ls + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
       { const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cxL - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, ty + 14 * ls); lx += ctx.measureText(c).width + sp; } }
-      ty += titleH + gapA; ctx.textAlign = 'center'; ctx.font = `200 ${54 * ls}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(TM.t), cxL, ty + 44 * ls);
-      ty += timeH + gapB; ctx.font = `400 ${11 * ls + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('geçen süre', cxL, ty + 12 * ls);
+      ty += titleH + gapA; ctx.textAlign = 'center'; ctx.font = `200 ${54 * ls}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(PLAY.t), cxL, ty + 44 * ls);
+      ty += timeH + gapB; ctx.font = `400 ${11 * ls + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('oynanan süre', cxL, ty + 12 * ls);
       // iki sütun arasında ince ayraç
       ctx.save(); ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W / 2, y0); ctx.lineTo(W / 2, y0 + total); ctx.stroke(); ctx.restore();
       // sağ sütun: düğmeler
@@ -6548,8 +6657,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const total = 316 * u + 52; let y = Math.max(UI_TOP, (H - total) / 2 - H * 0.03);
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `500 ${13 * u + 2}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.7)`;
     const T = 'DURAKLATILDI', ch = [...T], sp = 5, tw = ch.reduce((q, c) => q + ctx.measureText(c).width + sp, -sp); let lx = cx - tw / 2; ctx.textAlign = 'left'; for (const c of ch) { ctx.fillText(c, lx, y + 14 * u); lx += ctx.measureText(c).width + sp; }
-    y += 18 * u + 14 * u; ctx.textAlign = 'center'; ctx.font = `200 ${54 * u}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(TM.t), cx, y + 44 * u);
-    y += 54 * u + 4 * u; ctx.font = `400 ${11 * u + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('geçen süre', cx, y + 12 * u);
+    y += 18 * u + 14 * u; ctx.textAlign = 'center'; ctx.font = `200 ${54 * u}px ${UIF}`; ctx.fillStyle = `rgb(${fg})`; ctx.fillText(fmtTime(PLAY.t), cx, y + 44 * u);
+    y += 54 * u + 4 * u; ctx.font = `400 ${11 * u + 1}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; ctx.fillText('oynanan süre', cx, y + 12 * u);
     y += 12 * u + 28 * u; PAUSE.btns.length = 0; PAUSE.sl.length = 0;
     const bw = Math.min(W * 0.74, 280), bh = 52, og = 10, ow = (bw - og) / 2, oh = 40, bx0 = cx - bw / 2;   // tüm düğmeler aynı genişlikte hizalı
     menuPill(bx0, y, bw, bh, 'DEVAM ET', 1, true, performance.now() / 1000); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: bh + 8, fn: resumeGame });
@@ -6621,7 +6730,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   const INV_CATS = [['all', 'HEPSİ'], ['tre', 'HAZİNE'], ['wpn', 'SİLAH'], ['heal', 'ŞİFA'], ['mat', 'MALZEME']];
   const INV_CAT_NAME = { tre: 'HAZİNE', wpn: 'SİLAH', heal: 'ŞİFA', mat: 'MALZEME' };
   function invEnter(from) { INVP.from = from || 'main'; PAUSE.page = 'inv'; INVP.t = 0; INVP.pt = -9; }
-  function invBack() { PAUSE.page = INVP.from === 'craft' ? 'craft' : 'main'; }
+  function invBack() { if (INVP.from === 'bag') { PAUSE.page = 'main'; resumeGame(); return; } PAUSE.page = INVP.from === 'craft' ? 'craft' : 'main'; }   // 'bag': oyundaki çanta düğmesinden açıldı, geri = oyuna dön
   function invItems() {   // çantadaki tüm eşya türleri (sıra sabit) · n: sayı (null = sayısı yok) · cap: azami taşıma · eq: kuşanılı mı · tag: durum yazısı
     const GD = '232,187,76', PR = '166,108,255', HN = HEAL_NAME, C = HEAL_CAP;
     return [
@@ -7720,7 +7829,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         y += 98; y = rhPara(st[3], x0, y, 13.5, 400, fg, 0.62, cw, 20.5) + 20; hair(y, 0.07); end();
       });
       begin(); y += 28; dvText('NOTLAR', x0, y + 7, 11, 500, fg, 0.4, 3, 'left'); y += 20; hair(y, 0.09); y += 6; end();
-      ['Süre, ekrandaki sayaçla aynıdır ve kampta da akar.', 'Doğuşlar kampın içinde olmaz; kamptan çıkınca baskı kaldığı yerden sürer.', 'Çan çalındığında kimin daireye atılacağı belli olmaz: yakındakilerden her türe orantılı pay düşer.', 'Eriyen mum kayarken vurulamaz; yeniden şekillendiği an alev üfleyebilir.'].forEach(t => { begin(); y += 10; ctx.fillStyle = tint(0.5); ctx.beginPath(); ctx.arc(x0 + 3, y + 11, 1.7, 0, TAU); ctx.fill(); y = rhPara(t, x0 + 16, y, 13.5, 400, fg, 0.64, cw - 16, 20.5) + 8; end(); });
+      ['Dalga zamanı, oynanan süreyle aynıdır (duraklatma ve menüde ilerlemez) ve kampta da akar. Ekrandaki saat yalnızca oyun içi saattir.', 'Doğuşlar kampın içinde olmaz; kamptan çıkınca baskı kaldığı yerden sürer.', 'Çan çalındığında kimin daireye atılacağı belli olmaz: yakındakilerden her türe orantılı pay düşer.', 'Eriyen mum kayarken vurulamaz; yeniden şekillendiği an alev üfleyebilir.'].forEach(t => { begin(); y += 10; ctx.fillStyle = tint(0.5); ctx.beginPath(); ctx.arc(x0 + 3, y + 11, 1.7, 0, TAU); ctx.fill(); y = rhPara(t, x0 + 16, y, 13.5, 400, fg, 0.64, cw - 16, 20.5) + 8; end(); });
       y += 40; ctx.restore(); RH.max = Math.max(0, y - H);
       { const f1 = ctx.createLinearGradient(0, vt, 0, vt + 26); f1.addColorStop(0, `rgba(${bgRGB},1)`); f1.addColorStop(1, `rgba(${bgRGB},0)`); ctx.fillStyle = f1; ctx.fillRect(fx0, vt, W - fx0, 26);
         const f2 = ctx.createLinearGradient(0, H - 34, 0, H); f2.addColorStop(0, `rgba(${bgRGB},0)`); f2.addColorStop(1, `rgba(${bgRGB},1)`); ctx.fillStyle = f2; ctx.fillRect(fx0, H - 34, W - fx0, 34); }
@@ -7821,6 +7930,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (PAUSE.on) { try { AU.setMode('menu'); AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
     const fz = DEV.freeze;   // geliştirici: zamanı dondur (Halaskar dışında her şey durur)
     if (!fz) TM.t += dt;
+    PLAY.t += dt; GCLK.f = (GCLK.f + dt / GCLK.DAY) % 1;   // oynanan süre ve oyun saati (duraklatma / menüde döngü erken çıktığı için ilerlemez)
     const stopped = FX.stop > 0; if (stopped) FX.stop -= dt;
     const sdt = stopped ? dt * 0.04 : dt;   // vuruş duraklaması: oyun neredeyse donar
 
@@ -7912,7 +8022,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.restore();
     }
     drawHud(fg); drawBowHud(fg); drawTimer(fg, dt); drawHealHud(fg, dt); drawDevHp(fg, dt); drawCampHud(fg, dt);
-    drawAtk(fg, dt); drawSwapBtn(fg, dt); drawBowBtn(fg, dt); drawHealBtns(fg, dt); drawPrismBtns(fg, dt); drawPauseBtn(fg, dt);
+    drawAtk(fg, dt); drawSwapBtn(fg, dt); drawBowBtn(fg, dt); drawHealBtns(fg, dt); drawPrismBtns(fg, dt); drawPauseBtn(fg, dt); drawBagBtn(fg, dt);
     if (PAUSE.a > 0) drawPause(dt, true);
     if (DEATH.on) drawDeath(dt, fg);
     if (MENU.blk > 0) { MENU.blk = Math.max(0, MENU.blk - dt / 0.7); ctx.fillStyle = `rgba(0,0,0,${MENU.blk})`; ctx.fillRect(0, 0, W, H); }   // karartmadan açılış
