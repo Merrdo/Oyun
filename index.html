@@ -73,6 +73,7 @@
     if (navigator.standalone === true) {
       const full = Math.max(screen.width, screen.height);
       if (VPH > VPW && full > VPH) VPH = full;
+      else if (VPW > VPH) { const fh = Math.min(screen.width, screen.height); if (fh > VPH && fh - VPH < 90) VPH = fh; }   // yatay açılışta da alt güvenli alan / eski boyut yüzünden tuvalin altında siyah şerit kalmasın
     }
     // DİKEY FİZİKSEL EKRAN: yatay kilit mümkün değilse (iOS, tarayıcı sekmesi) oyun 90° döndürülüp yatay çizilir;
     // telefon dikey tutulsa da oyun yatay kalır, dikey düzen yoktur.
@@ -6169,36 +6170,25 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.stroke(); }
     ctx.restore();
   }
-  function windStart(u, hx, hy, R) {   // soldan sağa esen rüzgâr: 26 yaprak · gözler sağdayken bir yaprak ansızın soldan çarpıp kafanın sol kenarına yapışır
-    const lv = [];
-    for (let i = 0; i < 26; i++) { const z = i % 3 === 0 ? 0 : 1; lv.push({ x0: -rnd(20, W * 0.5), y0: i < 11 ? hy + rnd(-1.3, 1.3) * R : rnd(H * 0.08, H * 0.92), vx: rnd(280, 440) * u, fr: rnd(2, 4.6), ph: rnd(0, 6.3), am: rnd(14, 38) * u, dr: rnd(-14, 26) * u, sp: rnd(-5, 5), fl: rnd(2, 6), ty: (Math.random() * 3) | 0, sz: (z ? rnd(10, 16) : rnd(6, 9)) * u, z, c: LEAFC[(Math.random() * LEAFC.length) | 0] }); }
-    return { t: 0, lv, hx, hy, R, u, TA: 4.4, TS: 1.5, TF: 1.8, TL: 1.0, FL: 0.45, pos: [], stk: null, gx: -1, gy: -0.1, ox: 0, wide: 0, fast: false, done: false };
+  function windStart(u, hx, hy, R) {   // soldan sağa esen uzun rüzgâr: 44 yaprak ~8 sn boyunca birbiri ardına geçer
+    const lv = []; let dur = 0;
+    for (let i = 0; i < 44; i++) { const z = i % 3 === 0 ? 0 : 1, l = { x0: -rnd(20, W * 1.4), y0: i < 15 ? hy + rnd(-1.3, 1.3) * R : rnd(H * 0.08, H * 0.92), vx: rnd(280, 440) * u, fr: rnd(2, 4.6), ph: rnd(0, 6.3), am: rnd(14, 38) * u, dr: rnd(-14, 26) * u, sp: rnd(-5, 5), fl: rnd(2, 6), ty: (Math.random() * 3) | 0, sz: (z ? rnd(10, 16) : rnd(6, 9)) * u, z, c: LEAFC[(Math.random() * LEAFC.length) | 0] };
+      lv.push(l); dur = Math.max(dur, (W + 40 - l.x0) / l.vx); }
+    return { t: 0, lv, hx, hy, R, u, dur, pos: [], gx: -1, gy: -0.1, ox: 0, wide: 0, fast: false, done: false };
   }
-  function wdStuck(wd, bob) {   // ansızın çarpan yaprak: hızla gelir, kafanın SOL kenarına (arkasına) yapışır, sonra soyulup sallanarak düşer
-    const T = wd.t, { hx, hy, R, u, TA, TS, TF, FL } = wd, ax = hx + wd.ox - R * 1.08, ay = hy + bob - R * 0.28, gyL = hy + R * 1.2;
-    if (T < TA - FL) return { x: -200, y: ay, r: 1.2, a: 1, f: 1 };
-    if (T < TA) { const p = (T - (TA - FL)) / FL; return { x: lerp(-40, ax, 0.35 * p + 0.65 * p * p), y: ay - (1 - p) * 8 * u + Math.sin(p * 12) * 5 * u * (1 - p), r: 1.25 + Math.sin(p * 22) * 0.2, a: 1, f: 0.6 + 0.4 * Math.abs(Math.cos(p * 18)) }; }
-    if (T < TA + TS) return { x: ax, y: ay, r: 1 + 0.25 * Math.exp(-(T - TA) * 9) * Math.cos((T - TA) * 40), a: 1, f: 1 };
-    const q = clamp((T - TA - TS) / TF, 0, 1);
-    return { x: ax - Math.sin(q * PI * 2.2) * 16 * u - q * 12 * u, y: lerp(ay, gyL, q * q), r: 1 + Math.sin(q * 11) * 0.9 - q * 0.4, a: T > TA + TS + TF ? clamp(1 - (T - TA - TS - TF) / wd.TL, 0, 1) : 1, f: q >= 1 ? 0.45 : 0.55 + 0.45 * Math.abs(Math.cos(q * 15)) };
-  }
-  function windStep(wd, dt, bob) {   // yaprak konumları + bakış: önce sola, sonra yaprakları sağa doğru izler, sağda kalır → yaprak soldan çarpar: ürkek göz, sola bakış → düşeni izler
-    wd.t += dt; const T = wd.t, { hx, hy, R, TA, TS, TF } = wd, d = T - TA;
+  function windStep(wd, dt) {   // yaprak konumları + bakış: önce sola bakar, yaprakları soldan sağa izler; hepsi geçince göz normale döner
+    wd.t += dt; const T = wd.t, { hx, hy } = wd;
     wd.pos = wd.lv.map(l => ({ x: l.x0 + l.vx * T, y: l.y0 + Math.sin(T * l.fr + l.ph) * l.am + T * l.dr, r: l.ph + T * l.sp, f: 0.45 + 0.55 * Math.abs(Math.cos(T * l.fl + l.ph)), l }));
-    wd.ox = Math.sin(clamp(T / TA, 0, 1) * PI) * 5 * wd.u + (d > 0 ? 9 * wd.u * Math.exp(-d * 6) * Math.cos(d * 18) : 0);   // rüzgâr iter · çarpınca sağa savrulup yaylanır
-    const sk = wd.stk = wdStuck(wd, bob); let sx = 0, sy = 0, n = 0;
-    for (const p of wd.pos) if (p.x > -10 && p.x < W + 10) { sx += p.x; sy += p.y; n++; }
-    let gx = T < 1.2 ? -1 : 1, gy = 0; if (n) { gx = clamp((sx / n - hx) / (W * 0.3), -1, 1); gy = clamp((sy / n - hy) / (H * 0.3), -1, 1) * 0.8; }
+    wd.ox = Math.sin(clamp(T / wd.dur, 0, 1) * PI) * 5 * wd.u;   // rüzgâr kafayı hafif iter
+    let sx = 0, sy = 0, n = 0; for (const p of wd.pos) if (p.x > -10 && p.x < W + 10) { sx += p.x; sy += p.y; n++; }
+    let gx = T < 1.2 ? -1 : 0, gy = 0; if (n) { gx = clamp((sx / n - hx) / (W * 0.3), -1, 1); gy = clamp((sy / n - hy) / (H * 0.3), -1, 1) * 0.8; }
     if (T < 0.35) { gx = -1; gy = -0.1; }
-    if (d >= 0 && d < TS + 0.1) { gx = -1; gy = -0.15; } else if (d >= TS + 0.1 && d < TS + TF) { gx = clamp((sk.x - hx) / (R * 1.2), -1, 1); gy = clamp((sk.y - hy) / (R * 1.2), -0.2, 1); }
-    wd.gx = gx; wd.gy = gy; wd.fast = d >= 0 && d < 0.7; wd.wide = d >= 0 ? 0.4 * Math.exp(-d * 2.2) : 0;
-    if (d > TS + TF + 0.5) wd.done = true;
+    wd.gx = gx; wd.gy = gy; if (T > wd.dur + 0.4) wd.done = true;
   }
-  function windBack(wd, fg, u) {   // arka plan: rüzgâr çizgileri + küçük yapraklar + kafanın ARKASINDA kalan (yapışan / düşen) yaprak
-    const T = wd.t, env = clamp(T / 0.6, 0, 1) * clamp((wd.TA + 0.4 - T) / 0.8, 0, 1);
+  function windBack(wd, fg, u) {   // arka plan: rüzgâr çizgileri + kafanın arkasından geçen küçük yapraklar
+    const T = wd.t, env = clamp(T / 0.6, 0, 1) * clamp((wd.dur + 0.2 - T) / 0.8, 0, 1);
     if (env > 0.01) { ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = 1.3 * u; for (let i = 0; i < 10; i++) { const p = (T * (0.55 + 0.5 * dHash(i, 5)) + dHash(i, 6)) % 1, ln = (70 + 110 * dHash(i, 7)) * u, x = -ln + p * (W + ln * 2), y = H * (0.08 + 0.84 * dHash(i, 8)); ctx.strokeStyle = `rgba(${fg},${Math.sin(PI * p) * 0.1 * env})`; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + ln * 0.5, y - 5 * u * Math.sin(T * 3 + i), x + ln, y); ctx.stroke(); } ctx.restore(); }
     for (const p of wd.pos) if (!p.l.z) drawLeaf(p.x, p.y, p.r, p.l.sz, p.l.c[0], p.l.c[1], 0.75, p.f, p.l.ty);
-    const k = wd.stk; if (k) drawLeaf(k.x, k.y, k.r, wd.R * 0.3, '#f6a04a', '#c0381f', k.a, k.f, 0);
   }
   function windFront(wd) { for (const p of wd.pos) if (p.l.z) drawLeaf(p.x, p.y, p.r, p.l.sz, p.l.c[0], p.l.c[1], 1, p.f, p.l.ty); }   // kafanın önünden geçen yapraklar
   function menuHead(cx, cy, R, o) {   // oyundaki karakterin kafası: dolu daire + nokta gözler
@@ -6243,7 +6233,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const bobE = Math.sin(t * 1.3) * 5 * u; let wd = MENU.wd;
     if (act) { MENU.wd = wd = null; }
     else if (!wd) { MENU.wT -= dt; if (MENU.wT <= 0 && t > 2.5 && MENU.egg < 0.05 && MENU.eggD <= 0) { MENU.wd = wd = windStart(u, hcx, hy, R); MENU.eggT = Math.max(MENU.eggT, 14); } }
-    if (wd) { windStep(wd, dt, bobE); if (wd.done) { MENU.wd = wd = null; MENU.tgx = 0; MENU.tgy = 0; MENU.gT = rnd(2.5, 4.5); MENU.wT = rnd(18, 30); } }
+    if (wd) { windStep(wd, dt); if (wd.done) { MENU.wd = wd = null; MENU.tgx = 0; MENU.tgy = 0; MENU.gT = rnd(2.5, 4.5); MENU.wT = rnd(18, 30); } }
     // bakış: dokunulan/imleç yönü, yoksa ara sıra rastgele göz gezdirme
     MENU.gT -= dt; if (MENU.gT <= 0) { MENU.gT = rnd(2.2, 4.5); MENU.tgx = Math.random() < 0.35 ? 0 : rnd(-0.7, 0.7); MENU.tgy = Math.random() < 0.4 ? 0 : rnd(-0.4, 0.4); }
     let tgx = MENU.tgx, tgy = MENU.tgy; if (t - MENU.pt < 3) { tgx = clamp((MENU.px - hcx) / (W * 0.4), -1, 1); tgy = clamp((MENU.py - hy) / (H * 0.35), -1, 1); }
@@ -8618,8 +8608,11 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   addEventListener('pointerup', function once2() { removeEventListener('pointerup', once2, true); applyOrient(true); }, true);   // dokunuş bırakılınca (tarayıcı izin verir) tam ekran + kilit
   addEventListener('scroll', () => { if (scrollX || scrollY) scrollTo(0, 0); });
   addEventListener('resize', resize);
-  addEventListener('orientationchange', resize);
-  resize();
+  const resizeSoon = () => { resize(); [120, 400, 1000].forEach(ms => setTimeout(resize, ms)); };   // iOS dönüş / açılışta eski boyutu bildirir: kısa gecikmelerle yeniden ölç
+  addEventListener('orientationchange', resizeSoon); addEventListener('pageshow', resizeSoon);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resizeSoon(); });
+  if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+  resize(); [150, 500, 1200].forEach(ms => setTimeout(resize, ms));
   try { const a = sessionStorage.getItem('hlk_auto'); if (a) { sessionStorage.removeItem('hlk_auto');   // yeniden yüklemeden sonra tarayıcı sesi bir dokunuş olmadan açmaz: oyun, ilk dokunuş/tuşla (ses kilidi açılırken) başlar
     if (MENU.on && MENU.st === 'idle') { menuStart(a === 'c'); MENU.mode = 'zoom'; MENU.sT = 0.5; } } } catch (_) {}   // dokunuş beklemeden başlar; ses ilk dokunuşta kendiliğinden açılır   // ölüm ekranından 'kayıttan devam / yeni oyun'
   requestAnimationFrame(frame);
