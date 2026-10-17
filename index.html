@@ -6040,6 +6040,56 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const c of ch) { ctx.fillText(c, lx, y + h / 2 + 0.5); lx += ctx.measureText(c).width + sp; }
     ctx.restore();
   }
+  function menuArt(kind, x, y, r, a, t) {   // ana menü düğmeleri: çantayla aynı çizim dili (kalın koyu dış çizgi, deri / maden / kumaş, altın detay) · birim: düğme yarıçapı 20
+    const OL = '#2a1608', GD = '#f6cf58', lg = (x0, y0, x1, y1, c0, c1) => { const q = ctx.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, c0); q.addColorStop(1, c1); return q; };
+    const tw = Math.min(1, Math.max(0, Math.sin(t * 2.1 + x * 0.05) * 1.6 - 0.6));   // her düğmenin parıltısı ayrı anda yanar
+    ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y + Math.sin(t * 1.5 + x * 0.013) * 1.1); ctx.scale(r / 20, r / 20); ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(0.8, 16.6, 11.5, 2.5, 0, 0, TAU); ctx.fill();
+    if (kind === 'gear') {   // pirinç çark: gölgeli yan yüz, perçin delikleri, cıvatalı göbek · yavaş döner
+      const gp = () => { ctx.beginPath(); for (let i = 0; i < 8; i++) for (const [d, q] of [[-0.27, 11], [-0.17, 14.8], [0.17, 14.8], [0.27, 11]]) { const an = i * TAU / 8 + d; ctx.lineTo(Math.cos(an) * q, Math.sin(an) * q); } ctx.closePath(); };
+      ctx.save(); ctx.rotate(t * 0.2); gp(); ctx.fillStyle = lg(-14, -14, 14, 14, '#ffdf7a', '#a8691f'); ctx.fill(); ctx.lineWidth = 1.9; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.save(); gp(); ctx.clip(); ctx.fillStyle = 'rgba(70,30,4,0.34)'; ctx.beginPath(); ctx.moveTo(-16, 16); ctx.lineTo(16, -16); ctx.lineTo(16, 16); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(42,22,8,0.55)'; ctx.stroke();
+      for (let i = 0; i < 4; i++) { const an = i * TAU / 4 + 0.785; ctx.beginPath(); ctx.arc(Math.cos(an) * 8.4, Math.sin(an) * 8.4, 1.15, 0, TAU); ctx.fillStyle = OL; ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, 0, 5.2, 0, TAU); ctx.fillStyle = lg(-5, -5, 5, 5, '#c07f3e', '#5a2d10'); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, TAU); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = OL; ctx.fillRect(-0.45, -1.8, 0.9, 3.6);
+      ctx.strokeStyle = 'rgba(255,248,200,0.8)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 12.6, 3.5, 4.4); ctx.stroke(); ctx.restore();
+    } else if (kind === 'dev') {   // çelik rün levhası: çıkıntılı çerçeve, koyu oyuk panel, parlayan altın </>
+      rr(-13.6, -12.4, 27.2, 24.8, 4.5); ctx.fillStyle = lg(-13, -12, 13, 12, '#c3d1db', '#4a5764'); ctx.fill(); ctx.lineWidth = 1.9; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.save(); rr(-13.6, -12.4, 27.2, 24.8, 4.5); ctx.clip(); ctx.fillStyle = 'rgba(15,25,40,0.28)'; ctx.fillRect(-14, 6, 28, 8); ctx.restore();
+      rr(-9.4, -8.4, 18.8, 16.8, 2.4); ctx.fillStyle = lg(0, -8, 0, 8, '#10171e', '#26323d'); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OL; ctx.stroke();
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * 11.5, sy * 10.3, 1.25, 0, TAU); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = OL; ctx.stroke(); }
+      ctx.save(); ctx.shadowColor = 'rgba(246,207,88,0.75)'; ctx.shadowBlur = 5; ctx.scale(6, 6); ctx.beginPath(); menuGlyph('dev'); ctx.lineWidth = 2.3 / 6; ctx.strokeStyle = GD; ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-9, -10.9); ctx.lineTo(4, -10.9); ctx.stroke();
+    } else if (kind === 'book') {   // zümrüt deri ciltli rehber: sayfa kenarı, altın dikiş çerçeve, sırtta bantlar, mühür, ayraç
+      rr(-8, -12.6, 20.4, 25.6, 2); ctx.fillStyle = '#f3e6c4'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.strokeStyle = 'rgba(120,90,50,0.65)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (const px of [8.6, 9.8, 11]) { ctx.moveTo(px, -9.5); ctx.lineTo(px, 10); } ctx.stroke();
+      rr(-11.4, -13.8, 20.8, 26.8, 2.6); ctx.fillStyle = lg(-11, -14, 9, 13, '#5fd09a', '#1d5c40'); ctx.fill(); ctx.lineWidth = 1.9; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.save(); rr(-11.4, -13.8, 20.8, 26.8, 2.6); ctx.clip(); ctx.fillStyle = '#154a33'; ctx.fillRect(-11.4, -13.8, 5.4, 26.8); ctx.fillStyle = 'rgba(4,34,20,0.3)'; ctx.fillRect(5.2, -14, 5, 28); ctx.restore();
+      ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-6, -13.4); ctx.lineTo(-6, 12.6); ctx.stroke();
+      for (const by of [-8, 0, 8]) { rr(-11, by - 1, 4.6, 2.2, 0.6); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 0.8; ctx.stroke(); }
+      ctx.save(); ctx.setLineDash([1.5, 1.3]); ctx.strokeStyle = 'rgba(246,207,88,0.8)'; ctx.lineWidth = 0.8; rr(-3.6, -11, 11.6, 22.2, 1.4); ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.moveTo(2.2, -7.2); ctx.lineTo(6, -1); ctx.lineTo(2.2, 5.2); ctx.lineTo(-1.6, -1); ctx.closePath(); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2.2, -3.2); ctx.lineTo(3.7, -1); ctx.lineTo(2.2, 1.2); ctx.lineTo(0.7, -1); ctx.closePath(); ctx.fillStyle = '#1d5c40'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(2.4, 13); ctx.lineTo(2.4, 18.2); ctx.lineTo(4.2, 16.6); ctx.lineTo(6, 18.2); ctx.lineTo(6, 13); ctx.closePath(); ctx.fillStyle = '#d4453f'; ctx.fill(); ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-3.4, -12.3); ctx.lineTo(5, -12.3); ctx.stroke();
+    } else {   // kıyafet: kızıl tunik, çelik omuzluk, koyu deri kemer, altın toka ve amblem
+      const tun = () => { ctx.beginPath(); ctx.moveTo(-5, -13); ctx.lineTo(-14, -9); ctx.lineTo(-15.4, -0.6); ctx.lineTo(-9.6, 0.8); ctx.lineTo(-9.6, 14.2); ctx.quadraticCurveTo(0, 16.4, 9.6, 14.2); ctx.lineTo(9.6, 0.8); ctx.lineTo(15.4, -0.6); ctx.lineTo(14, -9); ctx.lineTo(5, -13); ctx.quadraticCurveTo(0, -8.6, -5, -13); ctx.closePath(); };
+      tun(); ctx.fillStyle = lg(-14, -12, 14, 15, '#f0665a', '#9a2631'); ctx.fill(); ctx.lineWidth = 1.9; ctx.strokeStyle = OL; ctx.stroke();
+      ctx.save(); tun(); ctx.clip(); ctx.fillStyle = 'rgba(58,6,16,0.38)'; ctx.beginPath(); ctx.moveTo(6.4, -14); ctx.bezierCurveTo(7.6, -2, 7.6, 8, 6.6, 17); ctx.lineTo(17, 17); ctx.lineTo(17, -14); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.beginPath(); ctx.moveTo(-5, -13); ctx.quadraticCurveTo(0, -8.6, 5, -13); ctx.quadraticCurveTo(0, -5.4, -5, -13); ctx.fillStyle = '#3d0c13'; ctx.fill(); ctx.lineWidth = 1.3; ctx.stroke();
+      ctx.strokeStyle = '#f3e6c4'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-5.2, -12.8); ctx.quadraticCurveTo(0, -8.4, 5.2, -12.8); ctx.stroke();
+      ctx.strokeStyle = GD; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-1.8, -9.6); ctx.lineTo(1.8, -7.4); ctx.moveTo(1.8, -9.6); ctx.lineTo(-1.8, -7.4); ctx.stroke();
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sd * 11.2, -7.4, 4.6, 3, sd * 0.5, 0, TAU); ctx.fillStyle = lg(0, -10, 0, -5, '#e8eef2', '#76828e'); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OL; ctx.stroke(); ctx.beginPath(); ctx.arc(sd * 11.2, -7.4, 0.95, 0, TAU); ctx.fillStyle = GD; ctx.fill(); }
+      ctx.beginPath(); ctx.moveTo(0, -5.2); ctx.lineTo(2.5, -2.2); ctx.lineTo(0, 0.8); ctx.lineTo(-2.5, -2.2); ctx.closePath(); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = OL; ctx.stroke();
+      rr(-9.9, 4.8, 19.8, 4.6, 1.2); ctx.fillStyle = lg(0, 4.8, 0, 9.4, '#7a3b14', '#3f1d08'); ctx.fill(); ctx.lineWidth = 1.7; ctx.stroke();
+      rr(-3, 4.2, 6, 5.8, 1.3); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 1.3; ctx.stroke(); ctx.fillStyle = OL; ctx.fillRect(-0.5, 5.6, 1, 3);
+      ctx.save(); ctx.setLineDash([1.5, 1.3]); ctx.strokeStyle = 'rgba(243,230,196,0.8)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-8, 12.6); ctx.quadraticCurveTo(0, 14.6, 8, 12.6); ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-7.6, -2.2); ctx.lineTo(-7.8, 3); ctx.stroke();
+    }
+    if (tw > 0.02) { const k = tw, px = 13, py = -15; ctx.fillStyle = '#fff3b0'; ctx.strokeStyle = '#e0a82a'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(px, py - 3.2 * k); ctx.quadraticCurveTo(px + 0.5 * k, py - 0.5 * k, px + 3.2 * k, py); ctx.quadraticCurveTo(px + 0.5 * k, py + 0.5 * k, px, py + 3.2 * k); ctx.quadraticCurveTo(px - 0.5 * k, py + 0.5 * k, px - 3.2 * k, py); ctx.quadraticCurveTo(px - 0.5 * k, py - 0.5 * k, px, py - 3.2 * k); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+  }
   function menuIcon(x, y, r, kind, a) {   // yatay ana menü: yazısız, ince çizgili yuvarlak ikon düğmesi
     ctx.save(); ctx.globalAlpha *= a; const fg = light ? '0,0,0' : '255,255,255';
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = `rgba(${fg},0.03)`; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${fg},0.2)`; ctx.stroke();
@@ -6079,7 +6129,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       return;
     }
     // ---- durumlar ----
-    const hy = H * 0.5, R = 62 * u, hcx = W * 0.3;   // yatayda kafa solda, yazı ve düğmeler sağ sütunda
+    const hy = H * 0.5, R = 62 * u, hcx = W * 0.5;   // kafa tam ekran merkezinde; başlık üstte, BAŞLA sağ altta, simgeler köşelerde
     // bakış: dokunulan/imleç yönü, yoksa ara sıra rastgele göz gezdirme
     MENU.gT -= dt; if (MENU.gT <= 0) { MENU.gT = rnd(2.2, 4.5); MENU.tgx = Math.random() < 0.35 ? 0 : rnd(-0.7, 0.7); MENU.tgy = Math.random() < 0.4 ? 0 : rnd(-0.4, 0.4); }
     let tgx = MENU.tgx, tgy = MENU.tgy; if (t - MENU.pt < 3) { tgx = clamp((MENU.px - hcx) / (W * 0.4), -1, 1); tgy = clamp((MENU.py - hy) / (H * 0.35), -1, 1); }
@@ -6136,29 +6186,29 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const uiA = act ? 1 - clamp(sT / 0.25, 0, 1) : 1;
     if (uiA > 0.002) {
       ctx.save(); ctx.globalAlpha = uiA;
-      const hs0 = !!SAVED, colX = W * 0.66, colW = Math.min(W * 0.4, 420), Bh = (hs0 ? 248 : 202) * u, top0 = (H - Bh) / 2, tcx = colX;   // yatay: sağ sütun dikeyde ortalı
+      const colW = Math.min(W * 0.4, 420), top0 = Math.max(14, HUD_Y - 14) - 2 * u, tcx = cx;   // başlık üst ortada
       ctx.font = `300 100px ${UIF}`; const L = [...GAME_TITLE], w100 = L.reduce((q, c) => q + ctx.measureText(c).width + 20, -20), size = Math.min(46 * u, colW * 0.92 / w100 * 100);
       ctx.font = `300 ${size}px ${UIF}`; const sp = size * 0.2, ws = L.map(c => ctx.measureText(c).width), tot = ws.reduce((q, w) => q + w + sp, -sp), ty = top0 + 38 * u; let lx = tcx - tot / 2;
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-      L.forEach((c, i) => { const e = ease((t - 0.5 - i * 0.07) / 0.9), sh = 0.9 + 0.1 * Math.sin(t * 0.9 - i * 0.4); ctx.fillStyle = `rgba(${fg},${e * sh})`; ctx.fillText(c, lx, ty + (1 - e) * 10 * u); lx += ws[i] + sp; });
+      L.forEach((c, i) => { const e = clamp((t - 0.5 - i * 0.12) / 0.1, 0, 1), sh = 0.94 + 0.06 * Math.sin(t * 0.9 - i * 0.4); ctx.fillStyle = `rgba(${fg},${e * sh})`; ctx.fillText(c, lx, ty); lx += ws[i] + sp; });
       const le = ease((t - 1.3) / 1.0), ly = ty + 20 * u, lw = Math.min(colW * 0.6, 190 * u) * le;
       ctx.strokeStyle = `rgba(${fg},0.28)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tcx - lw / 2, ly); ctx.lineTo(tcx - 5, ly); ctx.moveTo(tcx + 5, ly); ctx.lineTo(tcx + lw / 2, ly); ctx.stroke();
       ctx.fillStyle = `rgba(240,194,74,${0.85 * le})`; ctx.save(); ctx.translate(tcx, ly); ctx.rotate(PI / 4); ctx.fillRect(-2.2, -2.2, 4.4, 4.4); ctx.restore();
       const se = ease((t - 1.6) / 1.0); ctx.font = `400 ${12 * u + 1}px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.5 * se})`; ctx.fillText(GAME_SUB, tcx, ly + 24 * u);
       MENU.btns.length = 0; const hs = !!SAVED, be = ease((t - 1.9) / 0.9);
-      {   // sağ sütunda ana düğme(ler) + yazısız ikonlar; köşelerde geliştirici / ayarlar
-        const k = u, pbw = Math.min(colW * 0.78, 230 * k), pbh = 44 * k, pry = ly + 44 * k + (1 - be) * 12, bx = colX - pbw / 2; let yy = pry + pbh;
+      {   // kompozisyon: BAŞLA sağ altta (altın) · sol üstte geliştirici + rehber · sağ üstte ayarlar + kıyafet (çanta tasarım dilinde)
+        const k = u, m = Math.max(14, HUD_M), ar = 25 * k, cy2 = Math.max(14, HUD_Y - 14) + ar * 0.8, gap = 10 * k, rowB = H - 30 * k;
+        const pbw = Math.min(W * 0.3, 230 * k), pbh = 44 * k, nh = 36 * k, bx = W - m - pbw, pry = rowB - (hs ? pbh + gap + nh : pbh) + (1 - be) * 14, gold = light ? '176,118,12' : '240,194,74';
         menuPill(bx, pry, pbw, pbh, hs ? 'DEVAM' : 'BAŞLA', be, true, t, null, k); MENU.btns.push({ x: bx, y: pry - 4, w: pbw, h: pbh + 8, fn: () => menuStart(hs) });
-        if (hs) { const ny = pry + pbh + 10 * k, nh = 36 * k; menuPill(bx, ny, pbw, nh, 'BAŞLA', be, false, t, null, k); MENU.btns.push({ x: bx, y: ny - 3, w: pbw, h: nh + 6, fn: () => menuStart(false) }); yy = ny + nh; }
-        const cr = 19 * k, cg = 16 * k, cyy = yy + 18 * k + cr + (1 - be) * 12;
-        [[colX - cg / 2 - cr, 'shirt', wdEnterFromMenu], [colX + cg / 2 + cr, 'book', rehberEnterFromMenu]].forEach(([ix, kd, fn]) => { menuIcon(ix, cyy, cr, kd, be); MENU.btns.push({ x: ix - cr - 6, y: cyy - cr - 6, w: cr * 2 + 12, h: cr * 2 + 12, fn }); });
-        const m = Math.max(14, HUD_M), r2 = 17, cy2 = Math.max(14, HUD_Y - 14) + r2;
-        menuIcon(m + r2, cy2, r2, 'dev', be); MENU.btns.push({ x: m - 6, y: cy2 - r2 - 6, w: r2 * 2 + 12, h: r2 * 2 + 12, fn: devEnterFromMenu });
-        menuIcon(W - m - r2, cy2, r2, 'gear', be); MENU.btns.push({ x: W - m - r2 * 2 - 6, y: cy2 - r2 - 6, w: r2 * 2 + 12, h: r2 * 2 + 12, fn: settingsEnterFromMenu });
+        if (hs) { const ny = pry + pbh + gap; menuPill(bx, ny, pbw, nh, 'BAŞLA', be, false, t, null, k); MENU.btns.push({ x: bx, y: ny - 3, w: pbw, h: nh + 6, fn: () => menuStart(false) }); }
+        const lx0 = m + ar * 0.8, rx0 = W - m - ar * 0.8, by2 = cy2 + 2 * ar + 2 * k, hb = ar + 4, bt = (cxx, cyy, fn) => MENU.btns.push({ x: cxx - hb, y: cyy - hb, w: hb * 2, h: hb * 2, fn });
+        menuArt('dev', lx0, cy2, ar, be, t); bt(lx0, cy2, devEnterFromMenu);
+        menuArt('book', lx0, by2, ar, be, t); bt(lx0, by2, rehberEnterFromMenu);
+        menuArt('gear', rx0, cy2, ar, be, t); bt(rx0, cy2, settingsEnterFromMenu);
+        menuArt('outfit', rx0, by2, ar, be, t); bt(rx0, by2, wdEnterFromMenu);
       }
       if (be < 0.45) MENU.btns.length = 0;   // düğmeler yeterince belirmeden basılamaz
-      if (H > 300) { ctx.font = `400 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.3 * be})`; ctx.fillText('sürükle: hareket  ·  buton: saldırı', colX, H - 14); }
-      if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', hcx, Math.min(H - 16, hy + R * 1.22 + 36 * u)); }
+      if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', hcx, H - 50 * u); }
       ctx.restore();
     } else MENU.btns.length = 0;
     ctx.restore();
