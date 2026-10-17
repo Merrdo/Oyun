@@ -1,5 +1,5 @@
 // Oyun service worker: önce ağ, olmazsa önbellek (çevrimdışı çalışır)
-const CACHE = 'oyun-v5'; // dosyaları güncellediğinde sürümü artır (v2, v3...)
+const CACHE = 'oyun-v6'; // dosyaları güncellediğinde sürümü artır (v2, v3...)
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (e) => {

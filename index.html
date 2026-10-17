@@ -33,6 +33,13 @@
 
   /* ---------- ARAYÜZ KURALI: oyun yalnızca YATAY çalışır. Dikey düzen yok. ---------- */
 
+  /* ---------- Dikey fiziksel ekranda dokunma eşleme (ROT) ---------- */
+  ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(tp => window.addEventListener(tp, e => {
+    if (!ROT) return;
+    const gx = e.clientY, gy = VPW - e.clientX;
+    try { Object.defineProperty(e, 'clientX', { value: gx, configurable: true }); Object.defineProperty(e, 'clientY', { value: gy, configurable: true }); } catch (_) {}
+  }, true));
+
   /* ---------- Canvas ---------- */
   const cv = document.getElementById('c');
   const ctx = cv.getContext('2d');
@@ -48,6 +55,7 @@
     };
   }
   let W = 0, H = 0, DPR = 1;
+  let VPW = 0, VPH = 0, ROT = false;   // PW/PH: fiziksel görünüm alanı · ROT: fiziksel ekran dikeyse oyun 90° döndürülmüş yatay çizilir
   let SAS = 0;   // yatay güvenli alan payı (çentik / dinamik ada / yuvarlak köşe): sayfa içerikleri ve sağ düğmeler bu kadar içeriden başlar
   let SEED = 0;   // harita tohumu: her yeni oyunda rastgele; hashN ile üretilen her şey (heykel, sandık, kamp, harabe) buna bağlıdır
   const cam = { x: 0, y: 0 };
@@ -58,22 +66,28 @@
 
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 3);
-    W = window.innerWidth; H = window.innerHeight;
+    VPW = window.innerWidth; VPH = window.innerHeight;
     // iOS ana ekran modunda innerHeight alt güvenli alanı (home indicator) hariç tutabiliyor;
     // bu durumda gerçek ekran yüksekliğini kullanıp tuvali tam boyuta uzatıyoruz.
     if (navigator.standalone === true) {
       const full = Math.max(screen.width, screen.height);
-      if (H > W && full > H) H = full;
+      if (VPH > VPW && full > VPH) VPH = full;
     }
+    // DİKEY FİZİKSEL EKRAN: yatay kilit mümkün değilse (iOS, tarayıcı sekmesi) oyun 90° döndürülüp yatay çizilir;
+    // telefon dikey tutulsa da oyun yatay kalır, dikey düzen yoktur.
+    ROT = VPH > VPW && matchMedia('(pointer: coarse)').matches;
+    if (ROT) { W = VPH; H = VPW; } else { W = VPW; H = VPH; }
     const de = document.documentElement.style, bs = document.body.style;
-    de.height = H + 'px'; bs.width = W + 'px'; bs.height = H + 'px';
+    de.height = VPH + 'px'; de.overflow = 'hidden'; bs.width = VPW + 'px'; bs.height = VPH + 'px'; bs.overflow = 'hidden';
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    cv.style.transformOrigin = '0 0';
+    cv.style.transform = ROT ? 'translateX(' + VPW + 'px) rotate(90deg)' : 'none';
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // kamera uzaklığı yatayda da dikeyle aynı: 1:1 (eskiden yatayda clamp(H / 460, 0.7, 1) ile uzaklaştırılıyordu)
     ZT = 1; ZOOM = ZT;
     // HUD: sol panel ile sağ düğme aynı kenar boşluğunda (çentik/yuvarlak köşe güvenli alanı dahil), yatayda üst boşluk küçük
-    const cs = getComputedStyle(probe), sal = parseFloat(cs.paddingLeft) || 0, sar = parseFloat(cs.paddingRight) || 0;
+    const cs = getComputedStyle(probe), sal = parseFloat(ROT ? cs.paddingTop : cs.paddingLeft) || 0, sar = parseFloat(ROT ? cs.paddingBottom : cs.paddingRight) || 0;
     SAS = Math.max(sal, sar); HUD_M = Math.max(12, sal, sar); HUD_Y = 38; HUD_S = clamp(H / 360, 1, 1.25);   // yatayda HUD biraz büyür (eskisinden ~%17 küçük: profil paneli, duraklatma, çanta, saat)
     cam.x = player.x - camCX(); cam.y = player.y - camCY();
   }
@@ -7978,12 +7992,26 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
 
 
   /* ---------- YATAY KİLİT · güvenli alan dokunma ofseti ---------- */
-  function applyOrient() { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (_) {} }   // yatay kilit (Android / tam ekran PWA)
+  function applyOrient(fs) {   // yatay kilit (Android Chrome: tam ekran gerekir; yüklü PWA: manifest orientation) · iOS kilidi desteklemez, orada ROT döndürmesi devreder
+    try {
+      const o = screen.orientation; if (!o || !o.lock) return;
+      const tryLock = () => o.lock('landscape').catch(() => {});
+      o.lock('landscape').catch(() => {
+        if (!fs) return;
+        const el = document.documentElement, rq = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (rq && !document.fullscreenElement) { try { Promise.resolve(rq.call(el, { navigationUI: 'hide' })).then(tryLock, () => {}); } catch (_) {} }
+      });
+    } catch (_) {}
+  }
+  applyOrient(false);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) applyOrient(false); });
+  document.addEventListener('fullscreenchange', () => applyOrient(false));
   const SHIFT_PAGES = ['wardrobe', 'dev', 'guide', 'craft', 'inv', 'smelt', 'skills', 'powers', 'settings'];
   ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(tp => addEventListener(tp, e => {   // kaydırılmış sayfalarda dokunuş x'i de aynı payla kaydırılır
     if (SAS > 0 && PAUSE.on && SHIFT_PAGES.includes(PAUSE.page)) { const x = e.clientX - SAS; try { Object.defineProperty(e, 'clientX', { value: x, configurable: true }); } catch (_) {} }
   }, true));
-  addEventListener('pointerdown', function once() { removeEventListener('pointerdown', once, true); applyOrient(); }, true);   // ilk dokunuşta yatay kilidi dene
+  addEventListener('pointerdown', function once() { removeEventListener('pointerdown', once, true); applyOrient(false); }, true);   // ilk dokunuşta yatay kilidi dene
+  addEventListener('pointerup', function once2() { removeEventListener('pointerup', once2, true); applyOrient(true); }, true);   // dokunuş bırakılınca (tarayıcı izin verir) tam ekran + kilit
   addEventListener('scroll', () => { if (scrollX || scrollY) scrollTo(0, 0); });
   addEventListener('resize', resize);
   addEventListener('orientationchange', resize);
