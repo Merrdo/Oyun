@@ -55,7 +55,8 @@
     };
   }
   let W = 0, H = 0, DPR = 1;
-  let VPW = 0, VPH = 0, ROT = false;   // PW/PH: fiziksel görünüm alanı · ROT: fiziksel ekran dikeyse oyun 90° döndürülmüş yatay çizilir
+  let VPW = 0, VPH = 0, ROT = false, PORTRAIT = false;   // PORTRAIT: dokunmatik cihaz dikey tutuluyor → oyun çizilmez, 'telefonu yatay çevir' animasyonu gösterilir
+     // PW/PH: fiziksel görünüm alanı · ROT: fiziksel ekran dikeyse oyun 90° döndürülmüş yatay çizilir
   let SAS = 0;   // yatay güvenli alan payı (çentik / dinamik ada / yuvarlak köşe): sayfa içerikleri ve sağ düğmeler bu kadar içeriden başlar
   let SEED = 0;   // harita tohumu: her yeni oyunda rastgele; hashN ile üretilen her şey (heykel, sandık, kamp, harabe) buna bağlıdır
   const cam = { x: 0, y: 0 };
@@ -75,8 +76,8 @@
     }
     // DİKEY FİZİKSEL EKRAN: yatay kilit mümkün değilse (iOS, tarayıcı sekmesi) oyun 90° döndürülüp yatay çizilir;
     // telefon dikey tutulsa da oyun yatay kalır, dikey düzen yoktur.
-    ROT = VPH > VPW && matchMedia('(pointer: coarse)').matches;
-    if (ROT) { W = VPH; H = VPW; } else { W = VPW; H = VPH; }
+    PORTRAIT = VPH > VPW && matchMedia('(pointer: coarse)').matches; ROT = false;   // artık oyun yan döndürülüp çizilmez: dikeyde yönlendirme ekranı çıkar
+    W = VPW; H = VPH;
     const de = document.documentElement.style, bs = document.body.style;
     de.height = VPH + 'px'; de.overflow = 'hidden'; bs.width = VPW + 'px'; bs.height = VPH + 'px'; bs.overflow = 'hidden';
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
@@ -138,6 +139,7 @@
 
   function joyStart(e) {
     AU.unlock();
+    if (PORTRAIT) return;   // dikeyken oyuna dokunuş yok
     if (DEATH.on) { deathTap(e.clientX, e.clientY); return; }   // ölüm ekranı: yalnızca düğmeler
     if (MENU.on && PAUSE.on) { pauseDown(e); return; }   // ana menüden açılan kıyafet sayfası
     if (MENU.on) { menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
@@ -8285,10 +8287,25 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const e of E) if (e.x > vx0 && e.x < vx1 && e.y > vy0 && e.y < vy1) { const va = (e.em < 1 ? e.em : 1) * (e.al === undefined ? 1 : e.al); if (va < 0.03) continue; sh(e.x, e.y, 42, 8, 0, va); }   // görünmez düşmanın gölgesi yok · belirirken gölge de belirir
     if (F.death < 0) sh(player.x, player.y, 44, 7, 0);
   }
+  /* ---------- DİKEY EKRAN: oyun yalnızca yatay · dikeyde sade 'telefonu yatay çevir' animasyonu ---------- */
+  const RP = { t: 0 };
+  function drawRotatePrompt(dt) {   // saf siyah zemin · tek ince çizgili telefon · dikey → yatay yumuşak dönüş · yalnızca beyaz
+    RP.t += dt; const T = RP.t % 4.6, e = u => { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = H * 0.42, sz = Math.min(W, H) * 0.28, k = T < 0.8 ? 0 : T < 2.0 ? e((T - 0.8) / 1.2) : T < 3.4 ? 1 : T < 4.6 ? 1 - e((T - 3.4) / 1.2) : 0;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-k * PI / 2);
+    const pw = sz * 0.6, ph = sz * 1.1;
+    rr(-pw / 2, -ph / 2, pw, ph, pw * 0.17); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.6; ctx.stroke();
+    rr(-pw * 0.13, -ph / 2 + ph * 0.04, pw * 0.26, 3, 1.5); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();   // çentik
+    ctx.restore();
+    dvText('TELEFONU YATAY ÇEVİR', cx, H * 0.7, clamp(W * 0.038, 12, 15), 400, '255,255,255', 0.85, 6, 'center');
+    if (navigator.standalone !== true && !(window.matchMedia && matchMedia('(display-mode: standalone)').matches)) dvText('tam ekran için: Paylaş → Ana Ekrana Ekle', cx, H * 0.9, 11, 400, '255,255,255', 0.26, 0, 'center');
+  }
   /* ---------- Döngü ---------- */
   let last = performance.now();
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05); last = now;
+    if (PORTRAIT) { try { AU.update(dt, 0); } catch (_) {} drawRotatePrompt(dt); requestAnimationFrame(frame); return; }   // dikey: oyun donar, yönlendirme ekranı
     ZOOM = MENU.on ? 1 : ZT;   // ana menü 1:1 çizilir (kılıç/zemin ekran koordinatıyla çiziliyor)
     trnWatch(); if (MENU.on) THM.fresh = true;   // ana menüde: oyuna girişte zemin anında oyun saatine oturur
     if (MENU.on && PAUSE.on) { try { AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
