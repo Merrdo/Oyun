@@ -4139,6 +4139,9 @@
   const setMimic = v => { DEV.mimic = clamp(Math.round(v), 0, 100); try { localStorage.setItem('hlk_mimic', String(DEV.mimic)); } catch (_) {} };
   const setLuck = v => { DEV.luck = clamp(Math.round(v), 0, 100); try { localStorage.setItem('hlk_luck', String(DEV.luck)); } catch (_) {} };
   try { const m = parseFloat(localStorage.getItem('hlk_luck')); if (isFinite(m)) DEV.luck = clamp(Math.round(m), 0, 100); } catch (_) {}
+  DEV.egg = 0; try { const m = parseInt(localStorage.getItem('hlk_egg'), 10); if (m >= 0 && m <= 2) DEV.egg = m; } catch (_) {}   // ana menü kılıç sahnesi sıklığı: 0 nadir · 1 sık · 2 çok sık
+  const setEgg = v => { DEV.egg = v; try { localStorage.setItem('hlk_egg', String(v)); } catch (_) {} };
+  const eggGap = first => { const lv = DEV.on ? DEV.egg : 0; return lv === 2 ? rnd(4, 7) : lv === 1 ? rnd(14, 24) : first ? rnd(90, 180) : rnd(150, 300); };   // normalde gerçekten nadir: ilk çıkış 1,5–3 dk, sonrakiler 2,5–5 dk arayla
   try { const m = parseFloat(localStorage.getItem('hlk_mimic')); if (isFinite(m)) DEV.mimic = clamp(Math.round(m), 0, 100); } catch (_) {}
   function newMimic(x, y, em) { const e = newEnemy(x, y, 'mim', em); e.kind = 'mimic'; e.hp = e.max = 150; e.lg = 1; e.lk = 0; e.stk = 0; e.dzD = 1.7; e.d2 = false; return e; }
   function revealMimic(s, x, y) {   // sandık kaybolur, yerinde mimik belirir; sandığa vurulan hasar canından düşer
@@ -6031,14 +6034,17 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
 
   /* ---------- Ana menü: Halaskâr uyanır · arada sırada kılıç belirir · Başla'da kılıç kafaya saplanır ve ekran kararır ---------- */
   const GAME_TITLE = 'HALASKAR', GAME_SUB = 'karanlığın içinde bir kıvılcım';
-  const MENU = { on: true, st: 'idle', mode: 'zoom', sT: 0, blk: 0, t: 0, btns: [], mote: [], fl: 0, gx: 0, gy: 0, tgx: 0, tgy: 0, gT: 2.5, px: 0, py: 0, pt: -99, egg: 0, eggD: 0, eggT: rnd(14, 22), bT: rnd(3.5, 5.5), bP: -1, snd: 0, pr: {}, wd: null, wT: 6 };   // pr: dokunma geri bildirimi (düğme kimliği → 1..0) · wd: rüzgâr + yaprak sahnesi · wT: sonraki rüzgâra kalan süre
+  const MENU = { on: true, st: 'idle', mode: 'zoom', sT: 0, blk: 0, t: 0, btns: [], mote: [], fl: 0, gx: 0, gy: 0, tgx: 0, tgy: 0, gT: 2.5, px: 0, py: 0, pt: -99, egg: 0, eggD: 0, eggT: eggGap(true), bT: rnd(3.5, 5.5), bP: -1, snd: 0, pr: {}, wd: null, wT: 6, hh: null, pet: { s: 0, v: 0 } };   // hh: kafanın dokunma alanı · pet: sevme yayı (s: sapma, v: hız)   // pr: dokunma geri bildirimi (düğme kimliği → 1..0) · wd: rüzgâr + yaprak sahnesi · wT: sonraki rüzgâra kalan süre
   for (let i = 0; i < 48; i++) MENU.mote.push({ x: Math.random(), y: Math.random(), r: rnd(0.6, 1.9), v: rnd(0.012, 0.035), ph: rnd(0, 6), a: rnd(0.15, 0.5) });
   const UIF = '-apple-system, "Segoe UI", Roboto, sans-serif';
   addEventListener('pointermove', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });
   addEventListener('pointerdown', e => { MENU.px = e.clientX; MENU.py = e.clientY; MENU.pt = MENU.t; });   // dokunmatik: imleç olmadığı için dokunulan yere de bakar
   // menuStart: yeni oyun başlayınca eski kayıt silinir; devam düğmesi yeni oyunun ilk kaydından sonra (kamp / ana menüden çıkış) açılır
   function menuStart(cont) { if (!MENU.on || MENU.st !== 'idle') return; if (cont === true && SAVED) loadGame(SAVED); else { newGame(); try { localStorage.removeItem(SAVE_KEY); } catch (_) {} SAVED = null; } MENU.st = 'go'; try { AU.intro(); } catch (_) {} MENU.mode = Math.random() < 0.1 ? 'stab' : 'zoom'; MENU.sT = 0; MENU.snd = 0; MENU.fl = 1; if (MENU.mode === 'zoom') { try { AU.sfx('pickup'); } catch (_) {} } }   // çoğunlukla yakınlaşma; %10 ihtimalle kılıç saplanması (gizli)
-  function menuTap(px, py) { if (MENU.st !== 'idle') return false; for (const b of MENU.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; if (b.id) MENU.pr[b.id] = 1; if (b.ic) { try { AU.sfx('sheath'); } catch (_) {} } b.fn(); return true; } return false; }
+  function menuTap(px, py) { if (MENU.st !== 'idle') return false; for (const b of MENU.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; if (b.id) MENU.pr[b.id] = 1; if (b.ic) { try { AU.sfx('sheath'); } catch (_) {} } b.fn(); return true; }
+    const h = MENU.hh; if (h && MENU.egg < 0.4 && Math.hypot(px - h.x, py - h.y) <= h.r * 1.12) { petHead(); return true; }
+    return false; }
+  function petHead() { MENU.pet.v += 7.5; }   // kafaya dokunuş: yay animasyonuna her seferinde yeni itki eklenir (bitmesi beklenmez)
   function gearPath(R) {   // çark: 8 yamuk dişli dış çizgi + orta delik (orijinde, yarıçap R px)
     const N = 8, ro = R, rr0 = R * 0.72, st = TAU / N;
     for (let i = 0; i < N; i++) {
@@ -6231,6 +6237,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     }
     // ---- durumlar ----
     const hy = H * 0.5, R = 62 * u, hcx = W * 0.5;   // kafa tam ekran merkezinde; başlık üstte, BAŞLA sağ altta, simgeler köşelerde
+    const pet = MENU.pet; { const h = Math.min(dt, 0.033); pet.v += (-260 * pet.s - 14 * pet.v) * h; pet.s = clamp(pet.s + pet.v * h, -0.7, 1.4); }   // sevme yayı: her dokunuş itki ekler, biten animasyon beklenmez
+    MENU.hh = act ? null : { x: hcx, y: hy + Math.sin(t * 1.3) * 5 * u, r: R };
     // ---- rüzgâr: soldan esen sonbahar yaprakları (arada bir) ----
     const bobE = Math.sin(t * 1.3) * 5 * u; let wd = MENU.wd;
     if (act) { MENU.wd = wd = null; }
@@ -6246,7 +6254,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     MENU.bT -= dt; if (MENU.bT <= 0 && MENU.bP < 0) { MENU.bP = 0; MENU.bT = rnd(3.2, 6); } if (MENU.bP >= 0) { MENU.bP += dt / 0.16; if (MENU.bP >= 1) MENU.bP = -1; }
     const blink = MENU.bP >= 0 ? 1 - Math.sin(MENU.bP * PI) : 1;
     // gizli kılıç: arada sırada kafanın yerini alır
-    if (!act) { MENU.eggT -= dt; if (MENU.eggT <= 0) { MENU.eggD = 6; MENU.eggT = rnd(22, 38); } MENU.eggD = Math.max(0, MENU.eggD - dt); }
+    if (!act) { MENU.eggT -= dt; if (MENU.eggT <= 0) { MENU.eggD = 6; MENU.eggT = eggGap(false); } MENU.eggD = Math.max(0, MENU.eggD - dt); }
     MENU.egg += ((MENU.eggD > 0 && !act ? 1 : 0) - MENU.egg) * dmp(act ? 30 : 3.2, dt); if (MENU.egg < 0.003) MENU.egg = 0;
     const egg = MENU.egg;
     // ---- sahne anahtarları: saplanma ----
@@ -6268,7 +6276,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const open = ease((t - 1.0) / 1.1) * blink, breath = 1 + 0.014 * Math.sin(t * 1.5);
     if (egg < 0.995 || act) {
       const o = { ox: wd ? wd.ox : 0, sx: breath, sy: breath, gx: MENU.gx, gy: MENU.gy, wide: 1 + (wd ? wd.wide : 0), open, pain: 0, dead: false };
-      let hyy = hy + bob + (1 - hin) * 14 * u + egg * 20 * u, A = (1 - egg) * hin, hxx = hcx;
+      o.sx *= 1 + 0.2 * pet.s; o.sy *= 1 + 0.15 * pet.s;
+      let hyy = hy + bob - pet.s * 5 * u + (1 - hin) * 14 * u + egg * 20 * u, A = (1 - egg) * hin, hxx = hcx;
       if (stab) { o.wide = 1 + 0.55 * sstep(0.04, 0.28, sT); o.open = 1; }
       if (zoom) { const zp = clamp((sT - 0.15) / 0.85, 0, 1), k = 1 + 7 * Math.pow(zp, 2.4); o.wide = 1 + 0.7 * sstep(0.0, 0.18, sT) * (1 - 0.5 * zp); o.open = 1; o.sx *= k; o.sy *= k; hyy = lerp(hyy, H * 0.5, sstep(0, 1, zp)); hxx = lerp(hxx, cx, sstep(0, 1, zp)); }   // gözler parlar, kafa ekrana yaklaşır
       if (hitOn) { const k = Math.exp(-(sT - HIT) * 9); o.ox = 16 * u * (1 - 0.35 * hitP) * Math.min(1, (sT - HIT) * 30); o.sx = 0.88 + 0.12 * (1 - k); o.sy = 1.07 - 0.07 * (1 - k); o.pain = sT < HIT + 0.55 ? 1 : 0.7; o.tint = 0.22 + 0.78 * Math.exp(-(sT - HIT) * 7); o.wide = 1; o.open = 0; o.dead = sT > HIT + 0.55; hyy += 3 * u * hitP; }
@@ -6609,6 +6618,12 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         ob(x0, sy, 44, 38, '−', () => setLuck(DEV.luck - 5), { dim: v <= 0, size: 18 }); dvText('%' + v, x0 + cw / 2, sy + 20, 22, 500, fg, 1, 0, 'center'); ob(x0 + cw - 44, sy, 44, 38, '+', () => setLuck(DEV.luck + 5), { dim: v >= 100, size: 18 });
         const cy = sy + 50, n = 5, gp = 8, cwid = (cw - gp * (n - 1)) / n; [0, 25, 50, 75, 100].forEach((q, i) => ob(x0 + i * (cwid + gp), cy, cwid, 30, '%' + q, () => setLuck(q), { on: v === q, size: 12.5 }));
         dvText('Sandık, heykel, harabe ve kap ganimeti ile iz bırakma şansına işler.', x0, cy + 52, 11, 400, fg, 0.4, 0, 'left'); dvText('Mimik oranı ve kamp sıklığı ayrı ayarlanır.', x0, cy + 68, 11, 400, fg, 0.4, 0, 'left');
+        hair(y + h + 8, 0.08); y += h + 8; }
+      y += 22; y = sec('ana menü', y);
+      { const h = 132; dvText('Kılıç sahnesi', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText('ana ekrana saplanan kılıç', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
+        const cy = y + 44, n = 3, gp = 8, cwid = (cw - gp * (n - 1)) / n;
+        [['nadir', 0], ['sık', 1], ['çok sık', 2]].forEach(([nm, v], i) => ob(x0 + i * (cwid + gp), cy, cwid, 34, nm, () => setEgg(v), { on: DEV.egg === v, size: 12.5 }));
+        ob(x0, cy + 46, cw, 42, 'şimdi göster', () => { MENU.eggT = 0.3; devToast('ana menüye dönünce kılıç belirir'); }, { solid: true, size: 14 });
         hair(y + h + 8, 0.08); y += h + 8; }
     } else if (DEVP.tab === 1) {
       y = sec('türler', y);
