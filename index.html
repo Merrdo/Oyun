@@ -3647,6 +3647,7 @@
     for (let i = 0; i < n; i++) LOOT.push({ k: 'coin', x, y: y + 4, z: 14, vx: rnd(-150, 150), vy: rnd(-70, 70), vz: rnd(230, 420), t: 0, ph: rnd(0, 6), b: 0, rest: false });
     bowDrops(x, y, s);   // yay / cephane: şansa bağlı
     healDrops(x, y, s);   // bandaj / şifa otu / reçine: şansa bağlı
+    if (Math.random() < luckP(0.55)) { const nl = 1 + (Math.random() < 0.4 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0); for (let i = 0; i < nl; i++) LOOT.push({ k: 'log', x, y: y + 4, z: 16, vx: rnd(-130, 130), vy: rnd(-60, 60), vz: rnd(250, 380), t: 0, ph: rnd(0, 6), b: 0, rest: false }); }   // tahta parçalarından tek tük odun: şansa bağlı (%55 ile 1–3 odun)
     if (id === 'cb0' || Math.random() < luckP((s.chain ? 0.22 : 0.3) * gearM('keyx'))) LOOT.push({ k: 'key', x, y: y + 4, z: 18, vx: rnd(-50, 50), vy: rnd(-30, 30), vz: 380, t: 0, ph: rnd(0, 6), b: 0, rest: false });   // altın anahtar: şansa bağlı
   }
   function updateChests(dt) {
