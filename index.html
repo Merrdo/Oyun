@@ -1292,7 +1292,7 @@
         if (d.y > gy) { d.y = gy; if (d.vy > 160) { d.vy *= -0.32; d.vx *= 0.5; d.vr *= 0.45; sparks(d.x, d.y, 5, 120, -PI / 2, 0.9); } else { d.rest = true; d.vx = d.vy = d.vr = 0; } }
       }
       if (t0 < 0.8 && F.death >= 0.8) { burst(player.x, player.y - 4, 9, 55); hitFx(0, 3); }
-      if (F.death > 2.3) { F.death = 2.3; if (!DEATH.on) { DEATH.on = true; DEATH.t = 0; } }   // ölüm kalıcı: yerde kalır, ölüm ekranı açılır
+      if (F.death > 2.3) { F.death = 2.3; if (!DEATH.on) { DEATH.on = true; DEATH.t = 0; DEATH.page = 'main'; DEATH.pg = 0; } }   // ölüm kalıcı: yerde kalır, ölüm ekranı açılır
       return;
     }
     if (F.pt >= 0) {
@@ -1380,62 +1380,91 @@
     const k = l.k, n = l.n || 1, g = STAT.got;
     if (k === 'bow') g.bow = 1; else if (k === 'ammo') g.arrows += n; else if (HEAL_CAP[k] !== undefined) g[k] += n; else if (k === 'prism') g.prism += n; else if (k === 'charm' && GEAR[l.g]) g.charms.push(GEAR[l.g].name);
   }
-  const DEATH = { on: false, t: 0, snap: null, btns: [] };
+  const DEATH = { on: false, t: 0, snap: null, btns: [], page: 'main', pg: 0 };   // page: 'main' (ortada sahne) | 'stats' (detaylar sayfası) · pg: sayfa geçişi 0..1
   function deathTap(px, py) { if (DEATH.t < 1.8) return; for (const b of DEATH.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return; } }
   function deathActions(hasSave) {   // ölüm ekranı düğmeleri (dikey ve yatay düzen ortak)
     return [[hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} location.reload(); }],
       ['ANA MENÜ', false, () => { location.reload(); }]];
   }
-  function deathLand(L, A, T, fg, red) {   // YATAY düzen: solda ÖLDÜN + süre / seviye + düğmeler, sağda istatistikler sütunlar halinde (güvenli alan içinde)
-    const s = clamp(H / 390, 0.72, 1.2), M = Math.max(HUD_M, 22), gap = 26 * s, LW = clamp(W * 0.36, 210, 310), rx0 = M + LW + gap, rw = W - M - rx0, hasSave = !!SAVED;
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    // sol sütun
-    const bh = 40 * s, bgp = 10 * s, titleH = 34 * s, statH = 48 * s, total = titleH + 26 * s + 2 * statH + 16 * s + 2 * bh + bgp;
-    let y = Math.max(14, (H - total) / 2);
-    ctx.globalAlpha = A; ctx.font = `300 ${34 * s}px ${UIF}`; ctx.fillStyle = `rgba(${red},0.95)`;
-    { let lx = M; for (const c of [...'ÖLDÜN']) { ctx.fillText(c, lx, y + titleH / 2); lx += ctx.measureText(c).width + 9 * s; } }
-    ctx.strokeStyle = `rgba(${red},0.35)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(M, y + titleH + 8 * s); ctx.lineTo(M + 56 * s, y + titleH + 8 * s); ctx.stroke();
-    y += titleH + 26 * s;
-    L.slice(0, 2).forEach((q, i) => {
-      ctx.globalAlpha = clamp((T - 0.7 - i * 0.12) * 3, 0, 1) * A;
-      ctx.font = `600 ${10 * s}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.45)`; { let lx = M; for (const c of [...q.l.toLocaleUpperCase('tr')]) { ctx.fillText(c, lx, y + 7 * s); lx += ctx.measureText(c).width + 1.8; } }
-      ctx.font = `500 ${22 * s}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.96)`; ctx.fillText(q.v, M, y + 29 * s); y += statH;
+  function dHash(i, k) { const q = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return q - Math.floor(q); }
+  function deathMain(sn, kills, A, T, fg, red, s, al, out) {   // ana sahne: ortada düşen ölü kafa, ÖLDÜN, üç temel bilgi, alt ortada düğmeler
+    const cx = W / 2, hy = H * 0.44, R = 46 * s, TL = 0.9, e3 = v => 1 - Math.pow(1 - clamp(v, 0, 1), 3), topM = Math.max(14, HUD_Y - 14);
+    ctx.save(); ctx.globalAlpha = al; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    const gr = 190 * s * (0.85 + 0.15 * Math.sin(T * 1.6)), lg = ctx.createRadialGradient(cx, hy, 0, cx, hy, gr);   // kor ışığı
+    lg.addColorStop(0, `rgba(${red},${0.2 * A})`); lg.addColorStop(0.55, `rgba(${red},${0.06 * A})`); lg.addColorStop(1, `rgba(${red},0)`); ctx.fillStyle = lg; ctx.fillRect(cx - gr, hy - gr, gr * 2, gr * 2);
+    for (let i = 0; i < 26; i++) {   // yükselen kızıl / altın kıvılcımlar
+      const p = (T * (0.05 + 0.09 * dHash(i, 1)) + dHash(i, 2)) % 1, x = cx + (dHash(i, 3) - 0.5) * W * 0.7 + Math.sin(T * 0.7 + i) * 9 * s, y = H * 1.02 - p * H * 1.04, a = Math.sin(PI * p) * 0.6 * A; if (a < 0.01) continue;
+      ctx.fillStyle = i % 3 ? `rgba(${red},${a})` : `rgba(240,194,74,${a})`; ctx.beginPath(); ctx.arc(x, y, (0.8 + 1.6 * dHash(i, 4)) * s, 0, TAU); ctx.fill();
+    }
+    // kafa: yukarıdan düşer, yere çarpıp sekir, şok halkası yayılır, rengi kızıldan soluk beyaza döner
+    const land = T - TL, fall = clamp(T / TL, 0, 1); let yy = hy - (1 - fall * fall) * 150 * s, sq = 0;
+    if (land > 0) { yy = hy - Math.abs(Math.sin(land * 11)) * 15 * s * Math.exp(-land * 5); sq = Math.exp(-land * 10); }
+    if (land > 1.2) yy += Math.sin((T - 1.2) * 1.3) * 3 * s * Math.min(1, land - 1.2);
+    ctx.fillStyle = `rgba(${fg},${0.12 * fall})`; ctx.beginPath(); ctx.ellipse(cx, hy + R * 1.22, R * 0.55 * clamp(1 - (hy - yy) / (220 * s), 0.3, 1), 5 * s, 0, 0, TAU); ctx.fill();
+    if (land > 0 && land < 0.9) { const k = land / 0.9; ctx.strokeStyle = `rgba(${red},${0.55 * (1 - k)})`; ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.arc(cx, hy + R * 0.9, R * (1.15 + 2.4 * k), 0, TAU); ctx.stroke(); }
+    ctx.globalAlpha = al * clamp(T / 0.25, 0, 1);
+    menuHead(cx, yy, R, { ox: 0, sx: 1 + 0.16 * sq, sy: 1 - 0.16 * sq, gx: 0, gy: 0.6, wide: 1, open: 0, pain: land < 0.12 ? 1 : 0.7, dead: land > 0.12, tint: land < 0 ? 0.55 : 0.4 + 0.55 * Math.exp(-land * 1.1) });
+    ctx.globalAlpha = al;
+    // ÖLDÜN: harfler sırayla, doğrudan kendi renginde
+    const fz = 40 * s; ctx.font = `300 ${fz}px ${UIF}`; const word = [...'ÖLDÜN'], ws = word.map(c => ctx.measureText(c).width), sp = fz * 0.24, tot = ws.reduce((q, w) => q + w + sp, -sp), ty = topM + 20 * s; let lx = cx - tot / 2;
+    word.forEach((c, i) => { const e = clamp((T - 0.55 - i * 0.11) / 0.12, 0, 1); ctx.fillStyle = `rgba(${red},${0.96 * e})`; if (e > 0.004) ctx.fillText(c, lx, ty); lx += ws[i] + sp; });
+    const le = e3((T - 1.2) / 0.8), ly = ty + 28 * s, lw = 70 * s * le; ctx.strokeStyle = `rgba(${red},0.4)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - lw, ly); ctx.lineTo(cx - 5, ly); ctx.moveTo(cx + 5, ly); ctx.lineTo(cx + lw, ly); ctx.stroke();
+    if (le > 0.004) { ctx.fillStyle = `rgba(240,194,74,${0.85 * le})`; ctx.save(); ctx.translate(cx, ly); ctx.rotate(PI / 4); ctx.fillRect(-2.2, -2.2, 4.4, 4.4); ctx.restore(); }
+    // üç temel bilgi (sayılar yukarı sayar)
+    const sy = hy + R * 1.22 + 40 * s, gap = Math.min(190 * s, W * 0.22), items = [[fmtPlay(sn.play), 'oynanan süre'], [Math.round((Number(sn.lv) || 0) * e3((T - 1.3) / 0.9)), 'ulaşılan seviye'], [Math.round(kills * e3((T - 1.45) / 0.9)), 'öldürülen düşman']];
+    ctx.textAlign = 'center';
+    items.forEach(([v, l], i) => {
+      const a = clamp((T - 1.2 - i * 0.15) * 3, 0, 1); if (a < 0.004) return; const x = cx + (i - 1) * gap; ctx.globalAlpha = al * a;
+      ctx.font = `500 ${26 * s}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.96)`; ctx.fillText(String(v), x, sy); ctx.font = `400 ${11.5 * s}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.5)`; ctx.fillText(l, x, sy + 24 * s);
+      if (i) { ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.moveTo(x - gap / 2, sy - 14 * s); ctx.lineTo(x - gap / 2, sy + 32 * s); ctx.stroke(); }
     });
-    y += 16 * s;
-    const ba = clamp((T - 1.8) / 0.5, 0, 1) * A; DEATH.btns.length = 0; ctx.globalAlpha = 1;
-    deathActions(hasSave).forEach(([lb, strong, fn], j) => { const by = y + j * (bh + bgp); menuPill(M, by, LW, bh, lb, ba, strong, T, strong ? undefined : red); DEATH.btns.push({ x: M, y: by, w: LW, h: bh, fn }); });
-    // ayraç
-    ctx.globalAlpha = A; ctx.strokeStyle = `rgba(${fg},0.1)`; ctx.beginPath(); ctx.moveTo(M + LW + gap / 2, H * 0.1); ctx.lineTo(M + LW + gap / 2, H * 0.9); ctx.stroke();
-    // sağ: istatistikler (bölümler sütunlara dizilir; sığmazsa yazı küçülür)
-    const items = L.slice(2), blocks = []; for (const q of items) { if (q.h) blocks.push({ h: q.h, rows: [] }); else if (blocks.length) blocks[blocks.length - 1].rows.push(q); }
-    const topR = Math.max(16, H * 0.07), colH = H - topR * 2, nc = rw >= 400 ? 2 : 1, cg = 24 * s, cw = (rw - cg * (nc - 1)) / nc;
-    const place = (k, lim) => { lim = lim || colH; const lh = 21 * s * k, hh = 30 * s * k, out = []; let col = 0, yy = 0;
-      for (const b of blocks) { const bH = hh + b.rows.length * lh; if (yy > 0 && yy + bH > lim && bH <= lim) { col++; yy = 0; } out.push({ h: b.h, col, y: yy, hd: true }); yy += hh;
-        for (const r of b.rows) { if (yy + lh > lim) { col++; yy = 0; } out.push({ r, col, y: yy }); yy += lh; } }
-      return { out, cols: col + 1, lh, hh, k }; };
+    // düğmeler: DETAYLAR · ana eylem · ANA MENÜ
+    ctx.globalAlpha = al; const ba = clamp((T - 1.8) / 0.5, 0, 1), bh = 40 * s, bg = 12 * s, acts = deathActions(!!SAVED), bw = [128 * s, 232 * s, 128 * s], by = H - 30 * s - bh;
+    const defs = [['DETAYLAR', false, () => { DEATH.page = 'stats'; }], [acts[0][0], true, acts[0][2]], [acts[1][0], false, acts[1][2]]]; let bx = cx - (bw[0] + bw[1] + bw[2] + bg * 2) / 2;
+    defs.forEach(([lb, strong, fn], j) => { menuPill(bx, by, bw[j], bh, lb, ba, strong, T, undefined, s); out.push({ x: bx, y: by, w: bw[j], h: bh, fn }); bx += bw[j] + bg; });
+    ctx.restore();
+  }
+  function deathDetail(L, T, fg, red, s, al, out) {   // detaylar sayfası: ortada başlık, istatistik sütunları, altta GERİ
+    const cx = W / 2, M = Math.max(HUD_M, 22), topM = Math.max(14, HUD_Y - 14);
+    ctx.save(); ctx.globalAlpha = al; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    const fz = 28 * s; ctx.font = `300 ${fz}px ${UIF}`; const word = [...'DETAYLAR'], ws = word.map(c => ctx.measureText(c).width), sp = fz * 0.24, tot = ws.reduce((q, w) => q + w + sp, -sp), ty = topM + 14 * s; let lx = cx - tot / 2;
+    ctx.fillStyle = `rgba(${red},0.96)`; word.forEach((c, i) => { ctx.fillText(c, lx, ty); lx += ws[i] + sp; });
+    const ly = ty + 24 * s; ctx.strokeStyle = `rgba(${red},0.4)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - 60 * s, ly); ctx.lineTo(cx - 5, ly); ctx.moveTo(cx + 5, ly); ctx.lineTo(cx + 60 * s, ly); ctx.stroke();
+    ctx.fillStyle = 'rgba(240,194,74,0.85)'; ctx.save(); ctx.translate(cx, ly); ctx.rotate(PI / 4); ctx.fillRect(-2.2, -2.2, 4.4, 4.4); ctx.restore();
+    const blocks = []; for (const q of L) { if (q.h) blocks.push({ h: q.h, rows: [] }); else if (blocks.length) blocks[blocks.length - 1].rows.push(q); }
+    const bh = 40 * s, y0 = ly + 24 * s, colH = H - y0 - bh - 44 * s, rw = W - M * 2, nc = rw >= 620 ? 3 : 2, cg = 30 * s, cw = (rw - cg * (nc - 1)) / nc;
+    const place = (k, lim) => { lim = lim || colH; const lh = 21 * s * k, hh = 30 * s * k, o = []; let col = 0, yy = 0;
+      for (const b of blocks) { const bH = hh + b.rows.length * lh; if (yy > 0 && yy + bH > lim && bH <= lim) { col++; yy = 0; } o.push({ h: b.h, col, y: yy, hd: true }); yy += hh;
+        for (const r of b.rows) { if (yy + lh > lim) { col++; yy = 0; } o.push({ r, col, y: yy }); yy += lh; } }
+      return { out: o, cols: col + 1, lh, hh, k }; };
     let P; for (let k = 1; k >= 0.58; k -= 0.04) { P = place(k); if (P.cols <= nc) break; }
-    if (P.cols < nc) { const tot = blocks.reduce((q, b) => q + P.hh + b.rows.length * P.lh, 0); for (let lim = tot / nc; lim <= colH; lim += 6 * s) { const Q = place(P.k, lim); if (Q.cols <= nc) { P = Q; break; } } }   // geniş ekranda sütunlar dengelenir
+    if (P.cols < nc) { const tt = blocks.reduce((q, b) => q + P.hh + b.rows.length * P.lh, 0); for (let lim = tt / nc; lim <= colH; lim += 6 * s) { const Q = place(P.k, lim); if (Q.cols <= nc) { P = Q; break; } } }   // geniş ekranda sütunlar dengelenir
     const fs = Math.max(9, 12.5 * s * P.k);
-    P.out.forEach((o, i) => {
-      ctx.globalAlpha = clamp((T - 0.9 - i * 0.06) * 3, 0, 1) * A;
-      const x0 = rx0 + o.col * (cw + cg), yy = topR + o.y;
-      if (o.hd) { ctx.font = `600 ${fs * 0.78}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.45)`; let lx = x0; for (const c of [...o.h]) { ctx.fillText(c, lx, yy + P.hh * 0.55); lx += ctx.measureText(c).width + 1.6; }
+    P.out.forEach(o => {
+      const x0 = M + o.col * (cw + cg), yy = y0 + o.y;
+      if (o.hd) { ctx.font = `600 ${fs * 0.78}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.45)`; let lx2 = x0; for (const c of [...o.h]) { ctx.fillText(c, lx2, yy + P.hh * 0.55); lx2 += ctx.measureText(c).width + 1.6; }
         ctx.strokeStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.moveTo(x0, yy + P.hh * 0.88); ctx.lineTo(x0 + cw, yy + P.hh * 0.88); ctx.stroke(); }
       else { ctx.font = `500 ${fs}px ${UIF}`; ctx.textAlign = 'left'; ctx.fillStyle = `rgba(${fg},0.62)`; ctx.fillText(o.r.l, x0, yy + P.lh / 2); ctx.textAlign = 'right'; ctx.font = `600 ${fs}px ${UIF}`; ctx.fillStyle = `rgba(${fg},0.96)`; ctx.fillText(o.r.v, x0 + cw, yy + P.lh / 2); }
     });
+    const bw = 200 * s, bx = cx - bw / 2, by = H - 28 * s - bh; menuPill(bx, by, bw, bh, 'GERİ', 1, true, T, undefined, s); out.push({ x: bx, y: by, w: bw, h: bh, fn: () => { DEATH.page = 'main'; } });
+    ctx.restore();
   }
   function drawDeath(dt, fg) {
-    DEATH.t += dt; const T = DEATH.t, A = clamp(T / 1.1, 0, 1), red = '224,88,74', sum = o => Object.values(o).reduce((a, b) => a + b, 0);
+    DEATH.t += dt; const T = DEATH.t, A = clamp(T / 1.1, 0, 1), red = '224,88,74', sum = o => Object.values(o).reduce((a, b) => a + b, 0), s = clamp(H / 390, 0.72, 1.2);
     ctx.save(); ctx.fillStyle = light ? `rgba(242,242,242,${0.985 * A})` : `rgba(0,0,0,${0.985 * A})`; ctx.fillRect(0, 0, W, H);
     const sn = DEATH.snap || { time: TM.t, play: PLAY.t, lv: LVL.lv }, g = STAT.got, L = [];
     const sec = h => L.push({ h }), row = (l, v) => L.push({ l, v: String(v) });
-    row('Oynanan süre', fmtPlay(sn.play)); row('Ulaşılan seviye', sn.lv);
+    sec('GENEL'); row('Oynanan süre', fmtPlay(sn.play)); row('Ulaşılan seviye', sn.lv);
     sec('ÖLDÜRÜLEN DÜŞMANLAR'); row('Toplam', sum(STAT.kills)); for (const k in STAT.kills) if (STAT.kills[k] > 0) row('· ' + (KILL_NAME[k] || k), STAT.kills[k]);
     sec('YIKILAN HEYKELLER'); row('Toplam', sum(STAT.statues)); for (const k in STAT.statues) if (STAT.statues[k] > 0) row('· ' + (STATUE_NAME[k] || k), STAT.statues[k]);
     sec('TOPLANANLAR'); row('Altın tozu', g.dust); row('Altın külçesi', g.ingot);
     [['keys', 'Altın anahtar'], ['prism', 'Mor prizma'], ['band', HEAL_NAME.band], ['medk', HEAL_NAME.medk], ['herb', HEAL_NAME.herb], ['resin', HEAL_NAME.resin], ['arrows', 'Ok']].forEach(([k, n]) => { if (g[k] > 0) row(n, g[k]); });
     if (g.bow) row('Yay', 'bulundu'); g.charms.forEach(n => row('Tılsım', n));
-    deathLand(L, A, T, fg, red); ctx.restore();
+    const tgt = DEATH.page === 'stats' ? 1 : 0; DEATH.pg += (tgt - DEATH.pg) * Math.min(1, dt * 8); if (Math.abs(tgt - DEATH.pg) < 0.004) DEATH.pg = tgt;
+    const bm = [], bd = [];
+    if (DEATH.pg < 0.995) deathMain(sn, sum(STAT.kills), A, T, fg, red, s, 1 - DEATH.pg, bm);
+    if (DEATH.pg > 0.005) deathDetail(L, T, fg, red, s, DEATH.pg, bd);
+    DEATH.btns = DEATH.pg < 0.5 ? bm : bd; ctx.restore();
   }
   const DUST_CHANCE = 0.4;   // görünmez düşmanın iz bırakma şansı (ileride şans sistemine bağlanacak)
   const EDUST = [];          // görünmez düşmanların bıraktığı az, silik toz
@@ -6025,7 +6054,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     else if (kind === 'gear') gearPath(1.12);
     else { ctx.moveTo(-0.38, -0.55); ctx.lineTo(-0.92, 0); ctx.lineTo(-0.38, 0.55); ctx.moveTo(0.38, -0.55); ctx.lineTo(0.92, 0); ctx.lineTo(0.38, 0.55); ctx.moveTo(0.14, -0.68); ctx.lineTo(-0.14, 0.68); }
   }
-  function menuPill(x, y, w, h, label, a, strong, t, tint, sc, ico) {   sc = sc || 1;   // ico: isteğe bağlı simge ('gear' | 'dev' ...) yazının soluna   // tint: isteğe bağlı renk ('r,g,b') — farklı renkli düğme
+  function menuPill(x, y, w, h, label, a, strong, t, tint, sc, ico) {   sc = sc || 1; if (a < 0.01) return;   // ico: isteğe bağlı simge ('gear' | 'dev' ...) yazının soluna   // tint: isteğe bağlı renk ('r,g,b') — farklı renkli düğme
     ctx.save(); ctx.globalAlpha *= a; rr(x, y, w, h, h / 2);
     const fg = tint || (light ? '0,0,0' : '255,255,255'), fl = strong ? MENU.fl * 0.18 : 0;
     ctx.fillStyle = `rgba(${fg},${(strong ? 0.05 : 0.025) + fl + (tint ? 0.08 : 0)})`; ctx.fill();
@@ -6040,7 +6069,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const c of ch) { ctx.fillText(c, lx, y + h / 2 + 0.5); lx += ctx.measureText(c).width + sp; }
     ctx.restore();
   }
-  function menuArt(kind, x, y, r, a, t) {   // ana menü düğmeleri: çantayla aynı çizim dili (kalın koyu dış çizgi, deri / maden / kumaş, altın detay) · birim: düğme yarıçapı 20
+  function menuArt(kind, x, y, r, a, t) {
+    if (a < 0.01) return;   // ana menü düğmeleri: çantayla aynı çizim dili (kalın koyu dış çizgi, deri / maden / kumaş, altın detay) · birim: düğme yarıçapı 20
     const OL = '#2a1608', GD = '#f6cf58', lg = (x0, y0, x1, y1, c0, c1) => { const q = ctx.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, c0); q.addColorStop(1, c1); return q; };
     const tw = Math.min(1, Math.max(0, Math.sin(t * 2.1 + x * 0.05) * 1.6 - 0.6));   // her düğmenin parıltısı ayrı anda yanar
     ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y + Math.sin(t * 1.5 + x * 0.013) * 1.1); ctx.scale(r / 20, r / 20); ctx.lineCap = ctx.lineJoin = 'round';
@@ -6059,7 +6089,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.save(); rr(-13.6, -12.4, 27.2, 24.8, 4.5); ctx.clip(); ctx.fillStyle = 'rgba(15,25,40,0.28)'; ctx.fillRect(-14, 6, 28, 8); ctx.restore();
       rr(-9.4, -8.4, 18.8, 16.8, 2.4); ctx.fillStyle = lg(0, -8, 0, 8, '#10171e', '#26323d'); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OL; ctx.stroke();
       for (const sx of [-1, 1]) for (const sy of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * 11.5, sy * 10.3, 1.25, 0, TAU); ctx.fillStyle = GD; ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = OL; ctx.stroke(); }
-      ctx.save(); ctx.shadowColor = 'rgba(246,207,88,0.75)'; ctx.shadowBlur = 5; ctx.scale(6, 6); ctx.beginPath(); menuGlyph('dev'); ctx.lineWidth = 2.3 / 6; ctx.strokeStyle = GD; ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.scale(6, 6); ctx.beginPath(); menuGlyph('dev'); ctx.lineWidth = 5 / 6; ctx.strokeStyle = 'rgba(246,207,88,0.22)'; ctx.stroke(); ctx.lineWidth = 2.3 / 6; ctx.strokeStyle = GD; ctx.stroke(); ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-9, -10.9); ctx.lineTo(4, -10.9); ctx.stroke();
     } else if (kind === 'book') {   // zümrüt deri ciltli rehber: sayfa kenarı, altın dikiş çerçeve, sırtta bantlar, mühür, ayraç
       rr(-8, -12.6, 20.4, 25.6, 2); ctx.fillStyle = '#f3e6c4'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OL; ctx.stroke();
@@ -6146,7 +6176,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const FLY = 0.35, HIT = 0.47, hitP = stab ? clamp((sT - HIT) / 0.5, 0, 1) : 0, hitOn = stab && sT >= HIT;
     if (stab) { if (MENU.snd < 1 && sT >= 0.3) { MENU.snd = 1; try { AU.sfx('swing'); } catch (_) {} } if (MENU.snd < 2 && sT >= HIT) { MENU.snd = 2; try { AU.sfx('hit', undefined, undefined, true); AU.sfx('hurt'); } catch (_) {} } }
     const shk = hitOn ? Math.max(0, 1 - (sT - HIT - 0.05) / 0.45) * 13 * u : 0, shx = hitOn && sT > HIT + 0.05 ? (Math.random() - 0.5) * 2 * shk : 0, shy = hitOn && sT > HIT + 0.05 ? (Math.random() - 0.5) * 2 * shk : 0;
-    ctx.save(); ctx.translate(shx, shy);
+    ctx.save(); ctx.translate(shx, shy); ctx.shadowColor = 'rgba(0,0,0,0)'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
     // ---- arka plan ----
     ctx.fillStyle = bgCol; ctx.fillRect(-30, -30, W + 60, H + 60);
     const ocam = { x: cam.x, y: cam.y }; cam.x = player.x - W / 2 + t * 9; cam.y = player.y - H / 2 + Math.sin(t * 0.13) * 40; drawWorld(fg); cam.x = ocam.x; cam.y = ocam.y;   // yavaşça kayan zemin
@@ -6190,11 +6220,11 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.font = `300 100px ${UIF}`; const L = [...GAME_TITLE], w100 = L.reduce((q, c) => q + ctx.measureText(c).width + 20, -20), size = Math.min(46 * u, colW * 0.92 / w100 * 100);
       ctx.font = `300 ${size}px ${UIF}`; const sp = size * 0.2, ws = L.map(c => ctx.measureText(c).width), tot = ws.reduce((q, w) => q + w + sp, -sp), ty = top0 + 38 * u; let lx = tcx - tot / 2;
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-      L.forEach((c, i) => { const e = clamp((t - 0.5 - i * 0.12) / 0.1, 0, 1), sh = 0.94 + 0.06 * Math.sin(t * 0.9 - i * 0.4); ctx.fillStyle = `rgba(${fg},${e * sh})`; ctx.fillText(c, lx, ty); lx += ws[i] + sp; });
+      L.forEach((c, i) => { const e = clamp((t - 0.5 - i * 0.12) / 0.1, 0, 1), sh = 0.94 + 0.06 * Math.sin(t * 0.9 - i * 0.4); ctx.fillStyle = `rgba(${fg},${e * sh})`; if (e > 0.004) ctx.fillText(c, lx, ty); lx += ws[i] + sp; });
       const le = ease((t - 1.3) / 1.0), ly = ty + 20 * u, lw = Math.min(colW * 0.6, 190 * u) * le;
       ctx.strokeStyle = `rgba(${fg},0.28)`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tcx - lw / 2, ly); ctx.lineTo(tcx - 5, ly); ctx.moveTo(tcx + 5, ly); ctx.lineTo(tcx + lw / 2, ly); ctx.stroke();
       ctx.fillStyle = `rgba(240,194,74,${0.85 * le})`; ctx.save(); ctx.translate(tcx, ly); ctx.rotate(PI / 4); ctx.fillRect(-2.2, -2.2, 4.4, 4.4); ctx.restore();
-      const se = ease((t - 1.6) / 1.0); ctx.font = `400 ${12 * u + 1}px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.5 * se})`; ctx.fillText(GAME_SUB, tcx, ly + 24 * u);
+      const se = ease((t - 1.6) / 1.0); ctx.font = `400 ${12 * u + 1}px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(${fg},${0.5 * se})`; if (se > 0.004) ctx.fillText(GAME_SUB, tcx, ly + 24 * u);
       MENU.btns.length = 0; const hs = !!SAVED, be = ease((t - 1.9) / 0.9);
       {   // kompozisyon: BAŞLA sağ altta (altın) · sol üstte geliştirici + rehber · sağ üstte ayarlar + kıyafet (çanta tasarım dilinde)
         const k = u, m = Math.max(14, HUD_M), ar = 25 * k, cy2 = Math.max(14, HUD_Y - 14) + ar * 0.8, gap = 10 * k, rowB = H - 30 * k;
@@ -6208,7 +6238,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         menuArt('outfit', rx0, by2, ar, be, t); bt(rx0, by2, wdEnterFromMenu);
       }
       if (be < 0.45) MENU.btns.length = 0;   // düğmeler yeterince belirmeden basılamaz
-      if (!AU.running && !AU.muted) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', hcx, H - 50 * u); }
+      if (!AU.running && !AU.muted && be > 0.004) { ctx.font = `500 11px ${UIF}`; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(240,194,74,${(0.45 + 0.35 * Math.sin(t * 2.2)) * be})`; ctx.fillText('♪  müziği duymak için ekrana dokun', hcx, H - 50 * u); }
       ctx.restore();
     } else MENU.btns.length = 0;
     ctx.restore();
@@ -6255,7 +6285,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function reviveFromSave() {
     const sv = SAVED; if (!sv) return;
     loadGame(sv);
-    DEATH.on = false; DEATH.t = 0; DEATH.snap = null; DEATH.btns.length = 0;
+    DEATH.on = false; DEATH.t = 0; DEATH.snap = null; DEATH.btns.length = 0; DEATH.page = 'main'; DEATH.pg = 0;
     Object.assign(F, { death: -1, dp: 0, fall: 1, ds: null, kd: -1, kp: 0, stag: 0, lx: 0, ly: 0, slow: 0, broken: 0, pt: -1, buf: false, down: false, hold: 0, guarding: false, gw: 0, bw: 0, sw: 0, lunge: 0, drop: 0, tx: 0, ty: 0, off: 0, squint: false, flash: 0, wince: 0, fx: null, hp: 100, hpMax: 100, dur: 100, tired: false });
     joy.id = null; joy.active = false; joy.dx = joy.dy = 0; for (const k in keys) keys[k] = false;
     try { if (atk.down || atk.kb) { atk.down = false; atk.kb = false; relAtk(); } atk.id = null; BOW.id = null; BOW.down = false; BOW.kb = false; BEAM.id = null; BEAM.down = false; BEAM.kb = false; beamCancel(0); BOW.st = 'idle'; BOW.ch = 0; BOW.full = false; BOW.hold = 0; } catch (_) {}
@@ -8495,8 +8525,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   addEventListener('orientationchange', resize);
   resize();
   try { const a = sessionStorage.getItem('hlk_auto'); if (a) { sessionStorage.removeItem('hlk_auto');   // yeniden yüklemeden sonra tarayıcı sesi bir dokunuş olmadan açmaz: oyun, ilk dokunuş/tuşla (ses kilidi açılırken) başlar
-    const go = () => { removeEventListener('pointerdown', go, true); removeEventListener('keydown', go, true); try { AU.unlock(); } catch (_) {} if (MENU.on && MENU.st === 'idle') menuStart(a === 'c'); };
-    addEventListener('pointerdown', go, true); addEventListener('keydown', go, true); } } catch (_) {}   // ölüm ekranından 'kayıttan devam / yeni oyun'
+    if (MENU.on && MENU.st === 'idle') { menuStart(a === 'c'); MENU.mode = 'zoom'; MENU.sT = 0.5; } } } catch (_) {}   // dokunuş beklemeden başlar; ses ilk dokunuşta kendiliğinden açılır   // ölüm ekranından 'kayıttan devam / yeni oyun'
   requestAnimationFrame(frame);
 })();
 </script>
