@@ -138,7 +138,6 @@
 
   function joyStart(e) {
     AU.unlock();
-    if (DNT.on) return;   // gün/gece geçişi animasyonu sırasında dokunuşlar yok
     if (DEATH.on) { deathTap(e.clientX, e.clientY); return; }   // ölüm ekranı: yalnızca düğmeler
     if (MENU.on && PAUSE.on) { pauseDown(e); return; }   // ana menüden açılan kıyafet sayfası
     if (MENU.on) { menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
@@ -273,7 +272,7 @@
         nz(d, t + 0.3, 4, 0.03, 'bandpass', 1100, 280, 1.2, 1.6);
       },
       celestSet(d, t) { nz(d, t, 1.8, 0.06, 'lowpass', 2800, 260, 0.7, 0.25); tone(d, 'sine', 392, 130, t, 1.6, 0.045, { att: 0.05, lp: 2000 }); },   // batış: yumuşak, inen süpürme
-      windTick(d, t, a) { a = a || 0; tone(d, 'square', 1500 + a * 1200, 800 + a * 500, t, 0.035, 0.045, { att: 0.001, lp: 4500 }); nz(d, t, 0.03, 0.05, 'highpass', 3500, 3500, 1, 0.001); },   // saat sarma tıkırtısı (a: ilerleme 0–1, perde yükselir)
+      windTick(d, t, a) { a = a || 0; tone(d, 'sine', 1100 + a * 900, 700 + a * 300, t, 0.05, 0.03, { att: 0.002, lp: 3600 }); },   // saat sarma tıkırtısı (a: ilerleme 0–1, perde yükselir)
       swing(d, t) { nz(d, t, 0.24, 0.5, 'bandpass', 450, 2800, 1.1, 0.08); tone(d, 'sine', 230, 130, t, 0.2, 0.08); },
       bellToll(d, t) {   // çan vuruşu: tok darbe + uyumsuz tizler, uzun çınlama
         tone(d, 'sine', 110, 62, t, 0.35, 0.8); nz(d, t, 0.07, 0.55, 'highpass', 2200, 2600, 0.7);
@@ -6261,7 +6260,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   }
   const PAUSE = { on: false, a: 0, snap: null, btns: [], sl: [], drag: null, page: 'main' };   // page: 'main' · 'wardrobe' (kıyafet) · 'dev' (geliştirici ayarları)
   function pauseGame() {
-    if (PAUSE.on || MENU.on || DNT.on) return;
+    if (PAUSE.on || MENU.on) return;
     joy.id = null; joy.active = false; joy.dx = joy.dy = 0; if (atk.down || atk.kb) { atk.down = false; atk.kb = false; relAtk(); } atk.id = null; BOW.id = null; BOW.down = false; BOW.kb = false; BEAM.id = null; BEAM.down = false; BEAM.kb = false; beamCancel(0); if (BOW.st === 'draw') { BOW.st = 'idle'; BOW.ch = 0; BOW.full = false; BOW.hold = 0; } for (const k in keys) keys[k] = false;
     try { const sc = document.createElement('canvas'); sc.width = cv.width; sc.height = cv.height; sc.getContext('2d').drawImage(cv, 0, 0); PAUSE.snap = sc; } catch (_) { PAUSE.snap = null; }
     PAUSE.on = true; PAUSE.a = 0; PAUSE.drag = null; PAUSE.page = 'main'; PAUSE.cfT = 0; PAUSE.fromCamp = false; AU.btn.pop = 1; AU.btn.ring = 1;
@@ -8165,82 +8164,61 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const wantLight = false;   // gündüz de ana ekran gibi koyu zemin + beyaz çizgi · gündüz/gece farkı atmosfer katmanıyla (güneş ışığı, gölge, gökyüzü tonu) verilir
     if (wantLight !== light) { if (!THM.fresh) thmCapture(); setLight(wantLight); }
   }
-  /* ---------- GÜN ↔ GECE GEÇİŞİ: 18:00'de güneş batar, ay doğar (saat 18:00'den 20:00'ye hızla sarılır) · 04:00'te ay batar, güneş doğar (04:00'ten 06:00'ya) · oyun donar, ekranı kaplayan sade animasyon oynar ---------- */
-  let DKV = 1;   // görsel gün ışığı (0 gece – 1 gündüz): geçiş animasyonu sırasında eski değerde kalır, bitince yeni değere oturur
-  const DNT = { on: false, kind: 'dusk', t: 0, dur: 7.2, snap: null, fade: 0, pend: null, snd: {}, tk: -1 };
+  /* ---------- GÜN ↔ GECE GEÇİŞİ: oyun DURMAZ · 18:00'de güneş sade bir çizimle ufka iner, ay yükselir; oyun saati 18:00 → 20:00 yumuşakça sarılır, dünya yavaşça kararır · 04:00'te tersi (04:00 → 06:00) ---------- */
+  let DKV = 1;   // görsel gün ışığı (0 gece – 1 gündüz): yumuşakça hedefe gider
+  const DNT = { on: false, kind: 'dusk', t: 0, dur: 5.4, pend: null, snd: {}, tk: -1 };
   const DN_CFG = { dusk: { f0: 18 / 24, f1: 20 / 24, from: 'sun', cap: ['gündüz', 'gece'] }, dawn: { f0: 4 / 24, f1: 6 / 24, from: 'moon', cap: ['gece', 'gündüz'] } };
-  function dnStart(kind) {
-    if (DNT.on) return; const c = DN_CFG[kind];
-    try { if (!DNT.snap) DNT.snap = document.createElement('canvas'); DNT.snap.width = cv.width; DNT.snap.height = cv.height; DNT.snap.getContext('2d').drawImage(cv, 0, 0); } catch (_) { DNT.snap = null; }
-    joy.id = null; joy.active = false; joy.dx = joy.dy = 0; if (atk.down || atk.kb) { atk.down = false; atk.kb = false; relAtk(); } atk.id = null; BOW.id = null; BOW.down = false; BOW.kb = false; BEAM.id = null; BEAM.down = false; BEAM.kb = false; beamCancel(0); if (BOW.st === 'draw') { BOW.st = 'idle'; BOW.ch = 0; BOW.full = false; BOW.hold = 0; } for (const k in keys) keys[k] = false;
-    DNT.on = true; DNT.kind = kind; DNT.t = 0; DNT.snd = {}; DNT.tk = -1; GCLK.f = c.f0;
-  }
-  function dnCheck(f0) {   // saat 18:00 / 04:00 çizgisini ileri doğru geçince animasyonu başlatır (geliştirici: ≥240× hızda ve geri sarmada atlanır)
+  const dnE3 = u => u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+  function dnStart(kind) { if (DNT.on) return; DNT.on = true; DNT.kind = kind; DNT.t = 0; DNT.snd = {}; DNT.tk = -1; GCLK.f = DN_CFG[kind].f0; }
+  function dnCheck(f0) {   // saat 18:00 / 04:00 çizgisini ileri doğru geçince başlar (geliştirici: ≥240× hızda ve geri sarmada atlanır)
     if (DNT.on || F.death >= 0 || DEATH.on) return;
     if (DNT.pend) { const k = DNT.pend; DNT.pend = null; dnStart(k); return; }
     const sp = DEV.on ? DEV.tspd : 1; if (sp <= 0 || sp >= 240) return;
     const f1 = GCLK.f, crossed = h => { const a = h / 24; return f1 >= f0 ? (f0 < a && f1 >= a) : (f0 < a || f1 >= a); };
     if (crossed(18)) dnStart('dusk'); else if (crossed(4)) dnStart('dawn');
   }
-  function dnEnd(c) { DNT.on = false; DNT.fade = 1; GCLK.f = c.f1; DKV = dayKof(GCLK.f); try { AU.setTime(GCLK.f, true); } catch (_) {} last = performance.now(); }
-  function dnSun(x, y, R, T, a, e) {   // kocaman, sade güneş: dolu disk + dönen ışınlar + ters dönen kesikli halka
-    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y);
-    const hg = ctx.createRadialGradient(0, 0, R * 0.9, 0, 0, R * 2.7); hg.addColorStop(0, 'rgba(242,200,76,0.20)'); hg.addColorStop(1, 'rgba(242,200,76,0)'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, R * 2.7, 0, TAU); ctx.fill();
-    const pu = 1 + 0.06 * Math.sin(T * 2.2); ctx.strokeStyle = 'rgb(242,200,76)'; ctx.lineCap = 'round'; ctx.save(); ctx.rotate(T * 0.18);
-    for (let i = 0; i < 16; i++) { const aa = i * TAU / 16, lg = i % 2 === 0, r0 = R * 1.22, r1 = R * (1.22 + (lg ? 0.4 : 0.2) * e) * pu; ctx.lineWidth = lg ? R * 0.035 : R * 0.025; ctx.beginPath(); ctx.moveTo(Math.cos(aa) * r0, Math.sin(aa) * r0); ctx.lineTo(Math.cos(aa) * r1, Math.sin(aa) * r1); ctx.stroke(); }
-    ctx.restore(); ctx.save(); ctx.rotate(-T * 0.12); ctx.setLineDash([R * 0.05, R * 0.16]); ctx.lineWidth = R * 0.012; ctx.strokeStyle = 'rgba(242,200,76,0.55)'; ctx.beginPath(); ctx.arc(0, 0, R * 1.9, 0, TAU); ctx.stroke(); ctx.restore();
-    ctx.fillStyle = 'rgb(242,200,76)'; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgb(252,226,140)'; ctx.beginPath(); ctx.arc(-R * 0.12, -R * 0.12, R * 0.76, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
-  function dnMoon(x, y, R, T, a) {   // kocaman, sade hilal: ince tam halka + hafifçe sallanan hilal + yumuşak hale
-    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y);
-    const hg = ctx.createRadialGradient(0, 0, R * 0.8, 0, 0, R * 2.6); hg.addColorStop(0, 'rgba(188,204,255,0.18)'); hg.addColorStop(1, 'rgba(188,204,255,0)'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, R * 2.6, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(188,204,255,0.3)'; ctx.lineWidth = R * 0.02; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
-    ctx.save(); ctx.rotate(-0.35 + Math.sin(T * 0.9) * 0.04); ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.clip();
-    ctx.fillStyle = 'rgb(188,204,255)'; ctx.beginPath(); ctx.rect(-R * 2, -R * 2, R * 4, R * 4); ctx.arc(R * 0.46, -R * 0.1, R * 0.86, 0, TAU); ctx.fill('evenodd'); ctx.restore();
-    ctx.restore();
-  }
-  function dnDraw(dt) {
-    const c = DN_CFG[DNT.kind], D = DNT.dur, T = (DNT.t += dt), e3 = u => u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
-    if (T >= D) { dnEnd(c); return; }
-    const sa = 1 - sstep(0, 1.1, T); if (sa > 0.01 && DNT.snap) { ctx.globalAlpha = sa; ctx.drawImage(DNT.snap, 0, 0, W, H); ctx.globalAlpha = 1; }
-    const ca = 1 - sstep(D - 1.0, D - 0.1, T), ina = sstep(0.4, 1.2, T), R = clamp(Math.min(W * 0.2, H * 0.34), 46, 190), cx = W / 2, hy = H * 0.66, yR = H * 0.37, yLow = hy + R * 1.75, fromSun = c.from === 'sun';
-    const uS = clamp((T - 1.5) / 1.9, 0, 1), uR = clamp((T - 2.9) / 2.0, 0, 1), fl = Math.sin(T * 1.4) * R * 0.025;
-    ctx.save(); ctx.globalAlpha = ca;
-    // yıldızlar: ay gökyüzünde belirirken açılır / güneş doğarken söner
-    const stOn = fromSun ? sstep(3.4, 5.0, T) : (1 - sstep(2.6, 4.4, T)) * ina;
-    if (stOn > 0.01) for (let i = 0; i < 20; i++) {
-      const h1 = Math.abs(Math.sin(i * 127.1 + 3.7) * 43758.5) % 1, h2 = Math.abs(Math.sin(i * 311.7 + 1.3) * 43758.5) % 1, h3 = Math.abs(Math.sin(i * 74.7 + 9.1) * 43758.5) % 1;
-      const tw = 0.35 + 0.65 * Math.pow(Math.sin(T * (1.1 + h3) + i * 1.7) * 0.5 + 0.5, 2);
-      ctx.globalAlpha = ca * stOn * tw; ctx.fillStyle = 'rgb(214,224,255)'; ctx.beginPath(); ctx.arc(W * (0.06 + 0.88 * h1), (hy - 16) * (0.05 + 0.9 * h2), 0.8 + h3 * 1.5, 0, TAU); ctx.fill();
-    }
-    ctx.globalAlpha = ca;
-    // ufuk ışıltısı: batarken sıcak, ay doğarken serin · ay batarken serin, güneş doğarken sıcak
-    const glow = (rgb, al) => { if (al < 0.005) return; const g = ctx.createLinearGradient(0, hy, 0, hy - H * 0.55); g.addColorStop(0, `rgba(${rgb},${al})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, hy); ctx.restore(); };
-    if (fromSun) { glow('242,170,76', 0.13 * Math.sin(PI * uS) * ina); glow('120,140,210', 0.1 * uR); } else { glow('120,140,210', 0.1 * (1 - uS) * ina); glow('242,170,76', 0.13 * uR); }
-    { const g = ctx.createLinearGradient(W * 0.1, 0, W * 0.9, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.strokeStyle = g; ctx.lineWidth = 1.2; ctx.globalAlpha = ca * sstep(0.3, 1.0, T); ctx.beginPath(); ctx.moveTo(W * 0.1, hy + 0.5); ctx.lineTo(W * 0.9, hy + 0.5); ctx.stroke(); ctx.globalAlpha = ca; }   // ufuk çizgisi
-    const body = (kind, y, a, e) => { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hy); ctx.clip(); if (kind === 'sun') dnSun(cx, y, R, T, a, e); else dnMoon(cx, y, R, T, a); ctx.restore(); };
-    body(c.from, lerp(yR, yLow, sstep(0, 1, uS)) + fl * (1 - uS), ca * ina, fromSun ? 1 - 0.4 * uS : 1);   // batan
-    if (T > 2.9) body(fromSun ? 'moon' : 'sun', lerp(yLow, yR, sstep(0, 1, uR)) + fl * uR, ca, fromSun ? 1 : 0.6 + 0.4 * uR);   // doğan
-    if (fromSun && T > 4.4 && T < 5.3) { const q = (T - 4.4) / 0.9, sx = W * 0.8 - q * W * 0.2, sy = H * 0.1 + q * H * 0.13, al = Math.sin(PI * q); ctx.strokeStyle = 'rgba(214,224,255,0.9)'; ctx.globalAlpha = ca * al * 0.8; ctx.lineWidth = 1.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + W * 0.07, sy - H * 0.045); ctx.stroke(); ctx.globalAlpha = ca; }   // tek kayan yıldız
-    // saat: 18:00 (ya da 04:00) görünür, sonra hızla ileri sarılır
-    const m0 = c.f0 * 1440, m1 = c.f1 * 1440, uc = clamp((T - 1.3) / 3.7, 0, 1), m = lerp(m0, m1, e3(uc)), mm = Math.floor(m + 0.001) % 1440;
-    const str = pad2(Math.floor(mm / 60)) + ':' + pad2(mm % 60), fs = clamp(H * 0.13, 34, 58), cy = hy + (H - hy) * 0.46;
-    ctx.font = `500 ${fs}px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    const dw = ctx.measureText('0').width + 1, cw2 = dw * 0.5; let x = cx - (dw * 4 + cw2) / 2; ctx.fillStyle = 'rgb(255,255,255)'; ctx.globalAlpha = ca * ina;
-    for (const ch of str) { const w = ch === ':' ? cw2 : dw; ctx.fillText(ch, x + w / 2, cy); x += w; }
-    { const bw = Math.min(W * 0.3, 200), by = cy + fs * 0.62; ctx.globalAlpha = ca * ina; ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(cx - bw / 2, by, bw, 1.5); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(cx - bw / 2, by, bw * e3(uc), 1.5); }   // sarma çubuğu
-    ctx.globalAlpha = 1;
-    { const cap = (str2, al) => { if (al > 0.01) dvText(str2.toLocaleUpperCase('tr'), cx, cy + fs * 0.95 + 8, 12, 500, '255,255,255', al * 0.55 * ca, 5, 'center'); }; cap(c.cap[0], ina * (1 - sstep(2.8, 3.6, T))); cap(c.cap[1], sstep(3.2, 4.0, T)); }
-    ctx.restore();
-    // sesler
+  function dnTick(dt) {   // her karede: oyun saatini yumuşakça sarar, sesleri tetikler, süre dolunca bitirir
+    const c = DN_CFG[DNT.kind], T = (DNT.t += dt), uc = clamp((T - 1.0) / 3.0, 0, 1);
+    GCLK.f = lerp(c.f0, c.f1, dnE3(uc));
     try {
       const sd = DNT.snd;
-      if (T > 1.5 && !sd.set) { sd.set = 1; AU.sfx('celestSet'); }
-      if (T > 2.9 && !sd.rise) { sd.rise = 1; AU.sfx(fromSun ? 'moonRise' : 'sunRise'); }
-      if (T > 1.35 && T < 5.0) { const tk = Math.floor(m / 5); if (tk !== DNT.tk) { DNT.tk = tk; AU.sfx('windTick', undefined, undefined, uc); } }
+      if (T > 0.8 && !sd.set) { sd.set = 1; AU.sfx('celestSet'); }
+      if (T > 2.0 && !sd.rise) { sd.rise = 1; AU.sfx(c.from === 'sun' ? 'moonRise' : 'sunRise'); }
+      if (T > 1.0 && T < 4.0) { const tk = Math.floor(GCLK.f * 144); if (tk !== DNT.tk) { DNT.tk = tk; AU.sfx('windTick', undefined, undefined, uc); } }
     } catch (_) {}
+    if (T >= DNT.dur) { DNT.on = false; GCLK.f = c.f1; try { AU.setTime(GCLK.f, true); } catch (_) {} }
+  }
+  function dnSun(x, y, R, T, a) {   // sade güneş: yumuşak ışıma, dolu disk, ince kısa ışınlar
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y);
+    const g = ctx.createRadialGradient(0, 0, R * 0.8, 0, 0, R * 2.4); g.addColorStop(0, 'rgba(242,200,76,0.16)'); g.addColorStop(1, 'rgba(242,200,76,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 2.4, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgb(242,200,76)'; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1.4, R * 0.045); ctx.save(); ctx.rotate(T * 0.15);
+    for (let i = 0; i < 12; i++) { const aa = i * TAU / 12, r0 = R * 1.35, r1 = R * (i % 2 ? 1.55 : 1.72); ctx.beginPath(); ctx.moveTo(Math.cos(aa) * r0, Math.sin(aa) * r0); ctx.lineTo(Math.cos(aa) * r1, Math.sin(aa) * r1); ctx.stroke(); }
+    ctx.restore(); ctx.fillStyle = 'rgb(242,200,76)'; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function dnMoon(x, y, R, T, a) {   // sade hilal: yumuşak ışıma + hafifçe sallanan hilal
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y);
+    const g = ctx.createRadialGradient(0, 0, R * 0.8, 0, 0, R * 2.3); g.addColorStop(0, 'rgba(188,204,255,0.14)'); g.addColorStop(1, 'rgba(188,204,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 2.3, 0, TAU); ctx.fill();
+    ctx.rotate(-0.35 + Math.sin(T * 0.9) * 0.04); ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.clip();
+    ctx.fillStyle = 'rgb(188,204,255)'; ctx.beginPath(); ctx.rect(-R * 2, -R * 2, R * 4, R * 4); ctx.arc(R * 0.46, -R * 0.1, R * 0.86, 0, TAU); ctx.fill('evenodd');
+    ctx.restore();
+  }
+  function dnOverlay() {   // oyunun üstüne (HUD'ın altına) yumuşakça belirir ve kaybolur · dokunuşları engellemez
+    const c = DN_CFG[DNT.kind], D = DNT.dur, T = DNT.t, fromSun = c.from === 'sun', ca = sstep(0, 0.9, T) * (1 - sstep(D - 1.1, D, T)); if (ca < 0.003) return;
+    const R = clamp(H * 0.115, 26, 60), cx = W / 2, yC = H * 0.3, hy = yC + R * 0.95, yLow = hy + R * 1.5, uS = clamp((T - 0.7) / 1.8, 0, 1), uR = clamp((T - 1.9) / 1.9, 0, 1), fl = Math.sin(T * 1.4) * R * 0.03;
+    ctx.save();
+    { const g = ctx.createRadialGradient(cx, yC + R * 0.6, 0, cx, yC + R * 0.6, Math.max(W, H) * 0.55); g.addColorStop(0, `rgba(10,10,10,${0.5 * ca})`); g.addColorStop(1, 'rgba(10,10,10,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }   // oyun görünür kalır, yalnızca ortası hafif kararır
+    { const g = ctx.createLinearGradient(cx - R * 2.6, 0, cx + R * 2.6, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.strokeStyle = g; ctx.lineWidth = 1.2; ctx.globalAlpha = ca; ctx.beginPath(); ctx.moveTo(cx - R * 2.6, hy + 0.5); ctx.lineTo(cx + R * 2.6, hy + 0.5); ctx.stroke(); }   // ufuk
+    const body = (kind, y, a) => { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hy); ctx.clip(); if (kind === 'sun') dnSun(cx, y, R, T, a); else dnMoon(cx, y, R, T, a); ctx.restore(); };
+    body(c.from, lerp(yC, yLow, sstep(0, 1, uS)) + fl * (1 - uS), ca);   // batan
+    if (T > 1.9) body(fromSun ? 'moon' : 'sun', lerp(yLow, yC, sstep(0, 1, uR)) + fl * uR, ca);   // doğan
+    const fs = clamp(H * 0.075, 22, 34), cy = hy + R * 0.6 + fs * 0.5, str = clockStr();   // oyun saatinin kendisi: yumuşakça ileri sarılır
+    ctx.font = `500 ${fs}px ${UIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.globalAlpha = ca; ctx.fillStyle = 'rgb(255,255,255)';
+    const dw = ctx.measureText('0').width + 1, cw2 = dw * 0.5; let x = cx - (dw * 4 + cw2) / 2;
+    for (const ch of str) { const w = ch === ':' ? cw2 : dw; ctx.fillText(ch, x + w / 2, cy); x += w; }
+    ctx.globalAlpha = 1;
+    { const cap = (t2, al) => { if (al > 0.01) dvText(t2.toLocaleUpperCase('tr'), cx, cy + fs * 0.9, 11, 500, '255,255,255', al * 0.55 * ca, 5, 'center'); }; cap(c.cap[0], 1 - sstep(2.0, 2.8, T)); cap(c.cap[1], sstep(2.4, 3.2, T)); }
+    ctx.restore();
   }
   function atmGlow() {   // ateş böceği / ışık sprite'ı: bir kez çizilir
     if (ATM.gl) return ATM.gl; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -8316,12 +8294,10 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (MENU.on && PAUSE.on) { try { AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
     if (MENU.on) { drawMenu(dt); trnDraw(dt); try { AU.update(dt, 0); } catch (_) {} requestAnimationFrame(frame); return; }
     if (PAUSE.on) { try { AU.setMode('menu'); AU.update(dt, 0); } catch (_) {} drawPause(dt, false); trnDraw(dt); requestAnimationFrame(frame); return; }
-    if (DNT.on) { try { AU.update(dt, 0); } catch (_) {} dnDraw(dt); requestAnimationFrame(frame); return; }   // gün/gece geçişi animasyonu: oyun donar
     const fz = DEV.freeze;   // geliştirici: zamanı dondur (Halaskar dışında her şey durur)
     if (!fz) TM.t += dt;
-    PLAY.t += dt; { const df0 = GCLK.f; GCLK.f = amod(GCLK.f + dt / GCLK.DAY * (DEV.on ? DEV.tspd : 1), 1); dnCheck(df0); }
-    if (DNT.on) { dnDraw(0); requestAnimationFrame(frame); return; }
-    { const dT = dayKof(GCLK.f); DKV = THM.fresh ? dT : DKV + clamp(dT - DKV, -dt / 1.2, dt / 1.2); } const DK = DKV; themeSync(); THM.fresh = false;   // zemin HER ZAMAN koyu kalır; gece/gündüz farkı atmosfer katmanıyla (ışık, gölge, ses) verilir   // oynanan süre ve oyun saati (duraklatma / menüde döngü erken çıktığı için ilerlemez)
+    PLAY.t += dt; { const df0 = GCLK.f; GCLK.f = amod(GCLK.f + dt / GCLK.DAY * (DEV.on ? DEV.tspd : 1), 1); dnCheck(df0); if (DNT.on) dnTick(dt); }
+    { let dT = dayKof(GCLK.f); if (DNT.on) dT = DNT.kind === 'dusk' ? (DNT.t < 1.6 ? 1 : 0) : (DNT.t < 1.6 ? 0 : 1); const dr = dt / (DNT.on ? 2.2 : 1.2); DKV = THM.fresh ? dT : DKV + clamp(dT - DKV, -dr, dr); } const DK = DKV; themeSync(); THM.fresh = false;   // zemin HER ZAMAN koyu kalır; gece/gündüz farkı atmosfer katmanıyla (ışık, gölge, ses) verilir   // oynanan süre ve oyun saati (duraklatma / menüde döngü erken çıktığı için ilerlemez)
     torchTick(dt, DK);
     const stopped = FX.stop > 0; if (stopped) FX.stop -= dt;
     const sdt = stopped ? dt * 0.04 : dt;   // vuruş duraklaması: oyun neredeyse donar
@@ -8355,7 +8331,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     updateEvil(fz ? 0 : sdt); updateChests(sdt); updateTrees(sdt);
     { const ft0 = FX.t; updateFx(dt, sdt); if (fz) FX.t = ft0; }
     let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
-    try { AU.setMode(F.death >= 0.6 ? 'death' : 'game'); AU.setListener(player.x, player.y); AU.setTime(GCLK.f); AU.update(dt, CAMP.in ? 0 : clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
+    try { AU.setMode(F.death >= 0.6 ? 'death' : 'game'); AU.setListener(player.x, player.y); AU.setTime(GCLK.f, DNT.on); AU.update(dt, CAMP.in ? 0 : clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
 
     joy.alpha += ((joy.active ? 1 : 0) - joy.alpha) * (1 - Math.exp(-16 * dt));
 
@@ -8388,7 +8364,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawChestPieces(light); drawChestFx(light); drawRings(); drawDmgNums(fg); drawFT(fg);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-    try { drawAtmo(dt, DK, campV); } catch (_) {}   // gece / gündüz atmosferi (HUD'dan önce)
+    try { drawAtmo(dt, DK, campV); } catch (_) {}
+    if (DNT.on) { try { dnOverlay(); } catch (_) {} }   // gün/gece geçişi: oyunun üstünde yumuşak, sade animasyon   // gece / gündüz atmosferi (HUD'dan önce)
     if (light && DBG) {
       ctx.font = '12px monospace'; ctx.fillStyle = 'rgba(0,0,0,0.7)';
       debugLines().forEach((t, i) => ctx.fillText(t, 20, 90 + i * 16));
@@ -8420,7 +8397,6 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (DEATH.on) drawDeath(dt, fg);
     if (MENU.blk > 0) { MENU.blk = Math.max(0, MENU.blk - dt / 0.7); ctx.fillStyle = `rgba(0,0,0,${MENU.blk})`; ctx.fillRect(0, 0, W, H); }   // karartmadan açılış
     thmDraw(dt);
-    if (DNT.fade > 0) { DNT.fade = Math.max(0, DNT.fade - dt / 1.1); ctx.fillStyle = `rgba(10,10,10,${DNT.fade * DNT.fade * (3 - 2 * DNT.fade)})`; ctx.fillRect(0, 0, W, H); }   // geçiş sonrası siyahtan açılış
     cam.x -= FX.ox; cam.y -= FX.oy;
     requestAnimationFrame(frame);
   }
