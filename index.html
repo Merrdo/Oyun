@@ -1672,9 +1672,15 @@
   }
   const DEATH = { on: false, t: 0, snap: null, btns: [], page: 'main', pg: 0 };   // page: 'main' (ortada sahne) | 'stats' (detaylar sayfası) · pg: sayfa geçişi 0..1
   function deathTap(px, py) { if (DEATH.t < 1.8) return; for (const b of DEATH.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return; } }
+  function backToMenu() {   // oyun içinden ana menüye dön: sayfa yeniden yüklenir, 'dokun' açılış ekranı atlanır · yeniden yükleme hata verirse yedek yollar denenir
+    try { sessionStorage.setItem('hlk_menu', '1'); } catch (_) {}
+    try { location.reload(); return; } catch (_) {}
+    try { location.replace(location.href); return; } catch (_) {}
+    try { location.href = location.href; } catch (_) {}
+  }
   function deathActions(hasSave) {   // ölüm ekranı düğmeleri (dikey ve yatay düzen ortak)
     return [[hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} location.reload(); }],
-      ['ANA MENÜ', false, () => { location.reload(); }]];
+      ['ANA MENÜ', false, () => { backToMenu(); }]];
   }
   function dHash(i, k) { const q = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return q - Math.floor(q); }
   function deathMain(sn, kills, A, T, fg, red, s, al, out) {   // ana sahne: ortada düşen ölü kafa, ÖLDÜN, üç temel bilgi, alt ortada düğmeler
@@ -7548,7 +7554,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       }
       { const cf = (PAUSE.cfT || 0) > 0;
         y += oh + g3; menuPill(bx0, y, bw, oh, cf ? 'EMİN MİSİN?' : 'ANA MENÜ', 1, false, 0, '224,88,74');
-        PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); location.reload(); }
+        PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { if ((PAUSE.cfT || 0) > 0) { try { AU.sfx('pickup'); } catch (_) {} saveCamp(); backToMenu(); }
            else PAUSE.cfT = 2.5; } }); }
     }
     {   // sağ üst: küçük simge düğmeleri · solda bilgi (Rehber), sağda ayarlar (ses)
@@ -9279,6 +9285,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resizeSoon(); });
   if (window.visualViewport) visualViewport.addEventListener('resize', resize);
   resize(); [150, 500, 1200].forEach(ms => setTimeout(resize, ms));
+  try { if (sessionStorage.getItem('hlk_menu')) { sessionStorage.removeItem('hlk_menu'); INTRO.on = false; INTRO.fade = 1; } } catch (_) {}   // oyun içinden ana menüye dönüş: 'dokun' açılış ekranı yalnızca oyunun ilk açılışında çıkar (ses kilidi ilk menü dokunuşunda açılır)
   try { const a = sessionStorage.getItem('hlk_auto'); if (a) { INTRO.on = false; sessionStorage.removeItem('hlk_auto');   // yeniden yüklemeden sonra tarayıcı sesi bir dokunuş olmadan açmaz: oyun, ilk dokunuş/tuşla (ses kilidi açılırken) başlar
     if (MENU.on && MENU.st === 'idle') { menuStart(a === 'c'); MENU.mode = 'zoom'; MENU.sT = 0.5; } } } catch (_) {}   // dokunuş beklemeden başlar; ses ilk dokunuşta kendiliğinden açılır   // ölüm ekranından 'kayıttan devam / yeni oyun'
   requestAnimationFrame(frame);
