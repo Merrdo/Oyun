@@ -39,6 +39,34 @@
 })();
 </script>
 <script>
+/* YUMUŞAK YENİDEN BAŞLATMA: 'ANA MENÜ' / 'YENİ OYUN' sayfayı yenilemez; oyun betiği aynı sayfada baştan çalıştırılır.
+   Böylece tarayıcının ses izni (AudioContext) korunur ve ekrana ikinci kez dokunmak gerekmez.
+   Oyunun eklediği dinleyiciler, zamanlayıcılar ve animasyon döngüsü kaydedilir; yeniden başlatırken hepsi temizlenir. */
+(function () {
+  var G = window.__hlk = { gen: 0, ls: [], iv: [], to: [] };
+  var ael = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function (t, f, o) { try { G.ls.push([this, t, f, o]); } catch (_) {} return ael.call(this, t, f, o); };
+  var si = window.setInterval, st = window.setTimeout;
+  window.setInterval = function () { var id = si.apply(window, arguments); G.iv.push(id); return id; };
+  window.setTimeout = function () { var id = st.apply(window, arguments); if (G.to.length > 400) G.to.splice(0, 200); G.to.push(id); return id; };
+  var raf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = function (cb) { var g = G.gen; return raf(function (t) { if (g === G.gen) cb(t); }); };
+  G.restart = function () {
+    var old = document.getElementById('hlk-game'); if (!old) return false;
+    var src = old.textContent;
+    try { if (window.__hlkDispose) window.__hlkDispose(); } catch (_) {}   // eski ses grafiği çıkıştan ayrılır (AudioContext açık kalır)
+    G.gen++;
+    G.ls.splice(0).forEach(function (r) { try { r[0].removeEventListener(r[1], r[2], r[3]); } catch (_) {} });
+    G.iv.splice(0).forEach(function (id) { clearInterval(id); });
+    G.to.splice(0).forEach(function (id) { clearTimeout(id); });
+    var pr = document.getElementById('hlk-probe'); if (pr) pr.remove();
+    var s = document.createElement('script'); s.id = 'hlk-game'; s.textContent = src;
+    old.parentNode.replaceChild(s, old);   // eklenince oyun betiği baştan çalışır
+    return true;
+  };
+})();
+</script>
+<script id="hlk-game">
 (() => {
   /* ---------- PWA: service worker ---------- */
   if ('serviceWorker' in navigator) {
@@ -109,7 +137,7 @@
   }
 
   /* ---------- Hata ayıklama bilgisi (açık zemin modunda görünür) ---------- */
-  const probe = document.createElement('div');
+  const probe = document.createElement('div'); probe.id = 'hlk-probe';
   probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100vh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);pointer-events:none;visibility:hidden';
   document.body.appendChild(probe);
   function debugLines() {
@@ -846,7 +874,7 @@
     function build() {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) {}
-      try { ac = new AC(); } catch (_) { ac = null; return; }
+      try { ac = (window.__hlkAC && window.__hlkAC.state !== 'closed') ? window.__hlkAC : new AC(); window.__hlkAC = ac; } catch (_) { ac = null; return; }   // yumuşak yeniden başlatmada açık AudioContext yeniden kullanılır
       master = ac.createGain(); master.gain.value = muted ? 0 : 0.9;
       const cp = ac.createDynamicsCompressor(); cp.threshold.value = -16; cp.knee.value = 18; cp.ratio.value = 4; cp.attack.value = 0.005; cp.release.value = 0.25; master.connect(cp); cp.connect(ac.destination);
       sfxBus = ac.createGain(); sfxBus.gain.value = SVL * VOL.sfx; sfxBus.connect(master);
@@ -914,8 +942,9 @@
       if (k === 'sfx') sfxBus.gain.setTargetAtTime(SVL * VOL.sfx, t, 0.03);
       else { if (deathBus) deathBus.gain.setTargetAtTime(0.9 * VOL.mus, t, 0.05); if (deathRev) deathRev.gain.setTargetAtTime(0.7 * VOL.mus, t, 0.05); if (menuBus) menuBus.gain.setTargetAtTime(MV2 * VOL.mus, t, 0.05); if (menuRev) menuRev.gain.setTargetAtTime(0.5 * VOL.mus, t, 0.05); musBus.gain.cancelScheduledValues(t); musBus.gain.setValueAtTime(musBus.gain.value, t); musBus.gain.setTargetAtTime(MV * VOL.mus, t, 0.05); if (musRev) musRev.gain.setTargetAtTime(0.38 * VOL.mus, t, 0.05); }
     }
-    return { unlock, intro, sfx, update, setTime, toggleMute, setVol, setMode, vol: VOL, btn, setListener(x, y) { LS.x = x; LS.y = y; }, get muted() { return muted; }, get running() { return !!ac && ac.state === 'running'; } };
+    return { unlock, intro, sfx, update, setTime, toggleMute, setVol, setMode, vol: VOL, btn, setListener(x, y) { LS.x = x; LS.y = y; }, get muted() { return muted; }, get running() { return !!ac && ac.state === 'running'; }, dispose() { try { if (master) master.disconnect(); } catch (_) {} } };
   })();
+  window.__hlkDispose = () => AU.dispose();
 
   // kumaş / saç zinciri: gövdeye bağlı, hıza göre uzar, rüzgârla dalgalanır
   const mkChain = o => Object.assign({ pts: o.w.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, ox: 0, oy: 0 })),
@@ -1672,14 +1701,16 @@
   }
   const DEATH = { on: false, t: 0, snap: null, btns: [], page: 'main', pg: 0 };   // page: 'main' (ortada sahne) | 'stats' (detaylar sayfası) · pg: sayfa geçişi 0..1
   function deathTap(px, py) { if (DEATH.t < 1.8) return; for (const b of DEATH.btns) if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) { MENU.fl = 1; b.fn(); return; } }
+  function softRestart() { try { return !!(window.__hlk && window.__hlkAC && window.__hlk.restart()); } catch (_) { return false; } }   // oyunu aynı sayfada baştan kurar · olmazsa false → sayfa yenilenir
   function backToMenu() {   // oyun içinden ana menüye dön: sayfa yeniden yüklenir, 'dokun' açılış ekranı atlanır · yeniden yükleme hata verirse yedek yollar denenir
     try { sessionStorage.setItem('hlk_menu', '1'); } catch (_) {}
+    if (softRestart()) return;   // sayfa yenilenmez: ses izni korunur
     try { location.reload(); return; } catch (_) {}
     try { location.replace(location.href); return; } catch (_) {}
     try { location.href = location.href; } catch (_) {}
   }
   function deathActions(hasSave) {   // ölüm ekranı düğmeleri (dikey ve yatay düzen ortak)
-    return [[hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} location.reload(); }],
+    return [[hasSave ? 'KAYITTAN DEVAM' : 'YENİ OYUN', true, () => { try { AU.unlock(); } catch (_) {} if (hasSave) { reviveFromSave(); return; } try { sessionStorage.setItem('hlk_auto', 'n'); } catch (_) {} if (!softRestart()) location.reload(); }],
       ['ANA MENÜ', false, () => { backToMenu(); }]];
   }
   function dHash(i, k) { const q = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return q - Math.floor(q); }
@@ -9285,6 +9316,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resizeSoon(); });
   if (window.visualViewport) visualViewport.addEventListener('resize', resize);
   resize(); [150, 500, 1200].forEach(ms => setTimeout(resize, ms));
+  try { if (window.__hlkAC) AU.unlock(); } catch (_) {}   // yumuşak yeniden başlatma: açık ses bağlamı hemen devralınır, dokunuş beklenmez
   try { if (sessionStorage.getItem('hlk_menu')) { sessionStorage.removeItem('hlk_menu'); INTRO.on = false; INTRO.fade = 1; } } catch (_) {}   // oyun içinden ana menüye dönüş: 'dokun' açılış ekranı yalnızca oyunun ilk açılışında çıkar (ses kilidi ilk menü dokunuşunda açılır)
   try { const a = sessionStorage.getItem('hlk_auto'); if (a) { INTRO.on = false; sessionStorage.removeItem('hlk_auto');   // yeniden yüklemeden sonra tarayıcı sesi bir dokunuş olmadan açmaz: oyun, ilk dokunuş/tuşla (ses kilidi açılırken) başlar
     if (MENU.on && MENU.st === 'idle') { menuStart(a === 'c'); MENU.mode = 'zoom'; MENU.sT = 0.5; } } } catch (_) {}   // dokunuş beklemeden başlar; ses ilk dokunuşta kendiliğinden açılır   // ölüm ekranından 'kayıttan devam / yeni oyun'
