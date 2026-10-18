@@ -269,6 +269,7 @@
     let gameGate, menuGate, menuBus, menuPad, menuMel, menuRev, deathGate, deathBus, deathRev, mode = 'menu';   // müzik modu: 'menu' (ana menü + duraklatma) · 'game' · 'none'
     const LS = { x: 0, y: 0 }, btn = { x: 0, y: 0, r: 20, mt: 1, pop: 0, ring: 0 }, voices = new Map(), bad = new Set();
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+    const sT = t => Math.max(+t || 0, ac ? ac.currentTime : 0, 0.001);   // ses zamanı hiçbir koşulda 0 / negatif / geçmiş olamaz (iOS'ta AudioContext saati ilk anlarda 0'da kalabilir → 'startTime must be a positive value')
     const C_SND = 1500;            // oyun içi 'ses hızı' (px/sn): Doppler kayması net duyulsun diye düşük tutuldu
     let ambBus = null, windF, windG, crkG, musTL, tod = 1, hr = 8, lastDay = null; const ambT = { bird: 1.5, owl: 7, wolf: 25 };   // ortam sesleri · tod: gün ışığı (0 gece – 1 gündüz) · hr: oyun saati
     const MV = 0.4, SVL = 0.85;  // müzik / efekt seviyesi
@@ -277,7 +278,7 @@
 
     /* ----- temel yapı taşları ----- */
     function tone(d, type, f0, f1, t, dur, vol, o) {
-      o = o || {}; const os = ac.createOscillator(), g = ac.createGain(), att = Math.min(o.att || 0.005, dur * 0.9);
+      t = sT(t); o = o || {}; const os = ac.createOscillator(), g = ac.createGain(), att = Math.min(o.att || 0.005, dur * 0.9);
       os.type = type; os.frequency.setValueAtTime(f0, t); if (f1 !== f0) os.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       if (o.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = o.vib[0]; lg.gain.value = o.vib[1]; l.connect(lg); lg.connect(os.frequency); l.start(t); l.stop(t + dur + 0.1); }
@@ -285,7 +286,7 @@
       g.connect(d); os.start(t); os.stop(t + dur + 0.05);
     }
     function nz(d, t, dur, vol, ft, f0, f1, q, att) {
-      const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); att = Math.min(att || 0.004, dur * 0.9);
+      t = sT(t); const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); att = Math.min(att || 0.004, dur * 0.9);
       s.buffer = noiseBuf; s.loop = true; f.type = ft; f.frequency.setValueAtTime(f0, t); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + dur); f.Q.value = q || 1;
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       s.connect(f); f.connect(g); g.connect(d); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
@@ -726,12 +727,13 @@
     const beat = 60 / SONGS[0].bpm; let g16 = beat / 4;
     let gtrBus = null, strBus = null;
     function pad(m, t, dur, vol, dest) {
+      t = sT(t);
       const f = mtof(m), g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 1.5); g.gain.setValueAtTime(vol, t + dur - 0.2); g.gain.linearRampToValueAtTime(0.0001, t + dur + 2.2);
       [-7, 6].forEach((c, i) => { const o = ac.createOscillator(); o.type = i ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = c; o.connect(g); o.start(t); o.stop(t + dur + 2.4); }); g.connect(dest || padBus);
     }
     /* ----- piyano: tokmak vuruşu + hafif uyumsuz (inharmonic) tonlar, alt notalar uzun, üst notalar kısa çınlar ----- */
     function piano(m, t, vel, dest, len, lv) {
-      if (!isFinite(m) || !ac) return; vel = clamp(vel, 0.05, 1.2);
+      if (!isFinite(m) || !ac) return; t = sT(t); vel = clamp(vel, 0.05, 1.2);
       const f = mtof(m), B = 0.00032 * Math.pow(2, (m - 60) / 18), np = m > 88 ? 3 : m > 74 ? 4 : 5, base = clamp(7.4 - (m - 36) * 0.07, 1.5, 7.4) * (len || 1);
       const AMP = [1, 0.58, 0.32, 0.19, 0.1], pk = (lv || 0.1) * 3.4 * Math.pow(vel, 1.3);
       const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = clamp(700 + f * 2.2 + vel * 4200, 1100, 9000); lp.Q.value = 0.25;
@@ -749,6 +751,7 @@
       nz(lp, t, 0.045, pk * 0.55, 'bandpass', 1500 + f * 1.4, 900, 0.9, 0.002);   // tokmak
     }
     function boom(t, vel, dest) {   // derin tümtek: yumuşak, uzaktan gelen
+      t = sT(t);
       const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(82, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.9);
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.14 * vel, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8); o.connect(g); g.connect(dest); o.start(t); o.stop(t + 1.9);
       nz(dest, t, 0.25, 0.05 * vel, 'lowpass', 260, 90, 0.7, 0.004);
@@ -757,7 +760,7 @@
     const pwc = {};
     function pw(d) { if (!pwc[d]) { const re = new Float32Array(33), im = new Float32Array(33); for (let n = 1; n < 33; n++) re[n] = 2 / (n * Math.PI) * Math.sin(n * Math.PI * d); pwc[d] = ac.createPeriodicWave(re, im); } return pwc[d]; }
     function chip(m, t, dur, vel, dest, o) {
-      if (!isFinite(m) || !ac || !dest) return; o = o || {}; vel = clamp(vel, 0.05, 1.2);
+      if (!isFinite(m) || !ac || !dest) return; t = sT(t); o = o || {}; vel = clamp(vel, 0.05, 1.2);
       const f = mtof(m), pk = (o.vol || 0.05) * Math.pow(vel, 1.1), rel = o.rel || 0.05, end = t + Math.max(dur, 0.03), os = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
       if (o.duty) os.setPeriodicWave(pw(o.duty)); else os.type = o.type || 'square'; os.frequency.setValueAtTime(f, t);
       if (o.vib && dur > 0.25) { const lf = ac.createOscillator(), lg = ac.createGain(); lf.frequency.value = 5.5; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(o.vib, t + 0.2); lf.connect(lg); lg.connect(os.detune); lf.start(t); lf.stop(end + rel + 0.1); }
@@ -766,6 +769,7 @@
       os.connect(lp); lp.connect(g); g.connect(dest); os.start(t); os.stop(end + rel + 0.05);
     }
     function kick(t, v) {
+      t = sT(t);
       const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.13);
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5 * v, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(g); g.connect(musBus); o.start(t); o.stop(t + 0.35);
     }
@@ -806,8 +810,8 @@
       if (s === 0 && ib % 4 === 0 && inten > 0.5) kick(t, 0.5);   // 4 ölçüde bir ekstra vuruş
     }
     function musTick() {
-      if (!ac || ac.state !== 'running' || mode !== 'game') return; if (mus.next < ac.currentTime) mus.next = ac.currentTime + 0.1;
-      while (mus.next < ac.currentTime + 0.6) { musStep(mus.next); mus.next += g16; mus.step++; }
+      if (!ac || ac.state !== 'running' || mode !== 'game') return; if (mus.next < ac.currentTime + 0.02) mus.next = ac.currentTime + 0.1;
+      try { while (mus.next < ac.currentTime + 0.6) { musStep(mus.next); mus.next += g16; mus.step++; } } catch (_) { mus.next += g16; mus.step++; }
     }
 
 
@@ -862,12 +866,12 @@
       for (const [st, n, len] of DMEL[bar]) if (st === s) { piano(n, t + 0.01, 0.5 * hv(), deathBus, len, 0.13); if (cyc >= 1) piano(n - 12, t + 0.014, 0.32, deathBus, len, 0.1); }
     }
     function deathTick() {
-      if (!ac || ac.state !== 'running' || mode !== 'death') return; if (dm.next < ac.currentTime) dm.next = ac.currentTime + 0.12;
-      while (dm.next < ac.currentTime + 0.5) { deathStep(dm.next); dm.next += d8; dm.step++; }
+      if (!ac || ac.state !== 'running' || mode !== 'death') return; if (dm.next < ac.currentTime + 0.02) dm.next = ac.currentTime + 0.12;
+      try { while (dm.next < ac.currentTime + 0.5) { deathStep(dm.next); dm.next += d8; dm.step++; } } catch (_) { dm.next += d8; dm.step++; }
     }
     function menuTick() {
-      if (!ac || ac.state !== 'running' || mode !== 'menu') return; if (mm.next < ac.currentTime) mm.next = ac.currentTime + 0.12;
-      while (mm.next < ac.currentTime + 0.5) { menuStep(mm.next); mm.next += e16; mm.step++; }
+      if (!ac || ac.state !== 'running' || mode !== 'menu') return; if (mm.next < ac.currentTime + 0.02) mm.next = ac.currentTime + 0.12;
+      try { while (mm.next < ac.currentTime + 0.5) { menuStep(mm.next); mm.next += e16; mm.step++; } } catch (_) { mm.next += e16; mm.step++; }
     }
 
     /* ----- kurulum ----- */
@@ -9272,18 +9276,18 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const wantLight = false;   // gündüz de ana ekran gibi koyu zemin + beyaz çizgi · gündüz/gece farkı atmosfer katmanıyla (güneş ışığı, gölge, gökyüzü tonu) verilir
     if (wantLight !== light) { if (!THM.fresh) thmCapture(); setLight(wantLight); }
   }
-  /* ---------- GÜN ↔ GECE GEÇİŞİ: oyun DURMAZ · 18:00'de güneş sade bir çizimle ufka iner, ay yükselir; oyun saati 18:00 → 20:00 yumuşakça sarılır, dünya yavaşça kararır · 04:00'te tersi (04:00 → 06:00) ---------- */
+  /* ---------- GÜN ↔ GECE GEÇİŞİ: oyun DURMAZ · 18:00'de güneş sade bir çizimle ufka iner, ay yükselir; oyun saati 18:00 → 20:00 yumuşakça sarılır, dünya yavaşça kararır · 06:00'da tersi: ay iner, güneş doğar (06:00 → 08:00) ---------- */
   let DKV = 1;   // görsel gün ışığı (0 gece – 1 gündüz): yumuşakça hedefe gider
   const DNT = { on: false, kind: 'dusk', t: 0, dur: 5.4, pend: null, snd: {}, tk: -1 };
-  const DN_CFG = { dusk: { f0: 18 / 24, f1: 20 / 24, from: 'sun', cap: ['gündüz', 'gece'] }, dawn: { f0: 4 / 24, f1: 6 / 24, from: 'moon', cap: ['gece', 'gündüz'] } };
+  const DN_CFG = { dusk: { f0: 18 / 24, f1: 20 / 24, from: 'sun', cap: ['gündüz', 'gece'] }, dawn: { f0: 6 / 24, f1: 8 / 24, from: 'moon', cap: ['gece', 'gündüz'] } };
   const dnE3 = u => u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
   function dnStart(kind) { if (DNT.on) return; DNT.on = true; DNT.kind = kind; DNT.t = 0; DNT.snd = {}; DNT.tk = -1; GCLK.f = DN_CFG[kind].f0; }
-  function dnCheck(f0) {   // saat 18:00 / 04:00 çizgisini ileri doğru geçince başlar (geliştirici: ≥240× hızda ve geri sarmada atlanır)
+  function dnCheck(f0) {   // saat 18:00 (gün batımı) / 06:00 (gün doğumu) çizgisini ileri doğru geçince başlar (geliştirici: ≥240× hızda ve geri sarmada atlanır)
     if (DNT.on || F.death >= 0 || DEATH.on) return;
-    if (DNT.pend) { const k = DNT.pend; DNT.pend = null; dnStart(k); return; }
+    if (DNT.pend) { if (CV.in) return; const k = DNT.pend; DNT.pend = null; dnStart(k); return; }   // mağaradaysan animasyon dışarı çıkınca oynar (içeride çizilmediği için kaçıyordu)
     const sp = DEV.on ? DEV.tspd : 1; if (sp <= 0 || sp >= 240) return;
     const f1 = GCLK.f, crossed = h => { const a = h / 24; return f1 >= f0 ? (f0 < a && f1 >= a) : (f0 < a || f1 >= a); };
-    if (crossed(18)) dnStart('dusk'); else if (crossed(4)) dnStart('dawn');
+    const kd = crossed(18) ? 'dusk' : crossed(6) ? 'dawn' : null; if (kd) { if (CV.in) DNT.pend = kd; else dnStart(kd); }
   }
   function dnTick(dt) {   // her karede: oyun saatini yumuşakça sarar, sesleri tetikler, süre dolunca bitirir
     const c = DN_CFG[DNT.kind], T = (DNT.t += dt), uc = clamp((T - 1.0) / 3.0, 0, 1);
