@@ -1726,7 +1726,7 @@
     { id: 'sifa', name: 'Şifalı Eller', cost: 2, desc: 'Sağlık ekipmanları kalıcı olarak %25 daha güçlü iyileştirir: bandaj %10 yerine %12,5, medkit %50 yerine %62,5 can yeniler. Şifa Hilali de aynı oranda güçlenir.', buff: { healMul: 1.25 }, cls: 'hero', req: [], ico: 'heal' },
     { id: 'hisim', name: 'Kor Hışım', cost: 2, desc: 'Verdiğin hasar %20 artar (kılıç, ok, bomba, ışın). Yan etki olarak dayanıklılık %6 daha hızlı yenilenir, siper ve prizma ışını %5 daha az yorar.', buff: { dmgDealt: 1.2, stamRegen: 1.06, stamCost: 0.95 }, cls: 'hero', req: [], ico: 'dmg' }
   ];   // yeni beceri eklemek için buraya bir kayıt + ağaçtaki düğüm konumu yeterli · cls: 'hero' (Halaskar) | 'sword' (Kılıç) | 'bow' (Yay) · req: önce açık olması gereken becerilerin id'leri (Güçlendirmeler sayfasında bağlantı çizgisi olarak görünür; sınıflar arası da olabilir)
-  const CURSE = { on: false, kills: 0, need: 10, t: 0, fl: 0, vg: 0, pulse: 0, done: 0, ask: null, av: 0, bv: 0, nr: null, p: [] }, CURSE_M = { dmgTaken: 2, healMul: 0.5, dmgDealt: 2 / 3 };   // lanet: alınan hasar ×2 · iyileşme ×0,5 · verilen hasar ×⅔ (15 → 10)
+  const CURSE = { on: false, kills: 0, need: 10, t: 0, fl: 0, vg: 0, pulse: 0, done: 0, ask: null, av: 0, bv: 0, nr: null, p: [], info: null, iv: 0 }, CURSE_M = { dmgTaken: 2, healMul: 0.5, dmgDealt: 2 / 3 };   // lanet: alınan hasar ×2 · iyileşme ×0,5 · verilen hasar ×⅔ (15 → 10)
   const skM = n => { let m = 1; for (const q of SKILLS) if (SK.own[q.id] && q.buff[n] !== undefined) m *= q.buff[n]; if (CURSE.on && CURSE_M[n]) m *= CURSE_M[n]; return m; };   // beceri çarpanları (gearM ile birlikte okunur)
   const skSpent = () => SKILLS.reduce((a, q) => a + (SK.own[q.id] ? q.cost : 0), 0);
   function skReset() { SK.pts = 0; SK.own = {}; SK.sel = 0; SK.flash = 0; SK.msg = ''; SK.mt = 0; SK.fx = []; SK.gl = SK.pgl = 0; }
@@ -3257,17 +3257,17 @@
     const g = cvGeo(c); if (g.chs) return g.chs;
     const N = CVN, G = g.G, out = [], H = (i, k) => hashN(c.sd, 70 + i, k), cand = g.rooms.filter(r => r.kind !== 'start');
     let n = 0; if (cand.length && H(1, 3) < luckP(0.6)) { n = 1; if (H(2, 3) < luckP(0.02) && cand.length > 1) n = 2; }   // 2. sandık: çok yüksek şans / ileride şans eşyası
-    const kinds = []; for (let i = 0; i < n; i++) kinds.push('v'); if (cand.length > kinds.length && H(3, 3) < 0.4) kinds.push('x');   // 'x' = lanetli sandık (%40)
+    const kinds = []; for (let i = 0; i < n; i++) kinds.push('v'); if (cand.length && H(3, 3) < luckP(0.4)) kinds.push('x');   // 'x' = lanetli sandık (%40 · geliştirici şansı yükseldikçe artar, %100'de her mağarada)
     const at = (x, y) => G[y * N + x] === 1, usedR = new Set();
     for (let i = 0; i < kinds.length; i++) {
       const r0 = Math.floor(H(5 + i, 7) * cand.length); let found = null;
       for (let q = 0; q < cand.length && !found; q++) {
-        const ri = (r0 + q) % cand.length; if (usedR.has(ri)) continue; const R = cand[ri], spots = [];
+        const ri = (r0 + q) % cand.length; if (usedR.has(ri) && kinds[i] !== 'x') continue; const R = cand[ri], spots = [];   // lanetli sandık boş oda kalmadıysa ödül sandığıyla aynı odayı paylaşabilir
         for (let gy = Math.floor(R.cy - R.rh * 1.3); gy <= Math.ceil(R.cy + R.rh * 1.3); gy++) for (let gx = Math.floor(R.cx - R.rw * 1.3); gx <= Math.ceil(R.cx + R.rw * 1.3); gx++) {
           if (gx < 4 || gy < 4 || gx > N - 5 || gy > N - 5) continue;
           if (!at(gx, gy) || !at(gx - 1, gy) || !at(gx + 1, gy) || !at(gx, gy + 1) || !at(gx - 1, gy + 1) || !at(gx + 1, gy + 1) || at(gx, gy - 1) || at(gx - 1, gy - 1) || at(gx + 1, gy - 1)) continue;   // üstü duvar, önü ve yanları zemin
-          const lx = CVGX + (gx + 0.5) * CVS, ly = CVGY + gy * CVS + 22;
-          if (g.tor.some(T => Math.hypot(T.x - lx, T.y - ly) < 60)) continue;
+          const lx = CVGX + (gx + 0.5) * CVS, ly = CVGY + gy * CVS + 15;   // sandık duvara tam yaslanır: çarpışma elipsinin üstü, oyuncunun duvardan alabileceği en yakın çizgiden (9 birim) daha yukarıda kalır → arkasından geçilemez
+          if (g.tor.some(T => Math.hypot(T.x - lx, T.y - ly) < 60) || out.some(o => Math.hypot(o.lx - lx, o.ly - ly) < 90)) continue;
           if (cvWalk(c, lx, ly + 40) && cvWalk(c, lx - 30, ly + 40) && cvWalk(c, lx + 30, ly + 40)) spots.push({ lx, ly });
         }
         if (spots.length) { found = spots[Math.floor(H(9 + i, 11) * spots.length)]; usedR.add(ri); }
@@ -3476,6 +3476,31 @@
     let b = null, bd = 1e12; for (const c of campsIn(player.x - 7000, player.y - 7000, player.x + 7000, player.y + 7000)) { if (c.ruin) continue; const d = Math.hypot(c.x - player.x, c.y - player.y); if (d > 220 && d < bd) { bd = d; b = c; } }
     if (!b) { devToast('Yakında kamp yok'); return; }
     player.x = b.x - b.fl * 10; player.y = b.y + 100; player.vx = player.vy = 0; cam.x = player.x - camCX(); cam.y = player.y - camCY(); devToast('Kampa ışınlandın');
+  }
+  /* --- geliştirici: sandık seç ve ışınlan (normal · mağara ödül sandığı · lanetli sandık) --- */
+  const DEVC = { k: 'n', i: 0, l: null, ox: 0, oy: 0 };
+  const devChestOrigin = () => CV.in && CV.c ? [CV.c.x, CV.c.y] : [player.x, player.y];
+  function devTpWorld(x, y, msg) {   // dünyaya ışınlan (mağaradaysan önce dışarı çıkarır)
+    if (CV.in) { CV.in = false; CV.dp = 0; CV.wx = NaN; CV.fa = 1; CV.cd = 0.3; }
+    player.x = x; player.y = y; player.vx = player.vy = 0; cam.x = player.x - camCX(); cam.y = player.y - camCY(); DEVC.l = null; devToast(msg);
+  }
+  function devTpCave(c, ch) {   // mağaraya girip sandığın önüne ışınlan
+    CV.c = c; try { cvGeo(c); } catch (_) {}
+    let lx = ch.lx, ly = ch.ly + 42; if (!cvWalk(c, lx, ly)) for (const [dx, dy] of [[0, 52], [-34, 42], [34, 42], [0, 34]]) if (cvWalk(c, ch.lx + dx, ch.ly + dy)) { lx = ch.lx + dx; ly = ch.ly + dy; break; }
+    CV.in = true; CV.wx = NaN; player.x = CVO.x + lx; player.y = CVO.y + ly; player.vx = player.vy = 0; CV.px = player.x; CV.py = player.y; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); DEVC.l = null; devToast('Sandığın önüne ışınlandın');
+  }
+  function devChestScan() {   // seçili türdeki (kırılmamış / açılmamış) sandıkları yakından uzağa sıralar
+    const [ox, oy] = devChestOrigin(), out = []; DEVC.ox = ox; DEVC.oy = oy;
+    if (DEVC.k === 'n') {
+      const was = CV.in; CV.in = false;
+      try { for (const [x, y, id, lk] of chestsIn(ox - 5000, oy - 5000, ox + 5000, oy + 5000)) { const st = chState(id, lk); if (st.dead || st.gone || st.dying >= 0) continue; out.push({ d: Math.hypot(x - ox, y - oy), lk, go: () => devTpWorld(x, y + 52, 'Sandığın önüne ışınlandın') }); } } finally { CV.in = was; }
+    } else {
+      const cs = []; for (let i = Math.floor((ox - 7000) / CVC); i <= Math.floor((ox + 7000) / CVC); i++) for (let j = Math.floor((oy - 7000) / CVC); j <= Math.floor((oy + 7000) / CVC); j++) { const c = cvCand(i, j); if (c) cs.push(c); }
+      cs.sort((a, b) => Math.hypot(a.x - ox, a.y - oy) - Math.hypot(b.x - ox, b.y - oy));
+      for (const c of cs.slice(0, 14)) { let chs = []; try { chs = cvChests(c); } catch (_) {}
+        for (const ch of chs) { if (ch.id.charAt(2) !== DEVC.k) continue; const st = chState(ch.id, false); if (st.dead || st.gone || st.dying >= 0 || st.cop >= 0) continue; out.push({ d: Math.hypot(c.x - ox, c.y - oy), lk: false, go: () => devTpCave(c, ch) }); } }
+    }
+    return out.sort((a, b) => a.d - b.d);
   }
   /* --- kamp çizimi: zemin (parıltı + taş halka) ve sıralı nesneler (ateş, tezgah, çadır, fener, yatak, çanta, kasalar) --- */
   const campFlare = (x, y, r) => { let m = 1e9; for (const e of E) if (e.em >= 1) { const d = Math.hypot(e.x - x, (e.y - y) / CAMP_KY); if (d < m) m = d; } return clamp(1 - (m - r) / 170, 0, 1); };   // düşman yaklaştıkça mühür parlar
@@ -5236,9 +5261,9 @@
   /* ---------- LANETLİ SANDIK (mağara): 'cbx…' · E / düğme → onay → açılır, lanet başlar: hasar alma ×2 · iyileşme ×0,5 · verilen hasar ×⅔ · 10 düşman kesince kalkar ---------- */
   const CURSE_RGB = '96,255,160', CURSE_N = 10;
   const curseKill = () => { if (!CURSE.on) return; CURSE.kills++; CURSE.pulse = 1; if (CURSE.kills >= CURSE.need) curseEnd(true); };
-  function curseReset() { CURSE.on = false; CURSE.kills = 0; CURSE.ask = null; CURSE.p.length = 0; CURSE.fl = 0; }
+  function curseReset() { CURSE.on = false; CURSE.kills = 0; CURSE.ask = null; CURSE.info = null; CURSE.iv = 0; CURSE.p.length = 0; CURSE.fl = 0; }
   function curseEnd(win) {
-    CURSE.on = false; CURSE.ask = null;
+    CURSE.on = false; CURSE.ask = null; CURSE.info = null;
     if (!win) return;
     CURSE.fl = 0.7; CURSE.done = 2.6; hitFx(0.1, 5);
     for (let i = 0; i < 18; i++) CURSE.p.push({ k: 'wisp', x: player.x + rnd(-12, 12), y: player.y - rnd(0, 40), vx: rnd(-25, 25), vy: -rnd(30, 90), t: 0, l: rnd(1.0, 1.8), s: rnd(3, 7), w: 1 });
@@ -5251,29 +5276,33 @@
     for (let i = 0; i < 8; i++) CURSE.p.push({ k: 'bone', x: x + rnd(-14, 14), y: y - rnd(4, 18), vx: rnd(-120, 120), vy: -rnd(100, 240), gy: y + rnd(4, 14), t: 0, l: 3.2, r: rnd(0, TAU), vr: rnd(-9, 9), w: 3, h: 1.6, c: '#77737f', b: 0 });
     for (let i = 0; i < 16; i++) CURSE.p.push({ k: 'wisp', x: x + rnd(-14, 14), y: y - 22, vx: rnd(-40, 40), vy: -rnd(30, 110), t: 0, l: rnd(0.9, 1.7), s: rnd(3, 8), w: 0 });
     CURSE.p.push({ k: 'ring', x, y: y + 2, r: 120, t: 0, l: 0.8, w: 0 }, { k: 'ring', x, y: y + 2, r: 70, t: 0, l: 0.5, w: 0 });
-    CURSE.on = true; CURSE.kills = 0; CURSE.need = CURSE_N; CURSE.fl = 1; CURSE.pulse = 1; hitFx(0.2, 10);
+    const np = 4 + (Math.random() * 3 | 0); CURSE.on = true; CURSE.kills = 0; CURSE.need = CURSE_N; CURSE.fl = 1; CURSE.pulse = 1; CURSE.info = { t: 0, n: np }; hitFx(0.2, 10);   // bilgilendirme ekranı sandık açıldıktan sonra çıkar
     try { AU.sfx('curseOn', x, y - 20); } catch (_) {}
     ftext(x, y - 70, 'LANET!', '#7dffb4');
-    for (let i = 0, n = 4 + (Math.random() * 3 | 0); i < n; i++) LOOT.push({ k: 'prism', n: 1, cv: 1, x: x + rnd(-10, 10), y: y + 14, z: 30, vx: rnd(-90, 90), vy: rnd(40, 120), vz: rnd(380, 540), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // ödül havuzu: şimdilik yalnızca mor prizma (4–6)
+    for (let i = 0; i < np; i++) LOOT.push({ k: 'prism', n: 1, cv: 1, x: x + rnd(-10, 10), y: y + 14, z: 30, vx: rnd(-90, 90), vy: rnd(40, 120), vz: rnd(380, 540), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // ödül havuzu: şimdilik yalnızca mor prizma (4–6)
   }
   function curseTap(s, x, y, ang) {   // vurulan lanetli sandık açılmaz: yalnızca zıplar
     s.shk = 1; s.sq = 1; sparks(x + clamp(player.x - x, -16, 16), y - rnd(10, 30), 5, 170, ang + PI, 0.9); try { AU.sfx('chainClank', x, y - 14); } catch (_) {}
     if (s.cop < 0 && s.hint <= 0) { s.hint = 2.5; ftext(x, y - 58, 'Vurarak açılmaz', '#7dffb4'); }
   }
   const curseBtnRect = () => ({ x: W / 2 - 78, y: H - 104, w: 156, h: 42 });
-  function curseDlg() {
-    const w = Math.min(430, W - 28), h = Math.min(H - 20, 262), x = W / 2 - w / 2, y = H / 2 - h / 2, bh = 38, bw = (w - 44) / 2;
+  function curseDlg(hh) {
+    const w = Math.min(430, W - 28), h = Math.min(H - 20, hh || 172), x = W / 2 - w / 2, y = H / 2 - h / 2, bh = 38, bw = (w - 44) / 2;
     return { x, y, w, h, no: { x: x + 16, y: y + h - bh - 16, w: bw, h: bh }, yes: { x: x + w - 16 - bw, y: y + h - bh - 16, w: bw, h: bh } };
   }
+  const curseInfoBtn = () => { const d = curseDlg(262); return { x: d.x + 16, y: d.y + d.h - 54, w: d.w - 32, h: 38 }; };
+  const curseInfoOn = () => CURSE.info && CURSE.info.t > 0.6 && CURSE.iv > 0.6;
   const inR = (r, px, py, m) => px >= r.x - m && px <= r.x + r.w + m && py >= r.y - m && py <= r.y + r.h + m;
   function curseAccept() { const s = CURSE.ask; if (!s) return; CURSE.ask = null; if (s.cop < 0) { s.cop = 0; try { AU.sfx('chainClank', player.x, player.y - 20); } catch (_) {} } }
   function curseTapUI(px, py) {   // true = dokunuş harcandı
     if (CURSE.ask) { if (CURSE.av < 0.6) return true; const d = curseDlg(); if (inR(d.yes, px, py, 4)) curseAccept(); else if (inR(d.no, px, py, 4)) CURSE.ask = null; return true; }
+    if (curseInfoOn() && inR(curseInfoBtn(), px, py, 6)) { CURSE.info = null; return true; }   // TAMAM: bilgi kartı kapanır (kart dışındaki dokunuşlar oyuna geçer)
     if (CURSE.nr && CURSE.bv > 0.6 && F.death < 0 && inR(curseBtnRect(), px, py, 8)) { CURSE.ask = CURSE.nr.s; return true; }
     return false;
   }
   addEventListener('keydown', e => {
     if (MENU.on || PAUSE.on || e.repeat) return; const k = e.key.toLowerCase();
+    if (curseInfoOn() && (k === 'enter' || k === 'escape' || (k === 'e' && !CURSE.nr))) { CURSE.info = null; return; }
     if (CURSE.ask) { if (k === 'e' || k === 'enter') curseAccept(); else if (k === 'escape' || k === 'q') CURSE.ask = null; }
     else if (k === 'e' && CURSE.nr && F.death < 0) CURSE.ask = CURSE.nr.s;
   });
@@ -5306,6 +5335,8 @@
     CURSE.nr = nr; if (CURSE.ask && (!nr || nr.s !== CURSE.ask || F.death >= 0)) { const near2 = CURSE.ask && nr && Math.hypot(player.x - nr.x, (player.y - nr.y) * 1.3) < 110; if (!near2) CURSE.ask = null; }
     CURSE.bv += ((nr && !CURSE.ask ? 1 : 0) - CURSE.bv) * dmp(12, dt); if (CURSE.bv < 0.01) CURSE.bv = 0;
     CURSE.av += ((CURSE.ask ? 1 : 0) - CURSE.av) * dmp(14, dt); if (CURSE.av < 0.01) CURSE.av = 0;
+    if (CURSE.info) { CURSE.info.t += dt; if (CURSE.info.t > 16) CURSE.info = null; }
+    CURSE.iv += ((CURSE.info && CURSE.info.t > 0.6 ? 1 : 0) - CURSE.iv) * dmp(10, dt); if (CURSE.iv < 0.01) CURSE.iv = 0;
   }
   function drawCurseFx(light) {   // dünya katmanı: yeşil duman, kemik / zincir parçaları, halkalar
     if (!CURSE.p.length) return;
@@ -5344,12 +5375,20 @@
     if (CURSE.av > 0.01) {
       const d = curseDlg(), a = CURSE.av; ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = `rgba(0,0,0,${light ? 0.35 : 0.55})`; ctx.fillRect(0, 0, W, H);
       ctx.translate(0, (1 - a) * 10); rr(d.x, d.y, d.w, d.h, 16); ctx.fillStyle = `rgba(${light ? '246,248,246' : '10,14,12'},0.96)`; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${G},0.75)`; ctx.stroke();
-      const cx = d.x + d.w / 2; let y = d.y + 28;
-      dvText('LANETLİ SANDIK', cx, y, 15, 700, G, 1, 4, 'center'); y += 20; dvText('Açarsan lanet seni bulur', cx, y, 11.5, 400, fg, 0.6, 0.5, 'center'); y += 28;
+      const cx = d.x + d.w / 2; let y = d.y + 36;
+      dvText('LANETLİ SANDIK', cx, y, 15, 700, G, 1, 4, 'center'); y += 30; dvText('Açarsan lanet seni bulur.', cx, y, 12, 400, fg, 0.7, 0.5, 'center'); y += 20; dvText('Yine de açmak istiyor musun?', cx, y, 11.5, 400, fg, 0.5, 0.4, 'center');
+      for (const [r, txt, yes] of [[d.no, 'VAZGEÇ', 0], [d.yes, 'AÇ', 1]]) { rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = yes ? `rgba(${G},0.2)` : `rgba(${fg},0.06)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = yes ? `rgba(${G},0.9)` : `rgba(${fg},0.3)`; ctx.stroke(); dvText(txt, r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13, 700, yes ? G : fg, yes ? 1 : 0.75, 2.5, 'center'); }
+      ctx.restore();
+    }
+    if (CURSE.iv > 0.01 && CURSE.info) {   // sandık açıldıktan sonra: lanetin bedeli + ödül
+      const d = curseDlg(262), a = CURSE.iv; ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * 10);
+      rr(d.x, d.y, d.w, d.h, 16); ctx.fillStyle = `rgba(${light ? '246,248,246' : '10,14,12'},0.96)`; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${G},0.75)`; ctx.stroke();
+      const cx = d.x + d.w / 2; let y = d.y + 30;
+      dvText('LANET!', cx, y, 17, 700, G, 1, 5, 'center'); y += 20; dvText('Sandık açıldı, lanet seni buldu', cx, y, 11.5, 400, fg, 0.6, 0.5, 'center'); y += 28;
       const red = light ? '200,40,40' : '255,96,90', rows = [['Aldığın hasar', '×2', red], ['İyileşme', '×0,5', red], ['Verdiğin hasar', '−%33  ·  15 → 10', red]];
       for (const [n, v, c] of rows) { dvText(n, d.x + 26, y, 12.5, 400, fg, 0.8, 0.3, 'left'); dvText(v, d.x + d.w - 26, y, 13, 700, c, 1, 0.3, 'right'); ctx.fillStyle = `rgba(${fg},0.1)`; ctx.fillRect(d.x + 22, y + 11, d.w - 44, 1); y += 24; }
-      y += 6; dvText('Lanet 10 düşman kesince kalkar  ·  ölürsen silinir', cx, y, 11, 400, fg, 0.65, 0.2, 'center'); y += 18; dvText('Ödül: Mor Prizma', cx, y, 11.5, 600, '170,130,255', 1, 0.8, 'center');
-      for (const [r, txt, yes] of [[d.no, 'VAZGEÇ', 0], [d.yes, 'KABUL ET', 1]]) { rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = yes ? `rgba(${G},0.2)` : `rgba(${fg},0.06)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = yes ? `rgba(${G},0.9)` : `rgba(${fg},0.3)`; ctx.stroke(); dvText(txt, r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13, 700, yes ? G : fg, yes ? 1 : 0.75, 2.5, 'center'); }
+      y += 6; dvText('Lanet 10 düşman kesince kalkar  ·  ölürsen silinir', cx, y, 11, 400, fg, 0.65, 0.2, 'center'); y += 20; dvText('Ödül: Mor Prizma ×' + CURSE.info.n, cx, y, 12, 600, '170,130,255', 1, 0.8, 'center');
+      const r = curseInfoBtn(); rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = `rgba(${G},0.2)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = `rgba(${G},0.9)`; ctx.stroke(); dvText('TAMAM', r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13, 700, G, 1, 2.5, 'center');
       ctx.restore();
     }
   }
@@ -5423,7 +5462,8 @@
   /* ---------- MİMİK: sandık taklitçisi. Normal sandık gibi vurulur; 2. ya da 3. vuruşta (şansa bağlı) ortaya çıkar ---------- */
   const MS = 1.2;
   const setMimic = v => { DEV.mimic = clamp(Math.round(v), 0, 100); try { localStorage.setItem('hlk_mimic', String(DEV.mimic)); } catch (_) {} };
-  const setLuck = v => { DEV.luck = clamp(Math.round(v), 0, 100); try { localStorage.setItem('hlk_luck', String(DEV.luck)); } catch (_) {} };
+  const setLuck = v => { DEV.luck = clamp(Math.round(v), 0, 100); try { if (CVB.g) CVB.g.chs = null; } catch (_) {} DEVC.l = null;   // mağara sandıkları yeni şansla yeniden dağıtılır
+    try { localStorage.setItem('hlk_luck', String(DEV.luck)); } catch (_) {} };
   try { const m = parseFloat(localStorage.getItem('hlk_luck')); if (isFinite(m)) DEV.luck = clamp(Math.round(m), 0, 100); } catch (_) {}
   DEV.egg = 0; try { const m = parseInt(localStorage.getItem('hlk_egg'), 10); if (m >= 0 && m <= 2) DEV.egg = m; } catch (_) {}   // ana menü kılıç sahnesi sıklığı: 0 nadir · 1 sık · 2 çok sık
   const setEgg = v => { DEV.egg = v; try { localStorage.setItem('hlk_egg', String(v)); } catch (_) {} };
@@ -7895,6 +7935,17 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         [['seyrek', 0.15], ['normal', 0.3], ['sık', 0.5]].forEach(([nm, v], i) => ob(x0 + i * (cwid + gp), cy, cwid, 34, nm, () => { CAMP.rate = v; }, { on: CAMP.rate === v, size: 12.5 }));
         ob(x0, cy + 46, cw, 42, 'en yakın kampa git', devGoCamp, { solid: true, size: 14 });
         hair(y + h + 8, 0.08); y += h + 8; }
+      y += 22; y = sec('sandık', y);
+      { const h = 190, [ox, oy] = devChestOrigin(); if (!DEVC.l || Math.hypot(ox - DEVC.ox, oy - DEVC.oy) > 300) DEVC.l = devChestScan();
+        const L = DEVC.l, n = L.length; DEVC.i = n ? clamp(DEVC.i, 0, n - 1) : 0; const it = L[DEVC.i];
+        dvText('Sandığa git', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText(n + ' sandık bulundu', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
+        const ky = y + 44, gp = 8, cwid = (cw - gp * 2) / 3;
+        [['n', 'normal'], ['v', 'ödül · mağara'], ['x', 'lanetli · mağara']].forEach(([k, nm], i) => ob(x0 + i * (cwid + gp), ky, cwid, 34, nm, () => { DEVC.k = k; DEVC.i = 0; DEVC.l = null; }, { on: DEVC.k === k, size: 11.5 }));
+        const sy = ky + 46;
+        ob(x0, sy, 44, 38, '‹', () => { if (n) DEVC.i = (DEVC.i + n - 1) % n; }, { dim: n < 2, size: 18 }); ob(x0 + cw - 44, sy, 44, 38, '›', () => { if (n) DEVC.i = (DEVC.i + 1) % n; }, { dim: n < 2, size: 18 });
+        dvText(it ? '#' + (DEVC.i + 1) + ' / ' + n : 'yok', x0 + cw / 2, sy + 14, 15, 500, fg, 1, 0, 'center'); dvText(it ? 'uzaklık ' + Math.round(it.d) + (it.lk ? '  ·  zincirli' : '') : 'yakında bu türden sandık yok', x0 + cw / 2, sy + 31, 11, 400, fg, 0.5, 0, 'center');
+        ob(x0, sy + 50, cw, 42, 'seçili sandığa git', () => { if (it) it.go(); else devToast('Yakında bu türden sandık yok'); }, { solid: true, size: 14, dim: !it });
+        hair(y + h + 8, 0.08); y += h + 8; }
       y += 22; y = sec('şans', y);
       { const h = 176, v = DEV.luck;   // şans: şansa bağlı tüm ganimetlerin olasılığını yükseltir
         dvText('Şans', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText(v === 0 ? 'normal' : v >= 100 ? 'her şey kesin gerçekleşir' : 'olasılıklar artar', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
@@ -8959,26 +9010,28 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   const RH_CHESTS = [
     { kind: 'chest', name: 'Normal Sandık', tab: 'Normal', sub: 'SANDIK  ·  DÜNYA', atkTitle: 'KULLANIM', noplay: true,
       lore: 'Dünyanın her yerine serpiştirilmiş eski ahşap sandık. Kilidi yoktur; sağlam olduğu kadar da kırılgandır. Vurdukça parçaları kopar, son darbede dağılıp içindekini saçar. Zincirli olanlar daha dolgundur ama altın anahtar ister.',
-      stats: [['Dünya şansı', '%20  ·  zincirli %30'], ['Açılış', 'kırılarak'], ['Altın tozu', '%100  ·  3–6  ·  zincirli 8–14'], ['Odun', '%55  ·  1–3'], ['Altın anahtar', '%30  ·  zincirli %22'], ['Bandaj · otlar · yay · cephane', 'şansa bağlı  ·  eşya sayfalarına bak']],
+      stats: [['Dünya şansı', '%20  ·  zincirli %30'], ['Açılış', 'kırılarak'], ['Ödül havuzu', 'toz · odun · anahtar · şifa'], ['Altın tozu', '%100  ·  3–6  ·  zincirli 8–14'], ['Odun', '%55  ·  1–3'], ['Altın anahtar', '%30  ·  zincirli %22'], ['Bandaj · otlar · yay · cephane', 'şansa bağlı  ·  eşya sayfalarına bak']],
       atks: [
+        ['Ödül havuzu', 'Her sandıktan altın tozu (3–6, zincirliden 8–14) düşer. Bunların yanında şansa bağlı olarak odun, altın anahtar, bandaj ve otlar ile yay / cephane çıkabilir. Zincirli sandıkta taban şanslar daha yüksektir. Ayrıntılı oranlar yukarıdaki listede.', '—', 'toz kesin  ·  gerisi şansa bağlı'],
         ['Kırılma', 'Sandığa her vuruşta gövdeden ya da kapaktan gerçek bir parça kopar ve yere düşer. Yeterli vuruştan sonra sandık dağılır, ganimet havaya fırlar.', '—', 'vuruşla'],
         ['Zincir', 'Zincirli sandık anahtar olmadan açılmaz. Altın anahtarla zincir çözülür; içindeki ganimet daha zengindir.', '—', 'altın anahtar'],
         ['Mimik tehlikesi', 'Zincirsiz sandıkların bir kısmı mimiktir. Vurunca ortaya çıkıp saldırır.', '—', 'şansa bağlı']],
       tips: ['Sandığa vurmadan önce canını kontrol et: mimik olabilir.', 'Zincirli sandık için altın anahtarı sakla.'] },
     { kind: 'cvchest', name: 'Ödül Sandığı', tab: 'Ödül', sub: 'SANDIK  ·  MAĞARA', atkTitle: 'İÇERİK', noplay: true,
       lore: 'Mağaraların derinliğinde saklı, bronz bantlı koyu meşe sandık. Mağara duvarına yaslanmış durur. Normal sandıkla aynı yapıdadır ve aynı şekilde vurularak açılır; ayırt etmek için demir bantları altındır, çevresinde altın bir ışık ve yükselen parıltılar vardır. Son darbede dağılır, ganimet havaya fırlayıp yere saçılır; üzerinden geçerek toplarsın.',
-      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%60 şansla 1'], ['İkinci sandık', 'çok şanslıysan  ·  %2'], ['Açılış', 'vurarak  ·  4 darbe'], ['Altın tozu', '%100  ·  8–20'], ['Altın külçe', '%15  ·  1'], ['Kemik', '%100  ·  2–6'], ['Bandaj / medkit', 'can <%35: %70  ·  <%70: %35  ·  üstü: %10'], ['Şifa iksiri', '%3']],
+      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%60 şansla 1'], ['İkinci sandık', 'çok şanslıysan  ·  %2'], ['Açılış', 'vurarak  ·  4 darbe'], ['Ödül havuzu', 'toz · külçe · kemik · şifa'], ['Altın tozu', '%100  ·  8–20'], ['Altın külçe', '%15  ·  1'], ['Kemik', '%100  ·  2–6'], ['Bandaj / medkit', 'can <%35: %70  ·  <%70: %35  ·  üstü: %10'], ['Şifa iksiri', '%3']],
       atks: [
+        ['Ödül havuzu', 'Altın tozu (8–20) ve kemik (2–6) kesin düşer. Şansa bağlı olarak altın külçe (%15), bandaj ya da medkit (canına göre %10–70) ve çok nadir şifa iksiri (%3) çıkar.', '—', 'toz + kemik kesin  ·  gerisi şansa bağlı'],
         ['Altın', 'Her ödül sandığı 8–20 altın tozu verir. Nadiren bunların yanında bir de altın külçe çıkar.', '—', 'toz 8–20  ·  külçe %15'],
         ['Kemik', 'Her sandıktan 2–6 kemik düşer. Kemikler ileride Craft sisteminde kullanılacak.', '—', '2–6 kemik'],
         ['Duruma uygun eşya', 'Canın düştükçe sağlık eşyası çıkma şansı artar. Bandaj yaygındır, medkit daha nadirdir. Çok düşük şansla şifa iksiri bile çıkabilir.', '—', 'can <%35: %70  ·  <%70: %35  ·  üstü: %10'],
         ['Tek kullanımlık', 'Kırılan sandık yerinde enkaz olarak kalır. Çıkıp girerek yenileyemezsin.', '—', 'bir kez']],
       tips: ['Sandığa yaklaşmadan önce mağaradaki canavarlara dikkat et.', 'Canın azken sandık sana sağlık eşyası verme eğilimindedir.'] },
     { kind: 'cxchest', name: 'Lanetli Sandık', tab: 'Lanet', sub: 'SANDIK  ·  MAĞARA', atkTitle: 'LANET', noplay: true,
-      lore: 'Kara demirden ve kemikten yapılmış, çaprazlama zincirlenmiş bir sandık. Kapağında kuru bir kafatası kilit durur, gözleri yeşil yanar. Vurarak açılmaz: yanına gidip SANDIĞI AÇ düğmesine basarsın (klavyede E) ve çıkan uyarıyı onaylarsın. Kilit çatlar, kapak patlar; içinden değerli ödül saçılır ama lanet seni bulur.',
-      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%40 şansla 1'], ['Açılış', 'AÇ düğmesi + onay'], ['Aldığın hasar', '×2'], ['İyileşme', '×0,5'], ['Verdiğin hasar', '−%33  ·  15 → 10'], ['Lanet süresi', '10 düşman  ·  dünya dahil'], ['Ödül havuzu', 'Mor prizma  ·  %100  ·  4–6']],
+      lore: 'Kara demirden ve kemikten yapılmış, çaprazlama zincirlenmiş bir sandık. Kapağında kuru bir kafatası kilit durur, gözleri yeşil yanar. Vurarak açılmaz: yanına gidip SANDIĞI AÇ düğmesine basarsın (klavyede E) ve kısa uyarıyı onaylarsın; lanetin bedelini ve ödülü ancak sandık açıldıktan sonra öğrenirsin. Kilit çatlar, kapak patlar; içinden değerli ödül saçılır ama lanet seni bulur.',
+      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%40 şansla 1'], ['Açılış', 'AÇ düğmesi + onay'], ['Bilgi kartı', 'sandık açılınca çıkar'], ['Aldığın hasar', '×2'], ['İyileşme', '×0,5'], ['Verdiğin hasar', '−%33  ·  15 → 10'], ['Lanet süresi', '10 düşman  ·  dünya dahil'], ['Ödül havuzu', 'Mor prizma  ·  %100  ·  4–6']],
       atks: [
-        ['Onay', 'Sandığa yaklaşınca SANDIĞI AÇ düğmesi çıkar. Basınca lanetin bedelini gösteren bir pencere açılır; KABUL ET dersen sandık açılır, VAZGEÇ dersen hiçbir şey olmaz. Pencere açıkken sandıktan uzaklaşırsan kapanır.', '—', 'AÇ  ›  KABUL ET'],
+        ['Onay', 'Sandığa yaklaşınca SANDIĞI AÇ düğmesi çıkar. Basınca bedeli söylemeyen kısa bir onay penceresi açılır; AÇ dersen sandık açılır, VAZGEÇ dersen hiçbir şey olmaz. Pencere açıkken sandıktan uzaklaşırsan kapanır. Lanetin etkileri ve ödül, sandık açıldıktan sonra bir bilgi kartında gösterilir (TAMAM ile kapanır).', '—', 'AÇ  ›  bilgi kartı'],
         ['Lanet', 'Aldığın her hasar iki katına çıkar, tüm iyileşmeler (bandaj, medkit, otlar, iksir) yarıya iner, kılıç ve diğer silahlarla verdiğin hasar üçte bir azalır. Ekranın üstünde kafatası rozeti ve ilerleme sayacı görünür, kenarlar yeşile çalar.', '×2 · ×0,5 · −%33', 'hasar · iyileşme · saldırı'],
         ['Kalkması', 'Lanet açıkken kestiğin her düşman sayılır; mağarada ya da dünyada fark etmez. 10. düşmanda lanet duman olup dağılır. Ölürsen lanet silinir. Yeni bir lanetli sandık açarsan sayaç 10\'dan yeniden başlar.', '10 düşman', 'ölümde silinir'],
         ['Ödül havuzu', 'Şimdilik tek ödül mor prizma: 4–6 adet, kesin düşer. İleride daha değerli ödüller ve silahlar eklenecek; liste burada güncellenecek.', '%100', 'mor prizma 4–6']],
