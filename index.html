@@ -188,7 +188,7 @@
     if (MENU.on && PAUSE.on) { pauseDown(e); return; }   // ana menüden açılan kıyafet sayfası
     if (MENU.on) { menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
     if (PAUSE.on) { pauseDown(e); return; }   // duraklatılmışken dokunuşlar yalnızca menüye gider
-    if (curseTapUI(e.clientX, e.clientY)) return;   // lanetli sandık: AÇ düğmesi + onay penceresi
+    if (curseTapUI(e.clientX, e.clientY, e.pointerId)) return;   // lanetli sandık: AÇ düğmesi + onay penceresi
     { const dpz = Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y), dbg = bagHit(e.clientX, e.clientY), rh = AU.btn.r * HUD_S + 14; if (dbg < rh && dbg < dpz) { openBag(); return; } if (dpz < rh) { togglePause(); return; } }   // çanta / duraklatma düğmesi (yakın olan)
     { const hs = hotbarAt(e.clientX, e.clientY); if (hs) { hotbarDown(hs, e); return; } }   // hızlı slot çubuğu
     if (RAD.id === null && SWB.v > 0.6 && Math.hypot(e.clientX - SWB.x, e.clientY - SWB.y) < SWB.r + 12) { RAD.id = e.pointerId; RAD.t = 0; RAD.on = false; RAD.sel = null; RAD.px = e.clientX; RAD.py = e.clientY; try { e.target.setPointerCapture(e.pointerId); } catch (_) {} return; }   // alet düğmesi: kısa dokun = takas · basılı tut = radyal seçim
@@ -272,7 +272,7 @@
     const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
     const sT = t => Math.max(+t || 0, ac ? ac.currentTime : 0, 0.001);   // ses zamanı hiçbir koşulda 0 / negatif / geçmiş olamaz (iOS'ta AudioContext saati ilk anlarda 0'da kalabilir → 'startTime must be a positive value')
     const C_SND = 1500;            // oyun içi 'ses hızı' (px/sn): Doppler kayması net duyulsun diye düşük tutuldu
-    let ambBus = null, windF, windG, crkG, musTL, tod = 1, hr = 8, lastDay = null; const ambT = { bird: 1.5, owl: 7, wolf: 25 };   // ortam sesleri · tod: gün ışığı (0 gece – 1 gündüz) · hr: oyun saati
+    let wRumG, wRumF, wHowlG, wHowlF1, wHowlF2, wRusG, wRusF, wPan, wCreak = 3, wBurst = 4; let ambBus = null, windF, windG, crkG, musTL, tod = 1, hr = 8, lastDay = null; const ambT = { bird: 1.5, owl: 7, wolf: 25 };   // ortam sesleri · tod: gün ışığı (0 gece – 1 gündüz) · hr: oyun saati
     const MV = 0.4, SVL = 0.85;  // müzik / efekt seviyesi
     const VOL = { mus: 1, sfx: 1 }; let musRev = null, cvK = 0, cvRevIn = null, cvDuck = null, cvMusG = null, cvNb = null, cvNx = 0, cvFr = 0; const cvSt = new Map();   // oyuncunun duraklatma menüsünden ayarladığı çarpanlar (0–1)
     try { const j = JSON.parse(localStorage.getItem('hlk_vol') || 'null'); if (j) for (const k of ['mus', 'sfx']) { const v = parseFloat(j[k]); if (isFinite(v)) VOL[k] = Math.min(1, Math.max(0, v)); } } catch (_) {}
@@ -380,6 +380,7 @@
       chestHit(d, t, h) { tone(d, 'sine', 150, 60, t, 0.14, 0.8); nz(d, t, 0.12, 0.7, 'bandpass', 900, 300, 1.2); nz(d, t, 0.05, 0.4, 'highpass', 2400, 2400, 0.7); tone(d, 'triangle', 520 + (h || 0) * 60, 260, t, 0.09, 0.2); [1900, 2500].forEach((f, i) => tone(d, 'sine', f, f * 0.99, t + 0.01 + i * 0.02, 0.25, 0.06)); },
       chestBreak(d, t) { tone(d, 'sine', 110, 38, t, 0.5, 1.0); nz(d, t, 0.45, 0.9, 'lowpass', 2800, 200, 0.8); for (let i = 0; i < 7; i++) nz(d, t + 0.02 + i * 0.045 + Math.random() * 0.03, 0.06, 0.45, 'bandpass', 500 + Math.random() * 1800, 350, 2.5); [1568, 2093, 2637, 3136].forEach((f, i) => tone(d, 'sine', f, f, t + 0.08 + i * 0.06, 0.6, 0.1)); },
       curseOn(d, t) { tone(d, 'sine', 95, 30, t, 1.2, 0.9); tone(d, 'triangle', 233, 220, t, 0.9, 0.16); tone(d, 'triangle', 247, 233, t + 0.02, 0.9, 0.16); nz(d, t, 0.9, 0.6, 'lowpass', 1800, 120, 0.9); },
+      lidCreak(d, t) { tone(d, 'sawtooth', 130, 230, t, 0.38, 0.09, { lp: 900 }); tone(d, 'sawtooth', 240, 120, t + 0.32, 0.4, 0.07, { lp: 700 }); nz(d, t, 0.7, 0.1, 'bandpass', 700, 1400, 0.6); },
       curseEnd(d, t) { [392, 523, 659, 784].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.07, 0.8, 0.12)); nz(d, t, 0.5, 0.22, 'highpass', 3000, 6000, 0.7); },
       axeRaise(d, t, w) { w = w || 0.27; nz(d, t, w + 0.05, 0.22, 'bandpass', 260, 800, 1.2, 0.12); tone(d, 'sine', 120, 210, t, w + 0.03, 0.1); nz(d, t + w, 0.14, 0.4, 'bandpass', 2600, 500, 1.1, 0.03); },
       axeYank(d, t) { tone(d, 'sawtooth', 210, 110, t, 0.2, 0.09, { lp: 700, vib: [30, 10] }); nz(d, t, 0.14, 0.4, 'bandpass', 900, 320, 1.6); tone(d, 'sine', 150, 80, t + 0.12, 0.08, 0.3); },
@@ -437,6 +438,8 @@
       },
       keyGet(d, t) { [880, 1318.5, 1760, 2637].forEach((f, i) => tone(d, 'triangle', f, f, t + i * 0.06, 0.9, 0.14)); nz(d, t, 0.5, 0.3, 'highpass', 4000, 9000, 0.8, 0.03); },
       pickup(d, t) { nz(d, t, 0.4, 0.35, 'highpass', 3500, 9000, 0.8, 0.03); [1318.5, 1760, 2093, 2637].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.07, 0.8, 0.14)); },
+      torchOut(d, t) { nz(d, t, 0.75, 0.55, 'bandpass', 4200, 1300, 0.9); nz(d, t + 0.1, 0.55, 0.22, 'highpass', 5200, 2600, 0.8); nz(d, t, 0.2, 0.55, 'lowpass', 900, 180, 0.7); tone(d, 'sine', 220, 70, t, 0.17, 0.4); [0.16, 0.27, 0.41].forEach((o, i) => nz(d, t + o, 0.03, 0.3 - i * 0.07, 'bandpass', 2800 + i * 700, 2400, 3)); },   // fısss: alev bastırılır, kor çıtırdayıp söner
+      leafBurst(d, t, w) { w = Math.min(1.4, w || 0.8); const dur = 0.35 + 0.35 * Math.random(); nz(d, t, dur, 0.1 + 0.14 * w, 'bandpass', 2600 + 1500 * Math.random(), 6500, 0.6, dur * 0.35); nz(d, t + 0.05, dur * 0.8, 0.07 + 0.08 * w, 'highpass', 5200, 7800, 0.7, dur * 0.3); },   // yaprak kümesi savrulur
       sheath(d, t) { nz(d, t, 0.05, 0.4, 'bandpass', 3200, 2500, 2); tone(d, 'sine', 900, 500, t, 0.06, 0.25); },
       unsheath(d, t) { nz(d, t, 0.22, 0.3, 'highpass', 2500, 7000, 0.8, 0.02); tone(d, 'sine', 1800, 2600, t, 0.2, 0.05); },
       /* yay sesleri */
@@ -692,10 +695,22 @@
       const ws = ac.createBufferSource(); ws.buffer = noiseBuf; ws.loop = true;
       windF = ac.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 700; windF.Q.value = 0.7; windG = ac.createGain(); windG.gain.value = 0.05;
       const wl = ac.createOscillator(), wlg = ac.createGain(), wl2 = ac.createOscillator(), wlg2 = ac.createGain();
-      wl.frequency.value = 0.09; wlg.gain.value = 0.03; wl.connect(wlg); wlg.connect(windG.gain);   // esen / dinen rüzgâr
+      wl.frequency.value = 0.09; wlg.gain.value = 0.004; wl.connect(wlg); wlg.connect(windG.gain);   // esen / dinen rüzgâr
       wl2.frequency.value = 0.05; wlg2.gain.value = 260; wl2.connect(wlg2); wlg2.connect(windF.frequency);   // rüzgârın tınısı yavaşça gezinir
       ws.connect(windF); windF.connect(windG); windG.connect(ambBus); ws.start(); wl.start(); wl2.start();
       crkG = ac.createGain(); crkG.gain.value = 0; crkG.connect(ambBus);
+      // ---- şiddete duyarlı rüzgâr katmanları: alçak gümleme · ıslık / uğultu · yaprak hışırtısı (hepsi başta sessiz, updAmb şiddete göre açar)
+      wPan = ac.createStereoPanner ? ac.createStereoPanner() : ac.createGain(); wPan.connect(ambBus);
+      { const bl = ac.sampleRate * 3, bb = ac.createBuffer(1, bl, ac.sampleRate), bd = bb.getChannelData(0); let b = 0; for (let i = 0; i < bl; i++) { b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02; bd[i] = b * 3.6; } for (let i = 0; i < 4800; i++) bd[bl - 1 - i] *= i / 4800;   // kahverengi gürültü (derin gümleme)
+        const rs = ac.createBufferSource(); rs.buffer = bb; rs.loop = true; wRumF = ac.createBiquadFilter(); wRumF.type = 'lowpass'; wRumF.frequency.value = 160; wRumF.Q.value = 0.6; wRumG = ac.createGain(); wRumG.gain.value = 0;
+        const rl = ac.createOscillator(), rlg = ac.createGain(); rl.frequency.value = 0.37; rlg.gain.value = 50; rl.connect(rlg); rlg.connect(wRumF.frequency); rl.start();
+        rs.connect(wRumF); wRumF.connect(wRumG); wRumG.connect(wPan); rs.start(); }
+      { const hs = ac.createBufferSource(); hs.buffer = noiseBuf; hs.loop = true; wHowlF1 = ac.createBiquadFilter(); wHowlF2 = ac.createBiquadFilter(); wHowlF1.type = wHowlF2.type = 'bandpass'; wHowlF1.Q.value = 1.6; wHowlF2.Q.value = 1.2; wHowlF1.frequency.value = 520; wHowlF2.frequency.value = 860; wHowlG = ac.createGain(); wHowlG.gain.value = 0;
+        const hl = ac.createOscillator(), hlg = ac.createGain(), hl2 = ac.createOscillator(), hlg2 = ac.createGain(); hl.frequency.value = 0.31; hlg.gain.value = 90; hl2.frequency.value = 0.83; hlg2.gain.value = 55; hl.connect(hlg); hl2.connect(hlg2); hlg.connect(wHowlF1.frequency); hlg2.connect(wHowlF1.frequency); hlg.connect(wHowlF2.frequency); hlg2.connect(wHowlF2.frequency); hl.start(); hl2.start();
+        hs.connect(wHowlF1); hs.connect(wHowlF2); wHowlF1.connect(wHowlG); wHowlF2.connect(wHowlG); wHowlG.connect(wPan); hs.start(0, 0.7); }
+      { const ss = ac.createBufferSource(); ss.buffer = noiseBuf; ss.loop = true; const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400; wRusF = ac.createBiquadFilter(); wRusF.type = 'bandpass'; wRusF.frequency.value = 4800; wRusF.Q.value = 0.55; const am = ac.createGain(); am.gain.value = 0.55; wRusG = ac.createGain(); wRusG.gain.value = 0;
+        const a1 = ac.createOscillator(), a1g = ac.createGain(), a2 = ac.createOscillator(), a2g = ac.createGain(); a1.frequency.value = 6.3; a1g.gain.value = 0.28; a2.frequency.value = 10.7; a2g.gain.value = 0.17; a1.connect(a1g); a2.connect(a2g); a1g.connect(am.gain); a2g.connect(am.gain); a1.start(); a2.start();   // hışırtı: iki hızlı titreşim üst üste
+        ss.connect(hp); hp.connect(wRusF); wRusF.connect(am); am.connect(wRusG); wRusG.connect(wPan); ss.start(0, 1.1); }
       // cırcır böcekleri kaldırıldı (gece sesi: baykuş, kurt, derin rüzgâr)
     }
     function setTime(f, silent) {   // oyun saatini sese bildirir; gün doğarken / batarken tek bir işaret sesi çalar (silent: geçiş animasyonu kendi sesini çalar)
@@ -707,12 +722,17 @@
       if (!ambBus) return;
       const t = ac.currentTime, nm = 1 - tod, qa = clamp((t - quietUntil) / 3, 0, 1);
       ambBus.gain.setTargetAtTime(qa * (1 - 0.5 * mus.alert) * (1 - cvK), t, 0.5);   // çatışmada ortam geri çekilir
-      windF.frequency.setTargetAtTime(lerp(360, 800, tod), t, 1); windG.gain.setTargetAtTime(lerp(0.08, 0.035, tod), t, 1);   // gece: derin, kalın rüzgâr · gündüz: hafif esinti
+      { const wx = Math.min(1.4, window.WINDX || 0), g1 = sstep(0.1, 1.2, wx), gr = sstep(0.4, 1.3, wx);   // rüzgâr yalnızca esince duyulur: durgun havada tam sessizlik · yumuşak, tonsuz, çok yavaş geçişli
+        windF.frequency.setTargetAtTime(260 + 520 * wx, t, 1.2); windG.gain.setTargetAtTime((0.004 + 0.062 * Math.pow(g1, 1.15)) * lerp(1.25, 1, tod), t, 1.2);
+        if (wRumG) { wRumG.gain.setTargetAtTime(0.1 * Math.pow(gr, 1.5), t, 1.4); wHowlG.gain.setTargetAtTime(0, t, 0.5); wRusG.gain.setTargetAtTime(0.045 * sstep(0.3, 1, wx) * (0.5 + 0.5 * tod), t, 1.2); wRusF.frequency.setTargetAtTime(2600 + 1200 * wx, t, 1.2);
+          if (wPan.pan) wPan.pan.setTargetAtTime(clamp((window.WINDDX || 0) * 0.2 * Math.sin(t * 0.15), -0.4, 0.4), t, 1.5); } }
       crkG.gain.setTargetAtTime(0, t, 1.5);   // cırcır böcekleri kapalı
       if (musTL) musTL.frequency.setTargetAtTime(lerp(2500, 5800, tod), t, 1.2);   // müzik: gece loş / yumuşak, gündüz parlak
       if (musRev) musRev.gain.setTargetAtTime((0.38 + 0.22 * nm) * VOL.mus, t, 1);   // gece müzik daha yankılı / uzak
       if (qa < 1 || muted || cvK > 0.05) return;
-      const birdW = sstep(0.2, 0.75, tod), dawn = hr >= 4.5 && hr < 9.5;
+      { const wx = Math.min(1.4, window.WINDX || 0);   // sert rüzgârda ağaç gıcırtısı ve yaprak savrulması
+        if (wx > 0.95 && (wBurst -= dt) <= 0) { wBurst = rnd(4, 9); sfx('leafBurst', undefined, undefined, 0.4); } }
+      const birdW = sstep(0.2, 0.75, tod) * (1 - 0.6 * sstep(0.5, 1.1, Math.min(1.4, window.WINDX || 0))), dawn = hr >= 4.5 && hr < 9.5;   // sert rüzgârda kuşlar susar
       if (birdW > 0.05 && (ambT.bird -= dt) <= 0) { ambT.bird = rnd(1.3, 4.2) / (0.5 + birdW * 0.8) * (dawn ? 0.55 : 1); if (Math.random() < birdW + 0.15) { birdCall(rnd(-0.85, 0.85), 0); if (Math.random() < 0.45) birdCall(rnd(-0.85, 0.85), rnd(0.25, 0.9)); } }   // şafakta kuş korosu daha sık
       if (nm > 0.55 && (ambT.owl -= dt) <= 0) { ambT.owl = rnd(8, 19); owl(rnd(-0.9, 0.9)); }
       if (nm > 0.8 && (ambT.wolf -= dt) <= 0) { ambT.wolf = rnd(45, 95); wolf(rnd(-0.7, 0.7)); }
@@ -1726,7 +1746,7 @@
     { id: 'sifa', name: 'Şifalı Eller', cost: 2, desc: 'Sağlık ekipmanları kalıcı olarak %25 daha güçlü iyileştirir: bandaj %10 yerine %12,5, medkit %50 yerine %62,5 can yeniler. Şifa Hilali de aynı oranda güçlenir.', buff: { healMul: 1.25 }, cls: 'hero', req: [], ico: 'heal' },
     { id: 'hisim', name: 'Kor Hışım', cost: 2, desc: 'Verdiğin hasar %20 artar (kılıç, ok, bomba, ışın). Yan etki olarak dayanıklılık %6 daha hızlı yenilenir, siper ve prizma ışını %5 daha az yorar.', buff: { dmgDealt: 1.2, stamRegen: 1.06, stamCost: 0.95 }, cls: 'hero', req: [], ico: 'dmg' }
   ];   // yeni beceri eklemek için buraya bir kayıt + ağaçtaki düğüm konumu yeterli · cls: 'hero' (Halaskar) | 'sword' (Kılıç) | 'bow' (Yay) · req: önce açık olması gereken becerilerin id'leri (Güçlendirmeler sayfasında bağlantı çizgisi olarak görünür; sınıflar arası da olabilir)
-  const CURSE = { on: false, kills: 0, need: 10, t: 0, fl: 0, vg: 0, pulse: 0, done: 0, ask: null, av: 0, bv: 0, nr: null, p: [], info: null, iv: 0 }, CURSE_M = { dmgTaken: 2, healMul: 0.5, dmgDealt: 2 / 3 };   // lanet: alınan hasar ×2 · iyileşme ×0,5 · verilen hasar ×⅔ (15 → 10)
+  const CURSE = { on: false, kills: 0, need: 10, t: 0, fl: 0, vg: 0, pulse: 0, done: 0, ask: null, av: 0, bv: 0, nr: null, p: [], info: null, iv: 0, hp: 0, hid: null, hk: false }, CURSE_M = { dmgTaken: 2, healMul: 0.5, dmgDealt: 2 / 3 };   // lanet: alınan hasar ×2 · iyileşme ×0,5 · verilen hasar ×⅔ (15 → 10)
   const skM = n => { let m = 1; for (const q of SKILLS) if (SK.own[q.id] && q.buff[n] !== undefined) m *= q.buff[n]; if (CURSE.on && CURSE_M[n]) m *= CURSE_M[n]; return m; };   // beceri çarpanları (gearM ile birlikte okunur)
   const skSpent = () => SKILLS.reduce((a, q) => a + (SK.own[q.id] ? q.cost : 0), 0);
   function skReset() { SK.pts = 0; SK.own = {}; SK.sel = 0; SK.flash = 0; SK.msg = ''; SK.mt = 0; SK.fx = []; SK.gl = SK.pgl = 0; }
@@ -2386,7 +2406,7 @@
   function updateHero(dt) {
     dt = Math.max(dt, 1e-4);
     const H = hero, P = H.P, vx = player.vx, vy = player.vy, sp = Math.hypot(vx, vy);
-    H.time += dt; H.sp = sp;
+    H.time += dt; H.sp = sp; H.wb = (H.wb || 0) + ((WIND.h || 0) - (H.wb || 0)) * dmp(6, dt);   // wb: karşı rüzgârda zorlanma (poz)
     // yön: yumuşak dönüş
     if (sp > 14 && !bowAimOn()) { const d = wrap(player.angle - H.face) * dmp(11, dt); H.face += d; H.turn += (d / dt - H.turn) * dmp(10, dt); }
     else H.turn -= H.turn * dmp(10, dt);
@@ -2394,10 +2414,10 @@
     H.run += (sstep(108, 152, sp) - H.run) * dmp(9, dt);    // 0 yürüyüş → 1 koşu
     const mv = H.move, rn = H.run, idle = 1 - mv, sp01 = clamp(sp / SPEED, 0, 1), f = H.face, c = Math.cos(f), s = Math.sin(f);
     // adım temposu (yürüyüş ~1 Hz, koşu ~1.5-2 Hz)
-    H.phase += dt * TAU * lerp(0.8 + 0.25 * clamp(sp / 115, 0, 1), 1.5 + 0.45 * clamp((sp - 130) / 100, 0, 1), rn);
+    H.phase += dt * TAU * (1 - 0.28 * (H.wb || 0)) * lerp(0.8 + 0.25 * clamp(sp / 115, 0, 1), 1.5 + 0.45 * clamp((sp - 130) / 100, 0, 1), rn);
     // yorgunluk: hızlı koşu biriktirir, yürümek/durmak toparlar
     const ri = sstep(110, 215, sp);
-    H.fat = clamp(H.fat + (ri > 0.02 ? TIRE_RISE * ri : mv > 0.5 ? -REC_WALK : -REC_IDLE) * dt, 0, 1);
+    H.fat = clamp(H.fat + (ri > 0.02 ? TIRE_RISE * ri : mv > 0.5 ? -REC_WALK : -REC_IDLE) * dt + 0.05 * (WIND.h || 0) * dt, 0, 1);   // karşı rüzgâr yorar
     const fat = H.fat;
     // nefes
     const need = Math.max(fat, 0.3 * rn + 0.1 * mv);
@@ -2448,10 +2468,10 @@
     P.h = rn * mv * 0.5 * (1 - Math.cos(2 * ph));
     P.sc = 1 + 0.045 * P.h + 0.012 * (1 - rn) * mv * 0.5 * (1 + Math.cos(2 * ph));
     P.sw = sw; P.Bn = Bn; P.fall = fall;
-    const cf = Math.cos(f), sf = Math.sin(f), v = Math.abs(cf), lean = H.lx * 0.55 + H.hunch * 1.3 + H.jolt * 1.2 + 0.3 * Bn * idle + F.lunge * 1.8 - F.wind * 1.3 - flin * 1.6 + kneel * 0.8;
+    const cf = Math.cos(f), sf = Math.sin(f), v = Math.abs(cf), lean = H.lx * 0.55 + H.hunch * 1.3 + H.jolt * 1.2 + 0.3 * Bn * idle + F.lunge * 1.8 - F.wind * 1.3 - flin * 1.6 + kneel * 0.8 + (H.wb || 0) * 1.9;
     P.v = v; P.sg = cf < 0 ? -1 : 1; H.rd = [-cf, -sf * 0.8];
     P.up = P.h * 2.2 + (1 - rn) * mv * 0.8 * (0.5 + 0.5 * Math.cos(2 * ph));
-    P.drop = H.hunch * 3.4 + H.jolt * 1.6 + H.knee * 2 + G.bump * 2.6 + F.drop + F.wind * 1.4 + Math.sin(PI * G.sh) * 1.2 + Math.sin(PI * G.hw) * 1.4 + flin * 2 + kneel * 8;
+    P.drop = H.hunch * 3.4 + H.jolt * 1.6 + H.knee * 2 + G.bump * 2.6 + F.drop + F.wind * 1.4 + Math.sin(PI * G.sh) * 1.2 + Math.sin(PI * G.hw) * 1.4 + flin * 2 + kneel * 8 + (H.wb || 0) * 2.2;
     P.lx = lean * 0.8 * v;
     P.sway = (H.ly + sw * 0.9 + 0.55 * Math.sin(ph) * mv * (1 + rn)) * (1 - v) * P.sg;
     P.tw = lerp(15, 9.5, v) * (1 + 0.03 * Bn); P.th = 17.1 * (1 + 0.04 * Bn) - P.drop * 0.6;
@@ -2750,7 +2770,7 @@
     ctx.beginPath(); ctx.arc(hx, hy, 5.4, 0, TAU); ctx.fill(); ctx.fillStyle = col;
     ctx.fillStyle = bg;
     const dead = F.dp > 0.25, pain = dead ? 0 : sstep(0, 0.22, F.wince), tired = sstep(0.45, 0.9, H.fat) * (1 - 0.5 * F.gw);
-    const shut = !dead && pain < 0.05 && (cw > 0.3 || F.squint || H.time % 3.7 < 0.12 || H.time % 5.3 < 0.1);
+    const shut = !dead && pain < 0.05 && (cw > 0.3 || F.squint || (H.wb || 0) > 0.4 || H.time % 3.7 < 0.12 || H.time % 5.3 < 0.1);
     ctx.fillStyle = bg;
     const eye = (x, y, sd, w, h) => {
       ctx.strokeStyle = bg;
@@ -3342,9 +3362,9 @@
   }
   function drawCaveAtmo(dt) {   // mağara karanlığı: ateş çanakları, elde meşale ve merdivenden sızan gün ışığı karartıyı açar
     ATM.t += dt; const t = ATM.t, z = ZOOM; LT.length = 0;
-    if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R, a: TORCH.lit, k: TORCH.lit * TORCH.str });
-    { const cg = CV.c ? cvGeo(CV.c) : null; if (cg) for (const T of cg.tor) { if (Math.abs(T.x - (player.x - CVO.x)) > 900 || Math.abs(T.ly - (player.y - CVO.y)) > 700) continue; const fk = 0.95 + 0.05 * Math.sin(t * 9 + T.ph * 3) * Math.sin(t * 5.3 + T.ph); LT.push({ x: CVO.x + T.x, y: CVO.y + T.ly, R: CAMP_LR * 0.8 * fk, a: 1, k: 1 }); } }
-    if (CV.c) for (const ch of cvChests(CV.c)) { const cs = chState(ch.id, false), k = cs.dead ? Math.max(0, 1 - cs.dd / 3) : cs.dying >= 0 ? 1 : 0.35 + 0.12 * cs.hits; if (cs.gone) continue; LT.push({ x: CVO.x + ch.lx, y: CVO.y + ch.ly - 24, R: 120 + 90 * k + 10 * Math.sin(t * 2.2 + cs.t), a: 1, k: 0.45 + 0.5 * k }); }   // ödül sandığı kendi altın ışığını yayar: vurdukça, kırılırken parlar
+    if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R * TORCH.fk, a: TORCH.lit, k: TORCH.lit * TORCH.str });
+    { const cg = CV.c ? cvGeo(CV.c) : null; if (cg) for (const T of cg.tor) { if (Math.abs(T.x - (player.x - CVO.x)) > 900 || Math.abs(T.ly - (player.y - CVO.y)) > 700) continue; const fk = 0.95 + 0.05 * Math.sin(t * 9 + T.ph * 3) * Math.sin(t * 5.3 + T.ph) - 0.07 * WIND.s * (0.5 + 0.5 * Math.sin(t * 14 + T.ph * 5)); LT.push({ x: CVO.x + T.x, y: CVO.y + T.ly, R: CAMP_LR * 0.8 * fk, a: 1, k: 1 }); } }
+    if (CV.c) for (const ch of cvChests(CV.c)) { const cs = chState(ch.id, false), k = cs.curse && cs.cop >= 0.8 ? 0.15 + 0.85 * (1 - sstep(4, 10, cs.cop - 0.8)) : cs.dead ? Math.max(0, 1 - cs.dd / 3) : cs.dying >= 0 ? 1 : 0.35 + 0.12 * cs.hits; if (cs.gone) continue; LT.push({ x: CVO.x + ch.lx, y: CVO.y + ch.ly - 24, R: 120 + 90 * k + 10 * Math.sin(t * 2.2 + cs.t), a: 1, k: 0.45 + 0.5 * k }); }   // ödül sandığı kendi altın ışığını yayar: vurdukça, kırılırken parlar
     LT.push({ x: CVO.x, y: CVO.y + 10, R: 220, a: 0.9, k: 0.9 });
     ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     const sw = Math.ceil(W / 4), sh = Math.ceil(H / 4); if (!ATM.dk) { ATM.dk = document.createElement('canvas'); ATM.dkx = ATM.dk.getContext('2d'); } if (ATM.dk.width !== sw || ATM.dk.height !== sh) { ATM.dk.width = sw; ATM.dk.height = sh; }
@@ -3820,13 +3840,14 @@
 
   /* ---------- HARABE KAMP: koruması bozulmuş, yıkılmış eski kamp. Güvenli değil (mühür yok, düşman doğar). Aynı düzen, ama kırık-yırtık eşyalar; bazılarında bir nesne hâlâ yanıyor ---------- */
   function drawFlameBlob(x, y, w, h, t, sd) {   // yanan nesnenin üstünde alev + kor + duman
-    ctx.save(); ctx.translate(x, y); const k = 0.8 + 0.2 * Math.sin(t * 9 + sd * 7), gr = w * 2.2 + h;
+    ctx.save(); ctx.translate(x, y); const wl = WIND.s * WIND.dx * (0.85 + 0.3 * Math.sin(t * 0.9 + sd * 4)), k = 0.8 + 0.2 * Math.sin(t * 9 + sd * 7), gr = w * 2.2 + h;   // rüzgâr (mağarada hafif cereyan) alevi yatırır
+   
     const g = ctx.createRadialGradient(0, -h * 0.4, 2, 0, -h * 0.4, gr); g.addColorStop(0, `rgba(${GOLDRGB},${0.34 * k})`); g.addColorStop(1, `rgba(${GOLDRGB},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -h * 0.4, gr, 0, TAU); ctx.fill();
     for (let j = -1; j <= 1; j++) {
-      const cx0 = j * w * 0.55, hj = h * (0.62 + 0.38 * Math.sin(t * (8 + j * 2) + sd * 5 + j)), ww = w * (j ? 0.5 : 0.7), sh = Math.sin(t * 5 + j + sd) * 2.2;
+      const cx0 = j * w * 0.55, hj = h * (0.62 + 0.38 * Math.sin(t * (8 + j * 2) + sd * 5 + j)) * (1 - 0.14 * Math.abs(wl) + 0.1 * WIND.s * Math.sin(t * 23 + j * 2 + sd)), ww = w * (j ? 0.5 : 0.7), sh = Math.sin(t * 5 + j + sd) * 2.2 + wl * h * 0.28 * (0.8 + 0.2 * Math.sin(t * 6 + j + sd * 3));
       for (const [sc, col] of [[1, '#e8a43a'], [0.66, '#f0c24a'], [0.34, '#fff1c4']]) { ctx.beginPath(); ctx.moveTo(cx0 - ww * sc, 0); ctx.quadraticCurveTo(cx0 - ww * sc * 1.15, -hj * sc * 0.55, cx0 + sh * sc, -hj * sc); ctx.quadraticCurveTo(cx0 + ww * sc * 1.15, -hj * sc * 0.55, cx0 + ww * sc, 0); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); }
     }
-    for (let i = 0; i < 7; i++) { const ph = (t * 0.5 + i / 7 + hashN(i, sd * 9, 3)) % 1, a = Math.sin(PI * ph); ctx.fillStyle = `rgba(${GOLDRGB},${0.85 * a})`; ctx.beginPath(); ctx.arc(Math.sin(i * 6.1 + t * 1.3) * (w + ph * 10), -h * 0.6 - ph * (h + 40), 1.2 * (1 - ph * 0.5), 0, TAU); ctx.fill(); }   // kıvılcımlar
+    for (let i = 0; i < 7; i++) { const ph = (t * 0.5 + i / 7 + hashN(i, sd * 9, 3)) % 1, a = Math.sin(PI * ph); ctx.fillStyle = `rgba(${GOLDRGB},${0.85 * a})`; ctx.beginPath(); ctx.arc(Math.sin(i * 6.1 + t * 1.3) * (w + ph * 10) + wl * ph * 22, -h * 0.6 - ph * (h + 40), 1.2 * (1 - ph * 0.5), 0, TAU); ctx.fill(); }   // kıvılcımlar
     ctx.restore();
   }
   function drawSmoke(x, y, h, t, sd, fg, n) {   // yükselen koyu duman sütunu
@@ -4343,7 +4364,12 @@
   function collideChests() {
     chestsIn(player.x - 90, player.y - 90, player.x + 90, player.y + 90).forEach(([cx, cy, id, lk]) => {
       if (chState(id, lk).dead) return;
-      const rx = 19 * CHS + 5, ry = 7 * CHS + 4, nx = (player.x - cx) / rx, ny = (player.y - (cy + 3)) / ry, d = Math.hypot(nx, ny);
+      const rx = 19 * CHS + 5, ry = 7 * CHS + 4;
+      if (CV.in && id.startsWith('cb')) {   // mağara sandığı duvara yaslıdır: çarpışma duvara kadar uzanan dikdörtgen · arkasından geçilemez, yandan / önden itilir
+        const L = cx - rx, R = cx + rx, B = cy + 3 + ry; if (player.x > L && player.x < R && player.y > cy - 60 && player.y < B) { const dl = player.x - L, dr = R - player.x, dd = B - player.y; if (dd <= dl && dd <= dr) player.y = B; else if (dl < dr) player.x = L; else player.x = R; }
+        return;
+      }
+      const nx = (player.x - cx) / rx, ny = (player.y - (cy + 3)) / ry, d = Math.hypot(nx, ny);
       if (d < 1) { const q = d || 0.001; player.x = cx + nx / q * rx; player.y = cy + 3 + (d ? ny / q : 1) * ry; }
     });
   }
@@ -4560,7 +4586,8 @@
        son darbede çıtırdar, devrilir, yere çarpınca kütükler (Odun) saçılır ve geriye kütük kalır. Dünya tohumdan üretilir; yalnızca vurulan ağaçların durumu tutulur. ---------- */
   const TC = 170, TREE_HITS = 5, TREE_HP = TREE_HITS * 20, WOOD_CAP = 40, MOSS_CAP = 12;
   const TST = new Map(), treeCache = new Map(), LV = [], TP = [];   // TST: vurulan ağaçların durumu · LV: yapraklar · TP: kabuk / kıymık parçaları
-  const treeVar = (x, y) => ({ sd: hashN(x | 0, y | 0, 66), sc: 0.86 + 0.3 * hashN(x | 0, y | 0, 67), pine: hashN(x | 0, y | 0, 68) < 0.6, moss: hashN(x | 0, y | 0, 69) < 0.32 });   // moss: gövdesi yosun kaplı ağaç (~%32)
+  let TV_OVR = null;   // Rehber önizlemesi: ağaç türünü sabitler (null = dünya tohumundan)
+  const treeVar = (x, y) => TV_OVR || ({ sd: hashN(x | 0, y | 0, 66), sc: 0.86 + 0.3 * hashN(x | 0, y | 0, 67), sp: (r => r < 0.45 ? 0 : r < 0.67 ? 1 : r < 0.87 ? 2 : 3)(hashN(x | 0, y | 0, 68)), vi: Math.floor(hashN(x | 0, y | 0, 64) * 5), pine: hashN(x | 0, y | 0, 68) < 0.45, moss: hashN(x | 0, y | 0, 69) < 0.32 });   // moss: gövdesi yosun kaplı ağaç (~%32)
   const chestNear = (x, y, r) => chestsIn(x - r, y - r, x + r, y + r).length > 0;
   function treesIn(x0, y0, x1, y1) {
     if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
@@ -4601,13 +4628,13 @@
   }
   /* ----- parçacıklar ----- */
   const tchip = (x, y, vx, vy, gy, sz, c) => { if (TP.length < 70) TP.push({ x, y, vx, vy, gy, s: sz, c, r: rnd(0, TAU), vr: rnd(-10, 10), t: 0, life: rnd(2.4, 3.6), b: 0, rest: false }); };   // c: 0 kabuk · 1 taze odun
-  const leafFx = (x, y, n, sp, spread, gy) => { for (let i = 0; i < n && LV.length < 190; i++) LV.push({ x: x + rnd(-spread, spread), y: y + rnd(-spread * 0.6, spread * 0.6), vx: rnd(-sp, sp), vy: rnd(-sp * 0.5, sp * 0.25), gy: gy + rnd(-4, 12), r: rnd(0, TAU), vr: rnd(-7, 7), s: rnd(1.5, 2.8), c: (Math.random() * 3) | 0, ph: rnd(0, 6.28), t: 0, life: rnd(4, 6.5), rest: false }); };
+  const leafFx = (x, y, n, sp, spread, gy, spc) => { for (let i = 0; i < n && LV.length < 190; i++) LV.push({ x: x + rnd(-spread, spread), y: y + rnd(-spread * 0.6, spread * 0.6), vx: rnd(-sp, sp), vy: rnd(-sp * 0.5, sp * 0.25), gy: gy + rnd(-4, 12), r: rnd(0, TAU), vr: rnd(-7, 7), s: rnd(1.5, 2.8), c: (Math.random() * 3) | 0, sp: spc === undefined ? 1 : spc, ph: rnd(0, 6.28), t: 0, life: rnd(4, 6.5), rest: false }); };
   const mossFx = (x, y, n, d, gy) => { for (let i = 0; i < n && LV.length < 190; i++) LV.push({ x: x + rnd(-4, 4), y: y + rnd(-6, 6), vx: d * rnd(5, 45) + rnd(-18, 18), vy: -rnd(5, 50), gy: gy + rnd(-4, 8), r: rnd(0, TAU), vr: rnd(-4, 4), s: rnd(0.9, 1.5), c: 4, ph: rnd(0, 6.28), t: 0, life: rnd(2.6, 4.2), rest: false }); };   // yosun kırıntısı: hafif, süzülerek düşer
   const sawdust = (x, y, n, d, gy) => { for (let i = 0; i < n && LV.length < 190; i++) LV.push({ x: x + rnd(-3, 3), y: y + rnd(-5, 5), vx: d * rnd(20, 100) + rnd(-20, 20), vy: -rnd(30, 110), gy: gy + rnd(-4, 8), r: rnd(0, TAU), vr: rnd(-5, 5), s: rnd(0.8, 1.3), c: 3, ph: rnd(0, 6.28), t: 0, life: rnd(2, 3.6), rest: false }); };   // talaş: hafif, süzülerek düşer
   function updateTreeFx(dt) {
     for (let i = LV.length - 1; i >= 0; i--) {   // yapraklar: süzülür, sallanır, yere konar, solar
       const p = LV[i]; if ((p.t += dt) > p.life) { LV.splice(i, 1); continue; } if (p.rest) continue;
-      p.vy = Math.min(p.vy + 140 * dt, 62); p.vx += Math.sin(p.t * 6 + p.ph) * 90 * dt; p.vx *= 1 - 1.4 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
+      p.vy = Math.min(p.vy + 140 * dt, 62); p.vx += Math.sin(p.t * 6 + p.ph) * 90 * dt + (window.WINDX || 0) * (window.WINDDX || 0) * 330 * dt; p.vx *= 1 - (1.4 - 0.5 * Math.min(1, window.WINDX || 0)) * dt; p.vy -= Math.min(1.3, window.WINDX || 0) * 55 * dt * (0.5 + 0.5 * Math.sin(p.t * 3 + p.ph)); p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
       if (p.y >= p.gy) { p.y = p.gy; p.rest = true; }
     }
     for (let i = TP.length - 1; i >= 0; i--) {   // kabuk / kıymık: düşer, zıplar, yatar, solar
@@ -4643,7 +4670,7 @@
     s.sq = 1; s.flash = 0.09; s.rv += away * rnd(0.85, 1.1); s.cv += away * rnd(1.8, 2.3);
     for (let i = 0; i < 4 + s.hits; i++) wood(hx, hy, side * rnd(40, 170) + rnd(-40, 40), -rnd(50, 190), y + rnd(2, 12), rnd(2, 4.6), rnd(1.5, 2.8), [0, 3, 5, 6][i % 4]);   // kesikten kıymıklar saçılır
     for (let i = 0; i < 2 + (s.hits > 2 ? 1 : 0); i++) tchip(hx, hy, side * rnd(30, 120) + rnd(-30, 30), -rnd(70, 190), y + rnd(2, 12), rnd(1.8, 3.2), i % 2);
-    leafFx(x + rnd(-8, 8), y - 80 * v.sc, 6 + s.hits * 3, 55, 22, y);   // taçtan yapraklar dökülür
+    leafFx(x + rnd(-8, 8), y - 80 * v.sc, 8 + s.hits * 4, 60, 24, y, v.sp); if (s.hits >= 2) leafFx(x + side * 6, y - 70 * v.sc, 4, 110, 12, y, v.sp);   // taçtan türüne uygun renkte yapraklar dökülür · vuruş sayısı arttıkça gürleşir
     cdust(x, y + 1, 1, 0.5);
     LOOT.push({ k: 'log', x: hx, y: y + 4, z: 18, vx: side * rnd(40, 110) + rnd(-20, 20), vy: rnd(-40, 40), vz: rnd(230, 320), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // her darbede içinden bir odun parçası düşer
     for (let i = 0; i < 3; i++) tchip(hx, hy, side * rnd(80, 200), -rnd(110, 230), y + rnd(2, 12), rnd(2.4, 4.2), i % 2);   // kesikten iri odun parçaları
@@ -4657,19 +4684,19 @@
     }
     if (Math.random() < 0.5) LOOT.push({ k: 'log', x: hx, y: y + 4, z: 18, vx: side * rnd(40, 120) + rnd(-20, 20), vy: rnd(-40, 40), vz: rnd(230, 320), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // balta daha verimli: bazen fazladan odun
     AU.sfx('treeHit', x, y - 20, s.hits); hitFx(0.07, 3 + s.hits * 0.4);
-    if (s.hp <= 0) { s.hp = 0; s.dying = 0; s.dir = -side; AU.sfx('treeCreak', x, y - 30); hitFx(0.12, 6); }
+    if (s.hp <= 0) { s.hp = 0; s.dying = 0; s.dir = -side; AU.sfx('treeCreak', x, y - 30); hitFx(0.12, 6); leafFx(x, y - 84 * v.sc, 20, 120, 30, y, v.sp); }
   }
   function dyingTree(s, x, y, dt) {
-    const v = treeVar(x, y), d = s.dir, CY = (v.pine ? 66 : 84) * v.sc;
+    const v = treeVar(x, y), d = s.dir, CY = (v.pine ? 66 : v.sp === 3 ? 92 : 84) * v.sc;
     if (!s.landed) {
       s.dying += dt;
       if (s.dying < 0.5) {   // çıtırdar: gövde titrer, hafifçe yatar, kıymık ve yaprak dökülür
         s.fa = d * 0.04 * (s.dying / 0.5); hitFx(0, 1.4 + 2 * s.dying);
         if (Math.random() < dt * 28) wood(x - d * 5, y - rnd(10, 36) * v.sc, -d * rnd(20, 80), -rnd(30, 110), y + rnd(2, 10), rnd(1.6, 3.2), rnd(1.4, 2.4), [0, 5, 6][(Math.random() * 3) | 0]);
-        if (Math.random() < dt * 14) leafFx(x, y - 80 * v.sc, 1, 30, 24, y);
+        if (Math.random() < dt * 14) leafFx(x, y - 80 * v.sc, 1, 30, 24, y, v.sp);
       } else {
         const u = Math.min(1, (s.dying - 0.5) / 0.85); s.fa = d * (0.04 + (PI / 2 - 0.04) * u * u);
-        if (Math.random() < dt * 70) leafFx(x + (CY - 12) * Math.sin(s.fa) + rnd(-10, 10), y - 12 - (CY - 12) * Math.cos(s.fa) + rnd(-8, 8), 1, 50, 6, y);   // devrilirken taç yaprak savurur
+        if (Math.random() < dt * 70) leafFx(x + (CY - 12) * Math.sin(s.fa) + rnd(-10, 10), y - 12 - (CY - 12) * Math.cos(s.fa) + rnd(-8, 8), 1, 50, 6, y, v.sp);   // devrilirken taç yaprak savurur
         if (u >= 1) landTree(s, x, y, v, d, CY);
       }
     } else {
@@ -4681,7 +4708,7 @@
     s.landed = true; s.land = 0; s.fa = d * PI / 2;
     AU.sfx('treeFall', x + d * 50, y); hitFx(0.15, 8);
     for (const k of [22, 52, 82]) cdust(x + d * k * v.sc, y + 2, 3, 1.1);
-    leafFx(x + d * CY, y - 14, 38, 150, 38, y); leafFx(x + d * CY * 0.5, y - 10, 14, 90, 30, y);
+    leafFx(x + d * CY, y - 14, 42, 160, 40, y, v.sp); leafFx(x + d * CY * 0.5, y - 10, 16, 95, 30, y, v.sp);
     for (let i = 0; i < 16; i++) wood(x + d * rnd(14, 90) * v.sc, y - rnd(6, 18), d * rnd(10, 130) + rnd(-60, 60), -rnd(80, 250), y + rnd(2, 14), rnd(2, 5), rnd(1.6, 3), [0, 3, 5, 6][i % 4]);
     for (let i = 0; i < 7; i++) tchip(x + d * rnd(14, 90) * v.sc, y - rnd(6, 16), d * rnd(10, 110) + rnd(-50, 50), -rnd(90, 230), y + rnd(2, 14), rnd(2, 3.6), i % 2);
     for (let i = 0; i < 3; i++) LOOT.push({ k: 'log', x: x + d * (22 + i * 24) * v.sc, y: y + rnd(-2, 8), z: 12, vx: d * rnd(10, 70) + rnd(-25, 25), vy: rnd(-40, 40), vz: rnd(240, 360), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // gövde kütüklere ayrılır
@@ -4712,13 +4739,72 @@
     ? { b1: '#8a7058', b2: '#6b5742', ln: '#2b2118', raw: '#cfae76', rawD: '#a8864f', ring: '#9a7a48', l: ['#6f9a68', '#58814f', '#8ab67c'], mo: ['#86a64a', '#648030', '#b0cd6e'], fl: '#1a1a1a' }
     : { b1: '#66513c', b2: '#4a3a2b', ln: '#16110c', raw: '#d2b27a', rawD: '#a3834f', ring: '#8a6c3e', l: ['#3f6144', '#2f4b36', '#54784f'], mo: ['#7a9a3c', '#566f26', '#a3c260'], fl: '#efe6d8' };
   const tpoly = (p, fill, stroke, lw) => { ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 0.8; ctx.stroke(); } };
+
+  /* ----- YENİ AĞAÇ TASARIMI: 4 tür (çam · meşe · sonbahar akçaağacı · huş) · taçlar önceden bir kez çizilip önbelleğe alınır (zengin gölge / ışık / yaprak dokusu), gövde canlı çizilir (kesikler, yosun, sarsılma) ----- */
+  const SPC = [   // taç renkleri: d koyu · m orta · l açık · h ışık (güneş sağdan vurur)
+    { d: '#20372a', m: '#2c4e37', l: '#3f6d4a', h: '#65996a' },   // çam
+    { d: '#284631', m: '#38603f', l: '#528448', h: '#80b05f' },   // meşe
+    { d: '#86291b', m: '#c0432a', l: '#df7a35', h: '#f4b64c' },   // sonbahar akçaağacı
+    { d: '#5b7a3b', m: '#7fa64e', l: '#abc96e', h: '#d9e898' }];  // huş
+  const SPT = [null, null, ['#74503b', '#563a2b'], ['#e6e1d4', '#b9b3a3']];   // gövde renkleri: akçaağaç kızıl kahve · huş beyaz (çam / meşe: genel palet)
+  const TCK = 3, TCW = 120, TCH = 136, TCX = 60, TCY = 138, crownCache = new Map();
+  function crownBlob(cx, cy, rx, ry, n, R, amp) {   // yumuşak, tümsekli yaprak kümesi
+    const pts = []; for (let i = 0; i < n; i++) { const a = i / n * TAU, r = 1 - amp * 0.5 + amp * R() * (i % 2 ? 1 : 0.5); pts.push([cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r]); }
+    const pa = new Path2D(); pa.moveTo((pts[n - 1][0] + pts[0][0]) / 2, (pts[n - 1][1] + pts[0][1]) / 2);
+    for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; pa.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } pa.closePath(); return pa;
+  }
+  function crownSprite(sp, vi, flash) {
+    const key = sp * 20 + vi + (flash ? 100 : 0); let c = crownCache.get(key); if (c) return c;
+    c = document.createElement('canvas'); c.width = TCW * TCK; c.height = TCH * TCK; const g = c.getContext('2d');
+    if (flash) { g.drawImage(crownSprite(sp, vi, false), 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = tPal(false).fl; g.fillRect(0, 0, c.width, c.height); crownCache.set(key, c); return c; }
+    g.setTransform(TCK, 0, 0, TCK, TCX * TCK, TCY * TCK); g.lineJoin = g.lineCap = 'round';
+    let seed = (sp * 9301 + vi * 49297 + 12345) >>> 0; const R = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const P = SPC[sp], ln = tPal(false).ln, bark = SPT[sp] ? SPT[sp][1] : tPal(false).b2, tone = [P.d, P.m, P.l, P.h];
+    if (sp === 0) {   // ÇAM: 4 kat, pürüzlü alt kenar, sağdan ışık, altta gölge bandı, iğne tırtıkları
+      const yb = [-22, -42, -61, -79], hh = [37, 35, 32, 31], ww = [35, 30, 24, 17];
+      for (let i = 0; i < 4; i++) {
+        const b = yb[i] + (R() - 0.5) * 2, h = hh[i] + (R() - 0.5) * 3, w = ww[i] + (R() - 0.5) * 3, apx = (R() - 0.5) * 2.4, N = 6 + i % 2, ed = [];
+        for (let k = 0; k <= N; k++) { const f = k / N, x = -w + 2 * w * f; ed.push([x, b + 3.2 * (1 - Math.abs(2 * f - 1)) * 0.9 + (k % 2 ? 0 : 3.4) * (0.5 + 0.5 * R()) - 1.6 * Math.abs(2 * f - 1)]); }
+        const pa = new Path2D(); pa.moveTo(apx, b - h); ed.forEach(q => pa.lineTo(q[0], q[1])); pa.closePath();
+        g.fillStyle = P.m; g.fill(pa);
+        g.save(); g.clip(pa);
+        const rt = new Path2D(); rt.moveTo(apx, b - h); ed.filter(q => q[0] >= 0).forEach(q => rt.lineTo(q[0], q[1])); rt.lineTo(apx, b + 4); rt.closePath(); g.fillStyle = P.l; g.fill(rt);   // güneşli sağ yüz
+        const hl = new Path2D(); hl.moveTo(apx + 0.5, b - h + 1); hl.lineTo(w * 0.78, b - 3); hl.lineTo(w * 0.3, b - 5); hl.lineTo(apx + 0.5, b - h * 0.45); hl.closePath(); g.globalAlpha = 0.55; g.fillStyle = P.h; g.fill(hl); g.globalAlpha = 1;
+        g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(-w - 2, b - 5.5, 2 * w + 4, 12);   // alt gölge bandı (alttaki katın üstüne düşer)
+        g.strokeStyle = P.d; g.globalAlpha = 0.55; g.lineWidth = 0.7; g.beginPath();   // iğne tırtıkları
+        for (let k = 0; k < 14; k++) { const t = R(), sd = R() < 0.5 ? -1 : 1, y0 = b - 4 - t * h * 0.8, x0 = sd * (w * (1 - (b - y0) / h) * (0.35 + 0.55 * R())); g.moveTo(x0, y0); g.lineTo(x0 + sd * 2.6, y0 + 2.8); }
+        g.stroke(); g.globalAlpha = 1; g.restore();
+        g.strokeStyle = ln; g.lineWidth = 0.95; g.stroke(pa);
+      }
+    } else {   // YAPRAK DÖKENLER: dallar + üç katmanlı yuvarlak yaprak kümeleri (arka koyu → ön açık), ışık sağ üstten
+      const L = [   // [x, y, rx, ry, ton]
+        [[-25, -58, 19, 15, 0], [26, -60, 20, 16, 0], [0, -67, 31, 22, 0], [-15, -81, 19, 14, 1], [16, -83, 20, 15, 1], [-28, -74, 13, 10, 1], [29, -76, 13, 10, 1], [0, -96, 19, 14, 2], [-12, -91, 11, 8, 2], [14, -96, 10, 7, 2]],
+        [[-22, -60, 17, 14, 0], [24, -63, 18, 15, 0], [0, -71, 27, 21, 0], [-12, -86, 16, 12, 1], [14, -88, 17, 13, 1], [-26, -78, 11, 9, 1], [0, -101, 14, 11, 2], [-9, -94, 9, 7, 2], [16, -99, 9, 7, 2]],
+        [[-10, -62, 14, 13, 0], [12, -67, 15, 14, 0], [0, -80, 19, 16, 0], [-12, -94, 14, 12, 1], [10, -98, 14, 12, 1], [0, -110, 12, 11, 2], [-18, -82, 9, 8, 1], [18, -86, 9, 8, 1], [-4, -102, 8, 7, 2], [9, -108, 7, 6, 2]]][sp - 1];
+      g.strokeStyle = ln; g.lineCap = 'round'; const br = (x1, y1, w0) => { g.beginPath(); g.moveTo(0, -42); g.quadraticCurveTo(x1 * 0.2, (y1 - 42) * 0.7 - 30, x1 * 0.7, y1 * 0.8 - 8); g.lineWidth = w0 + 1.7; g.strokeStyle = ln; g.stroke(); g.lineWidth = w0; g.strokeStyle = bark; g.stroke(); };
+      br(-20, -62, 3.4); br(21, -66, 3.4); br(-4, -84, 3); br(sp === 3 ? -13 : -26, sp === 3 ? -92 : -72, 2.2);
+      L.forEach(([cx, cy, rx, ry, t]) => {
+        cx += (R() - 0.5) * 2.6; cy += (R() - 0.5) * 2.6; const pa = crownBlob(cx, cy, rx, ry, 14, R, 0.3);
+        g.fillStyle = tone[t]; g.fill(pa);
+        g.save(); g.clip(pa);
+        g.fillStyle = 'rgba(0,0,0,0.26)'; g.beginPath(); g.ellipse(cx - rx * 0.18, cy + ry * 0.6, rx * 0.95, ry * 0.5, 0, 0, TAU); g.fill();   // alt-sol gölge
+        g.globalAlpha = 0.9; g.fillStyle = tone[Math.min(3, t + 1)]; g.fill(crownBlob(cx + rx * 0.2, cy - ry * 0.24, rx * 0.64, ry * 0.58, 11, R, 0.34)); g.globalAlpha = 1;   // ışıklı kütle
+        for (let k = 0; k < 10; k++) { const a = R() * TAU, r = Math.sqrt(R()) * 0.85, x = cx + Math.cos(a) * rx * r, y = cy + Math.sin(a) * ry * r, lit = x > cx - rx * 0.1 && y < cy + ry * 0.1; g.globalAlpha = 0.6; g.fillStyle = lit ? tone[Math.min(3, t + 2)] : tone[Math.max(0, t - 1)]; g.beginPath(); g.ellipse(x, y, 1.5 + R() * 1.4, 1 + R() * 0.9, R() * 3, 0, TAU); g.fill(); }   // yaprak benekleri
+        g.globalAlpha = 1; g.restore();
+        g.strokeStyle = ln; g.lineWidth = 0.95; g.stroke(pa);
+      });
+      if (sp === 2) { g.fillStyle = P.h; g.strokeStyle = ln; g.lineWidth = 0.6; for (let k = 0; k < 7; k++) { const x = (R() - 0.5) * 56, y = -52 + R() * 12; g.save(); g.translate(x, y); g.rotate(R() * 6); g.beginPath(); g.ellipse(0, 0, 2.6, 1.5, 0, 0, TAU); g.fill(); g.stroke(); g.restore(); } }   // taçtan sarkan tek tük yaprak
+    }
+    crownCache.set(key, c); return c;
+  }
   function drawStump(x, y, C, id, shadow) {   // kesilmiş ağaçtan kalan kütük: taze kesik yüzey, halkalar, etrafında kıymıklar
     const v = treeVar(x, y), k = v.sc, q = (v.sd * 1000) | 0;
     ctx.save(); ctx.translate(x, y); ctx.lineJoin = 'round';
     // kırılan / kesilen ağacın kütüğünün gölgesi yok
-    tpoly([[-7.6 * k, 1.8], [-6.2 * k, -10 * k], [0, -10 * k], [0, 1.8]], C.b1, C.ln);
-    tpoly([[0, 1.8], [0, -10 * k], [6.2 * k, -10 * k], [7.6 * k, 1.8]], C.b2, C.ln);
-    tpoly([[-7.6 * k, 1.8], [-11 * k, 3], [-5.4 * k, -1]], C.b2, C.ln, 0.7); tpoly([[7.6 * k, 1.8], [11.4 * k, 3.2], [5.6 * k, -1]], C.b1, C.ln, 0.7);   // kök sivrilikleri
+    const TB = SPT[v.sp] || [C.b1, C.b2];
+    tpoly([[-7.6 * k, 1.8], [-6.2 * k, -10 * k], [0, -10 * k], [0, 1.8]], TB[0], C.ln);
+    tpoly([[0, 1.8], [0, -10 * k], [6.2 * k, -10 * k], [7.6 * k, 1.8]], TB[1], C.ln);
+    tpoly([[-7.6 * k, 1.8], [-11 * k, 3], [-5.4 * k, -1]], TB[1], C.ln, 0.7); tpoly([[7.6 * k, 1.8], [11.4 * k, 3.2], [5.6 * k, -1]], TB[0], C.ln, 0.7);   // kök sivrilikleri
     if (v.moss) { tpoly([[-7.6 * k, 1.8], [-7 * k, -4 * k], [-4.6 * k, -2.6 * k], [-2.4 * k, -5.4 * k], [0, -2 * k], [0, 1.8]], C.mo[0], C.ln, 0.6); tpoly([[0, 1.8], [0, -2.6 * k], [2.8 * k, -4.4 * k], [4.6 * k, -1.6 * k], [6.8 * k, -2.8 * k], [7.6 * k, 1.8]], C.mo[1], C.ln, 0.6); }   // yosunlu kütük
     ctx.beginPath(); ctx.ellipse(0, -10 * k, 6.5 * k, 2.6 * k, 0, 0, TAU); ctx.fillStyle = C.raw; ctx.fill(); ctx.strokeStyle = C.ln; ctx.lineWidth = 0.8; ctx.stroke();
     ctx.strokeStyle = C.ring; ctx.lineWidth = 0.6;
@@ -4727,10 +4813,16 @@
     for (let i = 0; i < 4; i++) { const px = (hashN(q, i, 90) - 0.5) * 30 * k, py = 2 + hashN(q, i, 91) * 5; tpoly([[px - 2, py], [px, py - 1.2], [px + 2.4, py + 0.3], [px, py + 1]], i % 2 ? C.raw : C.b1, C.ln, 0.5); }   // yerde kıymıklar
     ctx.restore();
   }
+  function treeWind(x, sd, pine, lag) {   // ağacın yerel rüzgârı: hamle dalgası yönde ilerler → [yatma (shear), çırpınma (rad), yerel şiddet]
+    const s = WIND.s, T = WIND.t - (lag || 0), ph = sd * 40, wave = 0.8 + 0.3 * Math.sin(x * 0.0045 * WIND.dir - T * (1.1 + 1.2 * s) + 1.7) + 0.12 * Math.sin(T * 2.3 + ph),
+      lo = Math.max(0, Math.min(1.6, s * wave)), st = pine ? 0.78 : 1;
+    const sw = Math.sin(T * (0.75 + 0.55 * lo) + ph) * 0.5 + Math.sin(T * (1.3 + 0.7 * lo) + ph * 1.7 + 1) * 0.28;   // yavaş, yumuşak salınım (titreme yok)
+    return [WIND.dx * lo * 0.12 * st * (1 + 0.22 * sw), sw * (0.012 + 0.03 * lo) * st * (0.35 + lo), lo];
+  }
   function drawTree(x, y, id, light) {
     const s = TST.get(id), C = tPal(light);
     if (s && s.dead) { drawStump(x, y, C, id, true); return; }
-    const v = treeVar(x, y), sc = v.sc, H = (v.pine ? 52 : 62) * sc, fall = !!s && s.dying >= 0.5, fl = !!s && s.flash > 0, q = (v.sd * 1000) | 0;
+    const v = treeVar(x, y), sc = v.sc, H = (v.pine ? 52 : v.sp === 3 ? 66 : 62) * sc, fall = !!s && s.dying >= 0.5, fl = !!s && s.flash > 0, q = (v.sd * 1000) | 0;
     const P = fl ? { ...C, b1: C.fl, b2: C.fl, raw: C.fl, rawD: C.fl, ring: C.fl, l: [C.fl, C.fl, C.fl], mo: [C.fl, C.fl, C.fl] } : C;
     const u = fall ? Math.min(1, Math.abs(s.fa) / (PI / 2)) : 0, ba = fall && s.landed ? Math.max(0, 1 - s.land / 0.28) : 1;
     ctx.save(); ctx.translate(x, y); ctx.globalAlpha = ba;   // gölge (devrilirken yere uzanır)
@@ -4738,25 +4830,40 @@
     ctx.restore();
     if (fall) drawStump(x, y, C, id, false);
     if (ba <= 0) return;
-    const tw = 6.5, tt = 4.2;
+    const tw = 6.5, tt = 4.2, TW = fall ? [0, 0, 0] : treeWind(x, v.sd, v.pine, 0), TK = fall ? [0, 0, 0] : treeWind(x, v.sd, v.pine, 0.28);   // TW: gövde · TK: taç (biraz gecikmeli, daha çok savrulur)
     const body = () => {
       ctx.lineJoin = 'round';
-      tpoly([[-tw - 2.4, 1.6], [-tw + 0.2, -7], [-tt, -H], [0, -H], [0, 1.6]], P.b1, P.ln);   // gövde: iki tonlu
-      tpoly([[0, 1.6], [0, -H], [tt, -H], [tw - 0.2, -7], [tw + 2.4, 1.6]], P.b2, P.ln);
+      const TBc = SPT[v.sp] && !fl ? SPT[v.sp] : [P.b1, P.b2], mid = (tw + tt) / 2;   // gövde: iki tonlu, hafif şişkin, köklü
+      tpoly([[-tw - 2.4, 1.6], [-tw - 5, 3.2], [-tw + 0.2, -7], [-mid - 0.2, -H * 0.5], [-tt, -H], [0, -H], [0, 1.6]], TBc[0], P.ln);
+      tpoly([[0, 1.6], [0, -H], [tt, -H], [mid + 0.2, -H * 0.5], [tw - 0.2, -7], [tw + 5, 3.2], [tw + 2.4, 1.6]], TBc[1], P.ln);
+      if (!fl) { ctx.fillStyle = 'rgba(255,238,205,0.14)'; ctx.beginPath(); ctx.moveTo(tt * 0.35, -H); ctx.lineTo(tt * 0.85, -H); ctx.lineTo(mid * 0.9, -H * 0.5); ctx.lineTo(tw * 0.88, -7); ctx.lineTo(tw * 0.35, -7); ctx.lineTo(mid * 0.38, -H * 0.5); ctx.closePath(); ctx.fill();   // sağdan ışık şeridi
+        if (v.sp === 3) { ctx.fillStyle = '#2a2622'; for (let i = 0; i < 9; i++) { const yy = -6 - hashN(q, i, 83) * (H - 12), w2 = 1.2 + hashN(q, i, 84) * 2.6, xx = (hashN(q, i, 85) - 0.5) * 4; ctx.beginPath(); ctx.ellipse(xx, yy, w2, 0.7, 0, 0, TAU); ctx.fill(); } } }   // huş: koyu çizgi işaretleri
       ctx.strokeStyle = fl ? P.fl : 'rgba(0,0,0,0.28)'; ctx.lineWidth = 0.7; ctx.beginPath();   // kabuk olukları
       for (let i = 0; i < 4; i++) { const gx = -4.2 + i * 2.8; ctx.moveTo(gx, -3 - hashN(q, i, 73) * 6); ctx.lineTo(gx + hashN(q, i, 74) - 0.5, -H * 0.45 - hashN(q, i, 75) * H * 0.35); }
       ctx.stroke();
-      if (v.moss) {   // yosun: gövdenin alt yarısına tutunmuş, üst üste binen yuvarlak kümeler (gövde çizgisinden hafifçe taşar) · bir yana daha yoğun · vuruldukça azalır
-        const mk = Math.max(0.3, 1 - (s ? s.hits : 0) * 0.17), lo = v.sd < 0.5 ? -1 : 1, rng = H * 0.56 * mk;
-        const blob = (cx, cy, rx, ry, col, k) => { const p = []; for (let i = 0; i < 9; i++) { const a = i / 9 * TAU, r = 0.84 + 0.28 * hashN(q, k, i + 110); p.push([cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r]); } tpoly(p, col, P.ln, 0.6); };
-        blob(lo * 1.2, 0.2, tw + 2.8, 3.2, P.mo[1], 40);   // zemine yakın geniş taban
-        const hl = [];
-        for (let i = 0; i < 10; i++) {
-          const t = i / 9, side = i % 3 === 2 ? -lo : lo, cy = -3 - t * rng * (0.7 + 0.3 * hashN(q, i, 99)), w = tw - (tw - tt) * Math.min(1, -cy / H);
-          const cx = side * w * (0.3 + 0.6 * hashN(q, i, 100)), rx = (5.4 - 2.8 * t) * (0.85 + 0.3 * hashN(q, i, 101)), ry = rx * 0.8;
-          blob(cx, cy, rx, ry, cx < 0 ? P.mo[0] : P.mo[1], i); hl.push([cx - rx * 0.28, cy - ry * 0.32, rx]);
+      if (v.moss) {   // yosun: gövdeye YAPIŞIK kalın bir örtü · gövde siluetiyle kırpılır, üst kenarı tüylü-dalgalı, altı koyu, tepeleri açık · bir yanda daha yüksek · kenarlardan hafifçe taşar · vuruldukça alçalır (üstten dökülür)
+        const nh = s ? s.hits : 0, lo = v.sd < 0.5 ? -1 : 1, mH = H * 0.5 * Math.max(0.16, 1 - 0.21 * nh), W0 = yy => tw - (tw - tt) * Math.min(1, -yy / H);
+        const topAt = x => { const i = Math.round((x + 14) / 2.4), cov = x * lo >= -1 ? 1 : 0.42 + 0.3 * hashN(q, i, 121); return -mH * cov * (0.78 + 0.22 * hashN(q, i, 120)) - 1.2 * Math.sin(x * 0.9 + q); };
+        const xs = []; for (let x = -13; x <= 13.01; x += 2.4) xs.push(x);
+        const shapes = () => { ctx.beginPath(); ctx.moveTo(-14, 4); xs.forEach(x => ctx.lineTo(x, topAt(x))); ctx.lineTo(14, 4); ctx.closePath(); xs.forEach(x => { ctx.moveTo(x + 2.1, topAt(x) + 0.7); ctx.ellipse(x, topAt(x) + 0.7, 2.1, 1.7, 0, 0, TAU); }); };   // taban + tepeciklerle taranmış üst kenar
+        ctx.save(); ctx.beginPath(); ctx.moveTo(-tw - 2.4, 1.6); ctx.lineTo(-tw - 5, 3.2); ctx.lineTo(-tw + 0.2, -7); ctx.lineTo(-(tw + tt) / 2 - 0.2, -H * 0.5); ctx.lineTo(-tt, -H); ctx.lineTo(tt, -H); ctx.lineTo((tw + tt) / 2 + 0.2, -H * 0.5); ctx.lineTo(tw - 0.2, -7); ctx.lineTo(tw + 5, 3.2); ctx.lineTo(tw + 2.4, 1.6); ctx.closePath(); ctx.clip();
+        shapes(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.ln; ctx.stroke();   // önce dış çizgi (birleşik silüet) …
+        shapes(); ctx.fillStyle = P.mo[1]; ctx.fill();                          // … sonra dolgu
+        for (let k = 0; k < 9; k++) {   // orta ton kümeler + tepelerinde açık parlama
+          const x = (hashN(q, k, 130) - 0.5) * 17 + lo * 1.4, y = -mH * (0.12 + 0.82 * hashN(q, k, 131)), tp = topAt(Math.round(x / 2.4) * 2.4); if (y < tp + 1.4) continue;
+          const rx = 2.1 + 1.5 * hashN(q, k, 132), ry = rx * 0.72;
+          ctx.fillStyle = P.mo[0]; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill();
+          if (x * lo > -2 || hashN(q, k, 133) < 0.5) { ctx.fillStyle = P.mo[2]; ctx.beginPath(); ctx.ellipse(x + rx * 0.22, y - ry * 0.38, rx * 0.5, ry * 0.36, -0.3, 0, TAU); ctx.fill(); }
         }
-        ctx.fillStyle = P.mo[2]; for (const [hx, hy, r] of hl) { ctx.beginPath(); ctx.ellipse(hx, hy, r * 0.32, r * 0.2, -0.3, 0, TAU); ctx.fill(); }
+        if (!fl) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-14, -1.6, 28, 6); }   // dipte gölge
+        ctx.restore();
+        for (let i = 0; i < 5; i++) {   // kenardan taşan tutamlar: yosun gövdeye sarılmış gibi görünsün
+          const sdn = i < 4 ? lo : -lo, yy = -(1.4 + (i < 4 ? i : 0.4) * mH * 0.23), xx = sdn * (W0(yy) + 0.1);
+          if (-yy > mH * 0.88 || (s && s.nd.some(n => n.side === sdn && Math.abs(-yy - n.h) < 6))) continue;
+          const rx = 1.5 + hashN(q, i, 140) * 0.9, ry = 2.0 + hashN(q, i, 141) * 1.1;
+          ctx.beginPath(); ctx.ellipse(xx, yy, rx, ry, sdn * 0.25, 0, TAU); ctx.fillStyle = i % 2 ? P.mo[1] : P.mo[0]; ctx.fill(); ctx.strokeStyle = P.ln; ctx.lineWidth = 0.6; ctx.stroke();
+        }
+        for (let i = 0; i < 3; i++) { const x = (i - 1) * 4.4 + (hashN(q, i, 150) - 0.5) * 2, yy = topAt(x) + 2.4; if (-yy < 3 || (x > 0 ? 1 : -1) * lo < 0 && i === 1) continue; ctx.beginPath(); ctx.ellipse(x, yy + 1.6, 0.8, 1.9, 0, 0, TAU); ctx.fillStyle = P.mo[1]; ctx.fill(); }   // sarkan ince saçaklar
       }
       if (s) for (const n of s.nd) {   // balta kesikleri: hasar arttıkça derinleşir
         const w = tw - (tw - tt) * Math.min(1, n.h / H), ex = n.side * (w + 0.5), inx = n.side * (w - Math.min(2 * w - 1.6, n.d)), hh = n.h;
@@ -4764,19 +4871,10 @@
         ctx.fillStyle = P.rawD; ctx.beginPath(); ctx.moveTo(inx, -hh - 0.8); ctx.lineTo(ex, -hh + 2.6); ctx.lineTo(ex, -hh + 1); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = P.raw; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ex, -hh - 6.5); ctx.lineTo(ex + n.side * 1.8, -hh - 8.4); ctx.moveTo(ex, -hh + 2.6); ctx.lineTo(ex + n.side * 1.6, -hh + 4.2); ctx.stroke();   // kenarda kopmuş kıymıklar
       }
-      ctx.save(); const cp = (v.pine ? 30 : 46) * sc; ctx.translate(0, -cp); ctx.rotate((s ? s.crot : 0) + Math.sin(TM.t * 1.35 + v.sd * 9) * 0.011); ctx.translate(0, cp);   // taç gövdeden ayrı, gecikmeli sallanır
+      ctx.save(); const cp = (v.pine ? 30 : v.sp === 3 ? 50 : 46) * sc; ctx.translate(0, -cp); ctx.rotate((s ? s.crot : 0) + Math.sin(TM.t * 1.35 + v.sd * 9) * 0.011 + TK[1] * 1.9 + TK[0] * 0.5); ctx.transform(1, 0, -TK[0] * 0.6, 1, 0, 0); if (s && s.sq > 0) ctx.scale(1 + 0.05 * s.sq, 1 - 0.07 * s.sq); ctx.translate(0, cp);   // taç gövdeden ayrı, gecikmeli sallanır · vuruşta ezilip toparlanır
       if (v.sd >= 0.5) ctx.scale(-1, 1);
-      if (v.pine) {   // çam: üç kat, iki tonlu yüzeyler
-        [[28, 46, 31], [52, 42, 25], [76, 36, 18]].forEach(([b, h, w], i) => {
-          b = -b * sc; h *= sc; w *= sc;
-          tpoly([[-w, b], [-w * 0.5, b - 3.2], [0, b], [0, b - h]], P.l[0], P.ln);
-          tpoly([[0, b - h], [0, b], [w * 0.5, b - 3.2], [w, b]], P.l[1], P.ln);
-          tpoly([[-w * 0.5, b - 1], [0, b - h * 0.92], [0, b - h * 0.45]], P.l[2], null);
-        });
-      } else {   // yaprak dökenler: küme küme taç
-        const blob = (cx, cy, rx, ry, k, col) => { const p = []; for (let i = 0; i < 10; i++) { const a = i / 10 * TAU, r = 0.84 + 0.2 * hashN(q, k, i + 80); p.push([cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r]); } tpoly(p, col, P.ln); };
-        blob(-17 * sc, -60 * sc, 18 * sc, 15 * sc, 1, P.l[1]); blob(18 * sc, -64 * sc, 19 * sc, 16 * sc, 2, P.l[1]); blob(0, -72 * sc, 30 * sc, 23 * sc, 3, P.l[0]); blob(2 * sc, -92 * sc, 17 * sc, 14 * sc, 4, P.l[0]); blob(-8 * sc, -80 * sc, 12 * sc, 8 * sc, 5, P.l[2]);
-      }
+      ctx.scale(sc, sc); ctx.drawImage(crownSprite(v.sp, v.vi, false), -TCX, -TCY, TCW, TCH);
+      if (s && s.flash > 0) { ctx.globalAlpha = ba * Math.min(1, s.flash / 0.05); ctx.drawImage(crownSprite(v.sp, v.vi, true), -TCX, -TCY, TCW, TCH); }   // vuruş parlaması
       ctx.restore();
     };
     ctx.save(); ctx.translate(x, y); ctx.globalAlpha = ba;
@@ -4786,7 +4884,7 @@
       ctx.beginPath(); ctx.ellipse(0, -12, 5.6, 2.1, 0, 0, TAU); ctx.fillStyle = P.raw; ctx.fill(); ctx.strokeStyle = P.ln; ctx.lineWidth = 0.7; ctx.stroke();   // kopan uçta taze kesit
     } else {
       const sw = (s ? s.rot + s.fa : 0) + Math.sin(TM.t * 0.9 + v.sd * 20) * 0.007 + (s && s.dying >= 0 ? Math.sin(s.dying * 62) * 0.016 : 0);
-      ctx.rotate(sw); if (s) ctx.scale(1 + 0.02 * s.sq, 1 - 0.035 * s.sq);
+      ctx.rotate(sw + TW[1] * 0.5); ctx.transform(1, 0, -TW[0], 1, 0, 0); if (s) ctx.scale(1 + 0.02 * s.sq, 1 - 0.035 * s.sq);   // gövde rüzgâr yönüne eğilir (tabanı sabit)
       body();
     }
     ctx.restore();
@@ -4802,7 +4900,7 @@
     for (const p of LV) {
       const a = p.t > p.life - 1 ? Math.max(0, p.life - p.t) : 1; ctx.globalAlpha = a;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.scale(1, p.rest ? 0.45 : 0.35 + 0.65 * Math.abs(Math.cos(p.t * 7 + p.ph)));
-      ctx.fillStyle = p.c === 3 ? C.raw : p.c === 4 ? C.mo[(p.ph | 0) % 3] : C.l[p.c]; ctx.beginPath(); ctx.ellipse(0, 0, p.s * 1.7, p.s * 0.95, 0, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = p.c === 3 ? C.raw : p.c === 4 ? C.mo[(p.ph | 0) % 3] : [SPC[p.sp === undefined ? 1 : p.sp].m, SPC[p.sp === undefined ? 1 : p.sp].l, SPC[p.sp === undefined ? 1 : p.sp].h][p.c]; ctx.beginPath(); ctx.ellipse(0, 0, p.s * 1.7, p.s * 0.95, 0, 0, TAU); ctx.fill(); ctx.restore();
     }
     ctx.globalAlpha = 1;
   }
@@ -5261,9 +5359,9 @@
   /* ---------- LANETLİ SANDIK (mağara): 'cbx…' · E / düğme → onay → açılır, lanet başlar: hasar alma ×2 · iyileşme ×0,5 · verilen hasar ×⅔ · 10 düşman kesince kalkar ---------- */
   const CURSE_RGB = '96,255,160', CURSE_N = 10;
   const curseKill = () => { if (!CURSE.on) return; CURSE.kills++; CURSE.pulse = 1; if (CURSE.kills >= CURSE.need) curseEnd(true); };
-  function curseReset() { CURSE.on = false; CURSE.kills = 0; CURSE.ask = null; CURSE.info = null; CURSE.iv = 0; CURSE.p.length = 0; CURSE.fl = 0; }
+  function curseReset() { CURSE.on = false; CURSE.kills = 0; CURSE.info = null; CURSE.p.length = 0; CURSE.fl = 0; }
   function curseEnd(win) {
-    CURSE.on = false; CURSE.ask = null; CURSE.info = null;
+    CURSE.on = false; CURSE.info = null;
     if (!win) return;
     CURSE.fl = 0.7; CURSE.done = 2.6; hitFx(0.1, 5);
     for (let i = 0; i < 18; i++) CURSE.p.push({ k: 'wisp', x: player.x + rnd(-12, 12), y: player.y - rnd(0, 40), vx: rnd(-25, 25), vy: -rnd(30, 90), t: 0, l: rnd(1.0, 1.8), s: rnd(3, 7), w: 1 });
@@ -5272,12 +5370,13 @@
     ftext(player.x, player.y - 70, 'Lanet kalktı', '#7dffb4');
   }
   function curseOpenFx(s, x, y) {   // kapak patlar: kafatası parçalanır, zincir kopar, lanet başlar, ödül saçılır
-    for (let i = 0; i < 9; i++) CURSE.p.push({ k: 'bone', x: x + rnd(-6, 6), y: y - 28, vx: rnd(-150, 150), vy: -rnd(170, 330), gy: y + rnd(4, 14), t: 0, l: 3.2, r: rnd(0, TAU), vr: rnd(-9, 9), w: rnd(2, 4.2), h: rnd(1.6, 3), c: i % 3 ? '#e2dac2' : '#a79e86', b: 0 });
+    for (let i = 0; i < 4; i++) CURSE.p.push({ k: 'bone', x: x + rnd(-6, 6), y: y - 28, vx: rnd(-150, 150), vy: -rnd(170, 330), gy: y + rnd(4, 14), t: 0, l: 3.2, r: rnd(0, TAU), vr: rnd(-9, 9), w: rnd(2, 4.2), h: rnd(1.6, 3), c: i % 3 ? '#e2dac2' : '#a79e86', b: 0 });
     for (let i = 0; i < 8; i++) CURSE.p.push({ k: 'bone', x: x + rnd(-14, 14), y: y - rnd(4, 18), vx: rnd(-120, 120), vy: -rnd(100, 240), gy: y + rnd(4, 14), t: 0, l: 3.2, r: rnd(0, TAU), vr: rnd(-9, 9), w: 3, h: 1.6, c: '#77737f', b: 0 });
     for (let i = 0; i < 16; i++) CURSE.p.push({ k: 'wisp', x: x + rnd(-14, 14), y: y - 22, vx: rnd(-40, 40), vy: -rnd(30, 110), t: 0, l: rnd(0.9, 1.7), s: rnd(3, 8), w: 0 });
     CURSE.p.push({ k: 'ring', x, y: y + 2, r: 120, t: 0, l: 0.8, w: 0 }, { k: 'ring', x, y: y + 2, r: 70, t: 0, l: 0.5, w: 0 });
-    const np = 4 + (Math.random() * 3 | 0); CURSE.on = true; CURSE.kills = 0; CURSE.need = CURSE_N; CURSE.fl = 1; CURSE.pulse = 1; CURSE.info = { t: 0, n: np }; hitFx(0.2, 10);   // bilgilendirme ekranı sandık açıldıktan sonra çıkar
-    try { AU.sfx('curseOn', x, y - 20); } catch (_) {}
+    const np = 4 + (Math.random() * 3 | 0); CURSE.on = true; CURSE.kills = 0; CURSE.need = CURSE_N; CURSE.fl = 1; CURSE.pulse = 1; CURSE.info = { t: 0, n: np, x, y }; hitFx(0.2, 10);   // bilgilendirme ekranı sandık açıldıktan sonra çıkar
+    try { AU.sfx('curseOn', x, y - 20); AU.sfx('lidCreak', x, y - 20); } catch (_) {}
+    try { cdust(x, y + 1, 6, 1); } catch (_) {}
     ftext(x, y - 70, 'LANET!', '#7dffb4');
     for (let i = 0; i < np; i++) LOOT.push({ k: 'prism', n: 1, cv: 1, x: x + rnd(-10, 10), y: y + 14, z: 30, vx: rnd(-90, 90), vy: rnd(40, 120), vz: rnd(380, 540), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // ödül havuzu: şimdilik yalnızca mor prizma (4–6)
   }
@@ -5286,26 +5385,17 @@
     if (s.cop < 0 && s.hint <= 0) { s.hint = 2.5; ftext(x, y - 58, 'Vurarak açılmaz', '#7dffb4'); }
   }
   const curseBtnRect = () => ({ x: W / 2 - 78, y: H - 104, w: 156, h: 42 });
-  function curseDlg(hh) {
-    const w = Math.min(430, W - 28), h = Math.min(H - 20, hh || 172), x = W / 2 - w / 2, y = H / 2 - h / 2, bh = 38, bw = (w - 44) / 2;
-    return { x, y, w, h, no: { x: x + 16, y: y + h - bh - 16, w: bw, h: bh }, yes: { x: x + w - 16 - bw, y: y + h - bh - 16, w: bw, h: bh } };
-  }
-  const curseInfoBtn = () => { const d = curseDlg(262); return { x: d.x + 16, y: d.y + d.h - 54, w: d.w - 32, h: 38 }; };
-  const curseInfoOn = () => CURSE.info && CURSE.info.t > 0.6 && CURSE.iv > 0.6;
   const inR = (r, px, py, m) => px >= r.x - m && px <= r.x + r.w + m && py >= r.y - m && py <= r.y + r.h + m;
-  function curseAccept() { const s = CURSE.ask; if (!s) return; CURSE.ask = null; if (s.cop < 0) { s.cop = 0; try { AU.sfx('chainClank', player.x, player.y - 20); } catch (_) {} } }
-  function curseTapUI(px, py) {   // true = dokunuş harcandı
-    if (CURSE.ask) { if (CURSE.av < 0.6) return true; const d = curseDlg(); if (inR(d.yes, px, py, 4)) curseAccept(); else if (inR(d.no, px, py, 4)) CURSE.ask = null; return true; }
-    if (curseInfoOn() && inR(curseInfoBtn(), px, py, 6)) { CURSE.info = null; return true; }   // TAMAM: bilgi kartı kapanır (kart dışındaki dokunuşlar oyuna geçer)
-    if (CURSE.nr && CURSE.bv > 0.6 && F.death < 0 && inR(curseBtnRect(), px, py, 8)) { CURSE.ask = CURSE.nr.s; return true; }
+  function curseOpen(s) { if (s && s.cop < 0) { s.cop = 0; try { AU.sfx('chainClank', player.x, player.y - 20); } catch (_) {} } }   // onay yok: düğme / E doğrudan açar; bilgi oyun içinde canlı verilir
+  const CURSE_HOLD = 0.7;   // sandığı açmak için basılı tutma süresi (sn)
+  function curseTapUI(px, py, id) {   // true = dokunuş harcandı · düğme basılı tutulunca dolar
+    if (CURSE.nr && CURSE.bv > 0.6 && F.death < 0 && inR(curseBtnRect(), px, py, 8)) { CURSE.hid = id === undefined ? -1 : id; return true; }
     return false;
   }
-  addEventListener('keydown', e => {
-    if (MENU.on || PAUSE.on || e.repeat) return; const k = e.key.toLowerCase();
-    if (curseInfoOn() && (k === 'enter' || k === 'escape' || (k === 'e' && !CURSE.nr))) { CURSE.info = null; return; }
-    if (CURSE.ask) { if (k === 'e' || k === 'enter') curseAccept(); else if (k === 'escape' || k === 'q') CURSE.ask = null; }
-    else if (k === 'e' && CURSE.nr && F.death < 0) CURSE.ask = CURSE.nr.s;
-  });
+  const curseRelease = e => { if (CURSE.hid !== null && (e.pointerId === CURSE.hid || CURSE.hid === -1)) CURSE.hid = null; };
+  addEventListener('pointerup', curseRelease); addEventListener('pointercancel', curseRelease);
+  addEventListener('keydown', e => { if (MENU.on || PAUSE.on || e.repeat) return; if (e.key.toLowerCase() === 'e' && CURSE.nr && F.death < 0) CURSE.hk = true; });
+  addEventListener('keyup', e => { if (e.key.toLowerCase() === 'e') CURSE.hk = false; });
   function curseUpdate(dt) {
     CURSE.t += dt; CURSE.pulse = Math.max(0, CURSE.pulse - dt * 1.6); CURSE.fl = Math.max(0, CURSE.fl - dt * 1.5); CURSE.done = Math.max(0, CURSE.done - dt);
     CURSE.vg += ((CURSE.on ? 1 : 0) - CURSE.vg) * dmp(3, dt); if (CURSE.vg < 0.004) CURSE.vg = 0;
@@ -5325,18 +5415,20 @@
         const c0 = s.cop; s.cop += dt;
         if (c0 < 0.8 && Math.random() < dt * 30) CURSE.p.push({ k: 'wisp', x: x + rnd(-15, 15), y: y - rnd(10, 30), vx: rnd(-20, 20), vy: -rnd(20, 60), t: 0, l: 0.6, s: rnd(2, 4), w: 0 });
         if (c0 < 0.8 && s.cop >= 0.8) curseOpenFx(s, x, y);
-        if (s.cop >= 0.8 && Math.random() < dt * 2.2) CURSE.p.push({ k: 'wisp', x: x + rnd(-12, 12), y: y - 24, vx: rnd(-10, 10), vy: -rnd(18, 40), t: 0, l: rnd(1.2, 2.2), s: rnd(3, 6), w: 0 });
+        if (!s.fz && s.cop > 6) { s.fz = 1; for (let i = 0; i < 12; i++) CURSE.p.push({ k: 'wisp', x: x + rnd(-16, 16), y: y - rnd(18, 40), vx: rnd(-14, 14), vy: -rnd(14, 44), t: 0, l: rnd(1.6, 2.8), s: rnd(3, 7), w: 0 }); }   // alev sönerken yeşil duman bırakır
+        if (s.cop >= 0.8 && Math.random() < dt * 2.2 * (0.12 + 0.88 * (1 - sstep(5.5, 11, s.cop - 0.8)))) CURSE.p.push({ k: 'wisp', x: x + rnd(-12, 12), y: y - 24, vx: rnd(-10, 10), vy: -rnd(18, 40), t: 0, l: rnd(1.2, 2.2), s: rnd(3, 6), w: 0 });
         continue;
       }
       if (Math.random() < dt * 1.3 && Math.hypot(x - player.x, y - player.y) < 700) CURSE.p.push({ k: 'wisp', x: x + rnd(-14, 14), y: y - rnd(18, 34), vx: rnd(-8, 8), vy: -rnd(14, 34), t: 0, l: rnd(1.2, 2.0), s: rnd(2, 4), w: 0 });
       const d = Math.hypot(player.x - x, (player.y - y) * 1.3);
       if (F.death < 0 && d < 72 && (!nr || d < nr.d)) nr = { s, x, y, d };
     }
-    CURSE.nr = nr; if (CURSE.ask && (!nr || nr.s !== CURSE.ask || F.death >= 0)) { const near2 = CURSE.ask && nr && Math.hypot(player.x - nr.x, (player.y - nr.y) * 1.3) < 110; if (!near2) CURSE.ask = null; }
-    CURSE.bv += ((nr && !CURSE.ask ? 1 : 0) - CURSE.bv) * dmp(12, dt); if (CURSE.bv < 0.01) CURSE.bv = 0;
-    CURSE.av += ((CURSE.ask ? 1 : 0) - CURSE.av) * dmp(14, dt); if (CURSE.av < 0.01) CURSE.av = 0;
-    if (CURSE.info) { CURSE.info.t += dt; if (CURSE.info.t > 16) CURSE.info = null; }
-    CURSE.iv += ((CURSE.info && CURSE.info.t > 0.6 ? 1 : 0) - CURSE.iv) * dmp(10, dt); if (CURSE.iv < 0.01) CURSE.iv = 0;
+    CURSE.nr = nr;
+    { const hold = nr && F.death < 0 && !MENU.on && (CURSE.hid !== null || CURSE.hk);
+      if (hold) { CURSE.hp = Math.min(1, CURSE.hp + dt / CURSE_HOLD); nr.s.shk = Math.max(nr.s.shk, 0.25 + 0.5 * CURSE.hp); if (CURSE.hp >= 1) { curseOpen(nr.s); CURSE.hp = 0; CURSE.hid = null; CURSE.hk = false; } }
+      else CURSE.hp = Math.max(0, CURSE.hp - dt * 3.5); }
+    CURSE.bv += ((nr ? 1 : 0) - CURSE.bv) * dmp(12, dt); if (CURSE.bv < 0.01) CURSE.bv = 0;
+    if (CURSE.info) { CURSE.info.t += dt; if (CURSE.info.t > 0.9 && !CURSE.info.rw) { CURSE.info.rw = 1; ftext(CURSE.info.x, CURSE.info.y - 96, 'Ödül: Mor Prizma ×' + CURSE.info.n, '#b79cff'); } if (CURSE.info.t > 9) CURSE.info = null; }   // bilgi canlı: rozet altındaki etki çipleri + sandığın üstünde ödül yazısı
   }
   function drawCurseFx(light) {   // dünya katmanı: yeşil duman, kemik / zincir parçaları, halkalar
     if (!CURSE.p.length) return;
@@ -5370,93 +5462,158 @@
     if (CURSE.bv > 0.01) {
       const r = curseBtnRect(); ctx.save(); ctx.globalAlpha = CURSE.bv; ctx.translate(0, (1 - CURSE.bv) * 8);
       rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = `rgba(${bgc},0.62)`; ctx.fill(); ctx.fillStyle = `rgba(${G},0.12)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = `rgba(${G},0.8)`; ctx.stroke();
-      dvText('SANDIĞI AÇ', r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13.5, 600, G, 1, 3, 'center'); ctx.restore();
+      if (CURSE.hp > 0.01) { ctx.save(); rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.clip(); ctx.fillStyle = `rgba(${G},0.42)`; ctx.fillRect(r.x, r.y, r.w * CURSE.hp, r.h); ctx.restore(); }   // basılı tutuldukça dolar
+      dvText('SANDIĞI AÇ', r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13.5, 600, G, 1, 3, 'center'); dvText('basılı tut', r.x + r.w / 2, r.y + r.h + 13, 10.5, 400, fg, 0.55, 1, 'center'); ctx.restore();
     }
-    if (CURSE.av > 0.01) {
-      const d = curseDlg(), a = CURSE.av; ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = `rgba(0,0,0,${light ? 0.35 : 0.55})`; ctx.fillRect(0, 0, W, H);
-      ctx.translate(0, (1 - a) * 10); rr(d.x, d.y, d.w, d.h, 16); ctx.fillStyle = `rgba(${light ? '246,248,246' : '10,14,12'},0.96)`; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${G},0.75)`; ctx.stroke();
-      const cx = d.x + d.w / 2; let y = d.y + 36;
-      dvText('LANETLİ SANDIK', cx, y, 15, 700, G, 1, 4, 'center'); y += 30; dvText('Açarsan lanet seni bulur.', cx, y, 12, 400, fg, 0.7, 0.5, 'center'); y += 20; dvText('Yine de açmak istiyor musun?', cx, y, 11.5, 400, fg, 0.5, 0.4, 'center');
-      for (const [r, txt, yes] of [[d.no, 'VAZGEÇ', 0], [d.yes, 'AÇ', 1]]) { rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = yes ? `rgba(${G},0.2)` : `rgba(${fg},0.06)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = yes ? `rgba(${G},0.9)` : `rgba(${fg},0.3)`; ctx.stroke(); dvText(txt, r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13, 700, yes ? G : fg, yes ? 1 : 0.75, 2.5, 'center'); }
-      ctx.restore();
-    }
-    if (CURSE.iv > 0.01 && CURSE.info) {   // sandık açıldıktan sonra: lanetin bedeli + ödül
-      const d = curseDlg(262), a = CURSE.iv; ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * 10);
-      rr(d.x, d.y, d.w, d.h, 16); ctx.fillStyle = `rgba(${light ? '246,248,246' : '10,14,12'},0.96)`; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${G},0.75)`; ctx.stroke();
-      const cx = d.x + d.w / 2; let y = d.y + 30;
-      dvText('LANET!', cx, y, 17, 700, G, 1, 5, 'center'); y += 20; dvText('Sandık açıldı, lanet seni buldu', cx, y, 11.5, 400, fg, 0.6, 0.5, 'center'); y += 28;
-      const red = light ? '200,40,40' : '255,96,90', rows = [['Aldığın hasar', '×2', red], ['İyileşme', '×0,5', red], ['Verdiğin hasar', '−%33  ·  15 → 10', red]];
-      for (const [n, v, c] of rows) { dvText(n, d.x + 26, y, 12.5, 400, fg, 0.8, 0.3, 'left'); dvText(v, d.x + d.w - 26, y, 13, 700, c, 1, 0.3, 'right'); ctx.fillStyle = `rgba(${fg},0.1)`; ctx.fillRect(d.x + 22, y + 11, d.w - 44, 1); y += 24; }
-      y += 6; dvText('Lanet 10 düşman kesince kalkar  ·  ölürsen silinir', cx, y, 11, 400, fg, 0.65, 0.2, 'center'); y += 20; dvText('Ödül: Mor Prizma ×' + CURSE.info.n, cx, y, 12, 600, '170,130,255', 1, 0.8, 'center');
-      const r = curseInfoBtn(); rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = `rgba(${G},0.2)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = `rgba(${G},0.9)`; ctx.stroke(); dvText('TAMAM', r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13, 700, G, 1, 2.5, 'center');
-      ctx.restore();
+    if (CURSE.info && CURSE.on) {   // canlı bilgi: rozetin altında etki çipleri sırayla belirir, birkaç saniye sonra kaybolur
+      const it = CURSE.info, q = HUD_S, red = light ? '200,40,40' : '255,96,90', ch = [['Aldığın hasar', '×2'], ['İyileşme', '×0,5'], ['Verdiğin hasar', '−%33']], cw2 = 116 * q, ch2 = 24 * q, gp = 6 * q, tot = ch.length * cw2 + (ch.length - 1) * gp, x0 = W / 2 - tot / 2, y0 = HUD_Y - 22 * q + 28 * q + 8 * q;
+      ch.forEach(([n, v], i) => {
+        const u = clamp((it.t - 0.5 - i * 0.35) / 0.3, 0, 1) * clamp((9 - it.t) / 0.8, 0, 1); if (u <= 0.01) return;
+        const x = x0 + i * (cw2 + gp), y = y0 + (1 - u) * -6 * q; ctx.save(); ctx.globalAlpha = u;
+        rr(x, y, cw2, ch2, ch2 / 2); ctx.fillStyle = `rgba(${bgc},0.6)`; ctx.fill(); ctx.fillStyle = `rgba(${red},0.1)`; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = `rgba(${red},0.55)`; ctx.stroke();
+        dvText(n, x + 10 * q, y + ch2 / 2 + 0.5, 9.5 * q, 400, fg, 0.75, 0.2, 'left'); dvText(v, x + cw2 - 10 * q, y + ch2 / 2 + 0.5, 10.5 * q, 700, red, 1, 0.2, 'right'); ctx.restore();
+      });
     }
   }
   function drawCursedChest(x, y, id, lk, light) {
     const s = chState(id, lk), t = performance.now() / 1000, cop = s.cop, sk = s.sd;
-    const op = cop < 0.8 ? 0 : clamp((cop - 0.8) / 0.4, 0, 1), eo = op ? 1 - Math.pow(1 - op, 3) + Math.sin(op * PI) * 0.12 : 0;
+    const op = cop < 0.8 ? 0 : clamp((cop - 0.8) / 0.6, 0, 1), eo = op ? 1 - Math.pow(1 - op, 3) + Math.sin(op * PI) * 0.1 : 0;   // kapak 0,6 sn'de açılır, hafif geri tepme
+    const age = cop >= 0.8 ? cop - 0.8 : 0;                                  // kilit patladığından beri geçen süre
+    const fireK = cop < 0.8 ? 1 : 1 - sstep(3, 7.5, age);                    // arkadaki hayalet alevi: ilk saniyeler yanar, sonra titreyip söner
+    const beamK = eo > 0 ? clamp(eo, 0, 1) * (1 - sstep(5.5, 11, age)) : 0;  // ışık süzmesi: ilk anda parlar, belli süre sonra yavaşça yok olur
+    const emb = eo > 0 ? 0.16 + 0.84 * beamK : 0;                            // ışık bitince içeride kalan zayıf kor
     const pre = cop >= 0 && cop < 0.8 ? cop / 0.8 : 0, ts = (t + sk) % 5.5, idle = cop < 0 && ts < 0.4 ? Math.sin(ts * 70) * 0.9 * (1 - ts / 0.4) : 0, pu = 0.5 + 0.5 * Math.sin(t * 2.4 + sk);
     const W1 = light ? '#2a2830' : '#1c1b21', W2 = light ? '#211f27' : '#15141a', BN = light ? '#d4ccb2' : '#e2dac2', BS = light ? '#9a917a' : '#a79e86', DK = '#08070b', GR = '#5dffa6';
-    const eye = cop < 0 ? 0.5 + 0.5 * pu : cop < 0.8 ? 1 : 0, mouth = Math.max(eo, 0);
+    const eye = cop < 0 ? 0.55 + 0.45 * pu * (0.85 + 0.15 * Math.sin(t * 31 + sk)) : cop < 0.8 ? 1.15 : (1 - sstep(0.45, 0.95, op)) * (0.8 + 0.2 * Math.sin(t * 47)) * 1.15;   // kapalıyken yanar · kapak tam açılınca gözler söner
+    const aur = cop < 0.8 ? 1 : 0.3 + 0.7 * Math.max(fireK, beamK), GC = light ? '30,200,120' : CURSE_RGB;
     ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';   // yeşil hayalet aurası
-    { const r = 62 + 10 * pu + 22 * (pre + eo), g = ctx.createRadialGradient(x, y - 18, 4, x, y - 18, r); g.addColorStop(0, `rgba(${light ? '30,200,120' : CURSE_RGB},${(light ? 0.2 : 0.2) + 0.1 * pu + 0.28 * (pre + eo * 0.7)})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - 18 - r, 2 * r, 2 * r); }
+    { const r = 62 + 10 * pu + 22 * (pre + beamK), g = ctx.createRadialGradient(x, y - 18, 4, x, y - 18, r); g.addColorStop(0, `rgba(${GC},${((light ? 0.2 : 0.2) + 0.1 * pu + 0.28 * (pre + beamK * 0.7)) * aur})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - 18 - r, 2 * r, 2 * r); }
     ctx.restore();
     ctx.fillStyle = light ? 'rgba(30,20,60,0.2)' : 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 24 * CHS, 6 * CHS, 0, 0, TAU); ctx.fill();
+    if (emb > 0.02) {   // sandığın önüne taşan yeşil ışık havuzu: ışık söndükçe küçülür
+      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'; ctx.translate(x, y + 7 * CHS); ctx.scale(1, 0.3);
+      const pr = (34 + 14 * beamK) * CHS, g = ctx.createRadialGradient(0, 0, 0, 0, 0, pr); g.addColorStop(0, `rgba(${GC},${(light ? 0.22 : 0.34) * emb})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, pr, 0, TAU); ctx.fill(); ctx.restore();
+    }
     ctx.save(); ctx.translate(x + (pre ? Math.sin(t * 95) * (0.5 + 1.8 * pre) : idle), y + (pre ? Math.sin(t * 71) * 0.5 * pre : 0)); ctx.scale(CHS * (1 + 0.06 * s.sq), CHS * (1 - 0.08 * s.sq)); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    // arkada sönük hayalet alevleri
-    ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
-    for (const fx of [-17, 17]) for (let k = 0; k < 2; k++) { const bx = fx + (k ? Math.sign(fx) * 3 : 0), h = (13 + 5 * Math.sin(t * 6 + fx + k * 2) + 8 * eo) * (k ? 0.7 : 1), sw = Math.sin(t * 3.1 + fx * 0.4 + k) * 2.2, by = -15, g = ctx.createLinearGradient(0, by, 0, by - h); g.addColorStop(0, `rgba(${light ? '30,190,110' : '120,255,190'},${0.55})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(bx - 3.4, by); ctx.quadraticCurveTo(bx - 4.2, by - h * 0.55, bx + sw, by - h); ctx.quadraticCurveTo(bx + 4.2, by - h * 0.5, bx + 3.4, by); ctx.fill(); }
-    ctx.restore();
+    // arkada hayalet alevi: 3 katman (koyu dış kor, yeşil gövde, beyazımsı çekirdek) · açılıştan birkaç sn sonra kısalır, titreşir ve söner
+    if (fireK > 0.01) {
+      const dy = cop >= 0.8 ? 1 - fireK : 0;   // sönerken titreme artar
+      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
+      { const gl = ctx.createRadialGradient(0, -6, 2, 0, -6, 38); gl.addColorStop(0, `rgba(${light ? '40,200,120' : '95,255,170'},${(0.26 + 0.1 * pu + 0.2 * Math.min(1, eo)) * fireK})`); gl.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.save(); ctx.scale(1.2, 0.5); ctx.translate(0, -4); ctx.fillStyle = gl; ctx.fillRect(-46, -46, 92, 80); ctx.restore(); }
+      for (const [wk, hk0, sp, fq, col, al, rim] of [[1, 1, 1.7, 0.31, light ? '16,150,100' : '30,200,130', 0.6, 0.0], [0.84, 0.82, 2.5, 0.43, light ? '30,190,110' : '95,255,170', 0.85, 0.5], [0.5, 0.55, 3.6, 0.6, light ? '80,215,150' : '210,255,232', 0.9, 0.0]]) {
+        const hk = hk0 * (0.3 + 0.7 * fireK), by = -9, top = 84 * hk + 8 * Math.min(1, eo) * fireK, g = ctx.createLinearGradient(0, by, 0, by - top); g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(0.16, `rgba(${col},${0.5 * al * fireK})`); g.addColorStop(0.62, `rgba(${col},${0.2 * al * fireK})`); g.addColorStop(1, `rgba(${col},0)`);
+        const P = []; for (let x = -28; x <= 28.01; x += 2) { const env = Math.pow(Math.max(0, 1 - (x / 29) ** 2), 0.8) * (0.55 + 0.45 * fireK), r = Math.pow(0.5 + 0.5 * Math.sin(x * fq + t * sp + sk * (1 + wk)) * Math.cos(x * fq * 0.37 - t * sp * 0.6), 1.3), fk = 1 + (0.12 + 0.3 * dy) * Math.sin(t * (5.3 + 6 * dy) + x * 0.7 + wk * 4), hh = env * (25 + 30 * r) * fk * hk + env * 8 * Math.min(1, eo) * fireK; P.push([x * wk + Math.sin(t * 2 * sp / 1.7 + x * 0.17 + sk) * 2.6 * (hh / 34), by - hh]); }
+        const path = () => { ctx.beginPath(); ctx.moveTo(-28 * wk, by); ctx.lineTo(P[0][0], P[0][1]); for (let i = 1; i < P.length - 1; i++) ctx.quadraticCurveTo(P[i][0], P[i][1], (P[i][0] + P[i + 1][0]) / 2, (P[i][1] + P[i + 1][1]) / 2); ctx.lineTo(P[P.length - 1][0], P[P.length - 1][1]); ctx.lineTo(28 * wk, by); ctx.closePath(); };
+        ctx.fillStyle = g; path(); ctx.fill();
+        if (rim) { ctx.strokeStyle = `rgba(${light ? '20,170,100' : '190,255,220'},${(0.28 + 0.12 * pu) * fireK})`; ctx.lineWidth = 0.55; ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length - 1; i++) ctx.quadraticCurveTo(P[i][0], P[i][1], (P[i][0] + P[i + 1][0]) / 2, (P[i][1] + P[i + 1][1]) / 2); ctx.stroke(); }
+      }
+      for (let i = 0; i < 6; i++) { const u = (t * (0.26 + i % 3 * 0.05) + i * 0.17 + sk * 0.13) % 1, ex = -17 + i * 6.8 + Math.sin(t * 1.8 + i * 2.3 + sk) * 3, ey = -30 - u * 30, a = Math.sin(u * PI) * 0.8 * fireK, c = light ? '30,180,105' : '190,255,220'; ctx.fillStyle = `rgba(${c},${a})`; ctx.beginPath(); ctx.arc(ex, ey, 0.8 * (1 - u * 0.5), 0, TAU); ctx.fill(); ctx.strokeStyle = `rgba(${c},${a * 0.45})`; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - Math.sin(t * 1.8 + i * 2.3 + sk) * 0.6, ey + 3.4); ctx.stroke(); }
+      ctx.restore();
+    }
+    // AÇIK KAPAK: arkaya dayanmış, iç yüzü görünür (kapalıyken önde duran kubbe kapak 0,3–0,42 aralığında bununla yer değiştirir)
+    if (eo > 0.3) {
+      const pa = clamp((eo - 0.3) / 0.12, 0, 1), Lh = 10 + 14 * sstep(0.3, 1, eo) + 3 * Math.max(0, eo - 1), by = -24.5, tt = 16.4, ty = by - Lh;
+      const lidPath = () => { ctx.beginPath(); ctx.moveTo(-18, by); ctx.lineTo(-tt, ty + 6); ctx.quadraticCurveTo(-tt, ty - 3, 0, ty - 3); ctx.quadraticCurveTo(tt, ty - 3, tt, ty + 6); ctx.lineTo(18, by); ctx.closePath(); };
+      ctx.save(); ctx.globalAlpha = pa; lidPath(); ctx.fillStyle = light ? '#1f1d25' : '#121117'; ctx.fill(); ctx.strokeStyle = DK; ctx.lineWidth = 1; ctx.stroke();
+      ctx.save(); lidPath(); ctx.clip();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, by - Lh * 0.42); ctx.lineTo(18, by - Lh * 0.42); ctx.stroke();
+      ctx.globalAlpha = pa * 0.55; ctx.fillStyle = BS; ctx.fillRect(-13, ty - 4, 4.2, Lh + 6); ctx.fillRect(8.8, ty - 4, 4.2, Lh + 6); ctx.globalAlpha = pa;
+      ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';   // mağzından yükselen yeşil ışık iç yüzü aydınlatır
+      { const g = ctx.createLinearGradient(0, by, 0, ty - 3); g.addColorStop(0, `rgba(${light ? '40,210,130' : '120,255,190'},${(light ? 0.3 : 0.4) * emb})`); g.addColorStop(1, `rgba(${CURSE_RGB},${0.04 * emb})`); ctx.fillStyle = g; ctx.fillRect(-19, ty - 4, 38, Lh + 6); }
+      ctx.restore();
+      ctx.strokeStyle = `rgba(${light ? '20,170,100' : '190,255,220'},${0.3 * emb})`; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-tt, ty + 6); ctx.quadraticCurveTo(-tt, ty - 3, 0, ty - 3); ctx.quadraticCurveTo(tt, ty - 3, tt, ty + 6); ctx.stroke();
+      ctx.fillStyle = '#4a4753'; [-15.2, 15.2].forEach(sx => { ctx.beginPath(); ctx.arc(sx, by - 1.6, 1.1, 0, TAU); ctx.fill(); });   // menteşe
+      ctx.restore();
+    }
     // gövde
     ctx.strokeStyle = DK; ctx.lineWidth = 1; ctx.fillStyle = W1; ctx.fillRect(-18, -20, 36, 20); ctx.fillStyle = W2; ctx.fillRect(-18, -13.5, 36, 6.5); ctx.strokeRect(-18, -20, 36, 20);
     ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -13.5); ctx.lineTo(18, -13.5); ctx.moveTo(-18, -7); ctx.lineTo(18, -7); ctx.stroke();
-    ctx.strokeStyle = `rgba(${CURSE_RGB},${0.35 + 0.25 * pu + 0.3 * pre})`; ctx.lineWidth = 0.6;   // ahşap çatlaklarından sızan ışık
+    ctx.strokeStyle = `rgba(${CURSE_RGB},${(0.35 + 0.25 * pu + 0.3 * pre) * (eo > 0 ? 0.25 + 0.75 * emb : 1)})`; ctx.lineWidth = 0.6;   // ahşap çatlaklarından sızan ışık
     ctx.beginPath(); ctx.moveTo(-6.5, -18); ctx.lineTo(-4.4, -14.6); ctx.lineTo(-6.2, -11.4); ctx.lineTo(-4.6, -8.4); ctx.moveTo(4.6, -12.6); ctx.lineTo(6.6, -9.8); ctx.lineTo(5, -7.6); ctx.stroke();
     ctx.strokeStyle = DK; ctx.lineWidth = 0.7; ctx.fillStyle = BN;   // kemik bantlar
     ctx.fillRect(-18, -3.2, 36, 3.2); ctx.strokeRect(-18, -3.2, 36, 3.2);
     [-13, 8.8].forEach(sx => { ctx.fillRect(sx, -20, 4.2, 17); ctx.strokeRect(sx, -20, 4.2, 17); });
     ctx.fillStyle = BS; [-13, 8.8].forEach(sx => ctx.fillRect(sx + 3.1, -19.6, 1, 16.4)); ctx.fillRect(-17.6, -1, 35.2, 0.9);
     ctx.fillStyle = GR; [[-11, -16], [11, -16], [-11, -6.5], [11, -6.5]].forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 0.95, 0, TAU); ctx.fill(); });
-    // açık ağız: içeriden yeşil ışık
+    if (eo > 0.05) {   // kopan zincirin yanlarda sarkan parçaları
+      ctx.save(); ctx.globalAlpha = clamp(eo * 2, 0, 1);
+      for (const sg of [-1, 1]) for (let i = 0; i < 3; i++) { const px = sg * (16.6 - i * 0.5) + Math.sin(t * 1.4 + i + sg) * 0.25 * i, py = -2.6 - i * 2.9; ctx.save(); ctx.translate(px, py); ctx.rotate(i % 2 ? PI / 2 : 0); ctx.strokeStyle = DK; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 0, 2, 1.1, 0, 0, TAU); ctx.stroke(); ctx.strokeStyle = i % 2 ? '#8b8794' : '#6f6b78'; ctx.lineWidth = 0.9; ctx.stroke(); ctx.restore(); }
+      ctx.restore();
+    }
+    // açık ağız: iç yüzey + içeriden yeşil ışık, ön dudak
     if (eo > 0.02) {
-      ctx.fillStyle = '#04140c'; ctx.fillRect(-16.5, -21.2, 33, 2.2 + 2 * eo);
-      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'; const bh = 26 + 52 * eo, g = ctx.createLinearGradient(0, -21, 0, -21 - bh); g.addColorStop(0, `rgba(${light ? '40,210,130' : '140,255,200'},${0.75 * eo})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-15, -21); ctx.lineTo(15, -21); ctx.lineTo(26, -21 - bh); ctx.lineTo(-26, -21 - bh); ctx.closePath(); ctx.fill(); ctx.restore();
+      const ie = Math.min(1, eo), ih = 5.5 * ie;
+      ctx.fillStyle = '#031a0f'; ctx.fillRect(-16.5, -20 - ih, 33, ih + 1.2);
+      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
+      { const g = ctx.createRadialGradient(0, -22.5, 0, 0, -22.5, 19); g.addColorStop(0, `rgba(${light ? '60,225,150' : '130,255,195'},${0.7 * emb * ie})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.save(); ctx.beginPath(); ctx.rect(-16.5, -20 - ih, 33, ih + 1.2); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(-20, -34, 40, 20); ctx.restore(); }
+      ctx.restore();
+      ctx.fillStyle = BN; ctx.fillRect(-18.5, -21.5, 37, 2.4); ctx.strokeStyle = DK; ctx.lineWidth = 0.8; ctx.strokeRect(-18.5, -21.5, 37, 2.4);
     }
-    // kapak (arka menteşe soldan yukarı döner)
-    ctx.save(); ctx.translate(-18, -20); ctx.rotate(-0.34 * eo); ctx.translate(18, 20 - 3 * eo);
-    ctx.beginPath(); ctx.moveTo(-18, -20); ctx.lineTo(-18, -25); ctx.quadraticCurveTo(-18, -36, 0, -36); ctx.quadraticCurveTo(18, -36, 18, -25); ctx.lineTo(18, -20); ctx.closePath();
-    ctx.fillStyle = W2; ctx.fill(); ctx.strokeStyle = DK; ctx.lineWidth = 1; ctx.stroke();
-    ctx.save(); ctx.clip();
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -28.5); ctx.lineTo(18, -28.5); ctx.stroke();
-    ctx.fillStyle = BN; ctx.fillRect(-13, -40, 4.2, 22); ctx.fillRect(8.8, -40, 4.2, 22); ctx.strokeStyle = DK; ctx.lineWidth = 0.7; ctx.strokeRect(-13, -40, 4.2, 22); ctx.strokeRect(8.8, -40, 4.2, 22);
-    ctx.fillStyle = BS; ctx.fillRect(-9.9, -40, 1, 22); ctx.fillRect(12, -40, 1, 22);
-    if (!light) { ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-15.5, -27); ctx.quadraticCurveTo(-14.5, -33, -6, -34.2); ctx.stroke(); }
-    ctx.restore();
-    ctx.fillStyle = BN; ctx.fillRect(-18.5, -21.5, 37, 2.4); ctx.strokeStyle = DK; ctx.lineWidth = 0.8; ctx.strokeRect(-18.5, -21.5, 37, 2.4);
-    // zincir (iki çapraz): açılırken kopar
-    const ca = cop < 0 ? 1 : clamp(1 - (cop - 0.45) / 0.35, 0, 1);
-    if (ca > 0.01) {
-      ctx.save(); ctx.globalAlpha = ca;
-      for (const sg of [1, -1]) { const x0 = -17 * sg, y0 = -3, x1 = 17 * sg, y1 = -19, an = Math.atan2(y1 - y0, x1 - x0), n = 8;
-        for (let i = 0; i <= n; i++) { const u = i / n, px = lerp(x0, x1, u), py = lerp(y0, y1, u) + Math.sin(u * PI) * 0.8; ctx.save(); ctx.translate(px, py); ctx.rotate(an + (i % 2 ? PI / 2 : 0)); ctx.strokeStyle = DK; ctx.lineWidth = 2.1; ctx.beginPath(); ctx.ellipse(0, 0, 2.1, 1.1, 0, 0, TAU); ctx.stroke(); ctx.strokeStyle = i % 2 ? '#8b8794' : '#6f6b78'; ctx.lineWidth = 0.95; ctx.stroke(); ctx.restore(); } }
+    // kapalı kubbe kapak: açılırken yukarı kalkıp ezilir, sonra arkadaki açık kapağa devrolur
+    const dome = 1 - clamp((eo - 0.3) / 0.12, 0, 1);
+    if (dome > 0.01) {
+      const pk = clamp(eo / 0.38, 0, 1);
+      ctx.save(); ctx.globalAlpha = dome; ctx.translate(0, -20 - pk * 8); ctx.scale(1, 1 - 0.5 * pk); ctx.translate(0, 20);
+      ctx.beginPath(); ctx.moveTo(-18, -20); ctx.lineTo(-18, -25); ctx.quadraticCurveTo(-18, -36, 0, -36); ctx.quadraticCurveTo(18, -36, 18, -25); ctx.lineTo(18, -20); ctx.closePath();
+      ctx.fillStyle = W2; ctx.fill(); ctx.strokeStyle = DK; ctx.lineWidth = 1; ctx.stroke();
+      ctx.save(); ctx.clip();
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -28.5); ctx.lineTo(18, -28.5); ctx.stroke();
+      ctx.fillStyle = BN; ctx.fillRect(-13, -40, 4.2, 22); ctx.fillRect(8.8, -40, 4.2, 22); ctx.strokeStyle = DK; ctx.lineWidth = 0.7; ctx.strokeRect(-13, -40, 4.2, 22); ctx.strokeRect(8.8, -40, 4.2, 22);
+      ctx.fillStyle = BS; ctx.fillRect(-9.9, -40, 1, 22); ctx.fillRect(12, -40, 1, 22);
+      if (!light) { ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-15.5, -27); ctx.quadraticCurveTo(-14.5, -33, -6, -34.2); ctx.stroke(); }
+      ctx.restore();
+      ctx.fillStyle = BN; ctx.fillRect(-18.5, -21.5, 37, 2.4); ctx.strokeStyle = DK; ctx.lineWidth = 0.8; ctx.strokeRect(-18.5, -21.5, 37, 2.4);
+      // zincir (iki çapraz): açılırken kopar
+      const ca = cop < 0 ? 1 : clamp(1 - (cop - 0.45) / 0.35, 0, 1);
+      if (ca > 0.01) {
+        ctx.save(); ctx.globalAlpha = dome * ca;
+        for (const sg of [1, -1]) { const x0 = -17 * sg, y0 = -3, x1 = 17 * sg, y1 = -19, an = Math.atan2(y1 - y0, x1 - x0), n = 8;
+          for (let i = 0; i <= n; i++) { const u = i / n, px = lerp(x0, x1, u), py = lerp(y0, y1, u) + Math.sin(u * PI) * 0.8; ctx.save(); ctx.translate(px, py); ctx.rotate(an + (i % 2 ? PI / 2 : 0)); ctx.strokeStyle = DK; ctx.lineWidth = 2.1; ctx.beginPath(); ctx.ellipse(0, 0, 2.1, 1.1, 0, 0, TAU); ctx.stroke(); ctx.strokeStyle = i % 2 ? '#8b8794' : '#6f6b78'; ctx.lineWidth = 0.95; ctx.stroke(); ctx.restore(); } }
+        ctx.restore();
+      }
       ctx.restore();
     }
-    // kuru kafa kilit
-    if (cop < 0.8) {
-      const kx = 0, ky = -27.5; ctx.strokeStyle = DK; ctx.lineWidth = 0.9; ctx.fillStyle = BN;
-      ctx.beginPath(); ctx.ellipse(kx, ky - 1.2, 5.6, 5.2, 0, 0, TAU); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(kx - 3.4, ky + 2); ctx.lineTo(kx - 3.4, ky + 5.4); ctx.lineTo(kx + 3.4, ky + 5.4); ctx.lineTo(kx + 3.4, ky + 2); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = BS; ctx.beginPath(); ctx.ellipse(kx + 1.8, ky - 0.6, 3.4, 3.8, 0, -1.1, 1.3); ctx.lineTo(kx + 1.4, ky); ctx.fill();
-      ctx.fillStyle = '#05080a'; ctx.beginPath(); ctx.ellipse(kx - 2.3, ky - 1.4, 1.6, 1.9, 0, 0, TAU); ctx.ellipse(kx + 2.3, ky - 1.4, 1.6, 1.9, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(kx, ky + 0.6); ctx.lineTo(kx - 0.9, ky + 2); ctx.lineTo(kx + 0.9, ky + 2); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = DK; ctx.lineWidth = 0.5; ctx.beginPath(); for (const dx of [-1.1, 1.1]) { ctx.moveTo(kx + dx, ky + 3); ctx.lineTo(kx + dx, ky + 5.2); } ctx.moveTo(kx, ky + 3); ctx.lineTo(kx, ky + 5.2); ctx.stroke();
-      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';   // yanan gözler
-      for (const ex of [-2.3, 2.3]) { const g = ctx.createRadialGradient(kx + ex, ky - 1.4, 0, kx + ex, ky - 1.4, 4.6); g.addColorStop(0, `rgba(${light ? '40,220,130' : '170,255,210'},${eye})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(kx + ex - 5, ky - 6.4, 10, 10); }
+    // kuru kafa kilit: kapalıyken gözleri yeşil yanar · kilit kırılınca gövdeye düşüp çenesi sarkar, kapak tam açılınca gözleri söner
+    {
+      const e2 = 1 - Math.pow(1 - op, 3), kx = 0, ky = lerp(-27.5, -11.5, e2), rot = 0.2 * e2 * (sk % 2 < 1 ? 1 : -1), crack = cop < 0 ? 0 : cop < 0.8 ? pre : 1;
+      ctx.save(); ctx.translate(kx, ky); ctx.rotate(rot);
+      if (eye > 0.02) { ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'; const g = ctx.createRadialGradient(0, -1, 0, 0, -1, 11); g.addColorStop(0, `rgba(${GC},${Math.min(0.3, 0.18 * eye)})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(-12, -13, 24, 24); ctx.restore(); }   // gözlerin çevreye saçtığı hafif ışık
+      ctx.strokeStyle = DK; ctx.lineWidth = 0.9; ctx.fillStyle = BN;
+      ctx.beginPath(); ctx.ellipse(0, -1.2, 5.6, 5.2, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.save(); ctx.translate(0, 1.4 * e2);   // çene sarkar
+      ctx.beginPath(); ctx.moveTo(-3.4, 2); ctx.lineTo(-3.4, 5.4); ctx.lineTo(3.4, 5.4); ctx.lineTo(3.4, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = DK; ctx.lineWidth = 0.5; ctx.beginPath(); for (const dx of [-1.1, 1.1]) { ctx.moveTo(dx, 3); ctx.lineTo(dx, 5.2); } ctx.moveTo(0, 3); ctx.lineTo(0, 5.2); ctx.stroke();
       ctx.restore();
-      if (pre > 0) { ctx.strokeStyle = `rgba(${CURSE_RGB},${pre})`; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(kx - 1, ky - 6.2); ctx.lineTo(kx + 0.6, ky - 3.4); ctx.lineTo(kx - 0.8, ky - 0.6); ctx.lineTo(kx + 0.4, ky + 2); ctx.stroke(); ctx.strokeStyle = `rgba(0,0,0,${pre})`; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(kx - 1.6, ky - 6); ctx.lineTo(kx, ky - 3.2); ctx.lineTo(kx - 1.4, ky - 0.4); ctx.stroke(); }
+      ctx.fillStyle = BS; ctx.beginPath(); ctx.ellipse(1.8, -0.6, 3.4, 3.8, 0, -1.1, 1.3); ctx.lineTo(1.4, 0); ctx.fill();
+      ctx.fillStyle = '#05080a'; ctx.beginPath(); ctx.ellipse(-2.3, -1.4, 1.6, 1.9, 0, 0, TAU); ctx.ellipse(2.3, -1.4, 1.6, 1.9, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, 0.6); ctx.lineTo(-0.9, 2); ctx.lineTo(0.9, 2); ctx.closePath(); ctx.fill();
+      if (eye > 0.02) {   // yanan gözler
+        ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
+        for (const ex of [-2.3, 2.3]) { const g = ctx.createRadialGradient(ex, -1.4, 0, ex, -1.4, 4.6); g.addColorStop(0, `rgba(${light ? '40,220,130' : '170,255,210'},${Math.min(1, eye)})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(ex - 5, -6.4, 10, 10); if (eye > 0.4) { ctx.fillStyle = `rgba(235,255,245,${Math.min(0.9, eye - 0.3)})`; ctx.beginPath(); ctx.arc(ex, -1.4, 0.65, 0, TAU); ctx.fill(); } }
+        ctx.restore();
+      }
+      if (crack > 0.01) { ctx.strokeStyle = `rgba(${CURSE_RGB},${crack * (cop >= 0.8 ? 0.35 + 0.65 * Math.min(1, eye) : 1)})`; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(-1, -6.2); ctx.lineTo(0.6, -3.4); ctx.lineTo(-0.8, -0.6); ctx.lineTo(0.4, 2); ctx.stroke(); ctx.strokeStyle = `rgba(0,0,0,${crack})`; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(-1.6, -6); ctx.lineTo(0, -3.2); ctx.lineTo(-1.4, -0.4); ctx.stroke(); }
+      ctx.restore();
     }
-    ctx.restore();
+    // IŞIK SÜZMESİ: ağızdan yükselen ince şaftlar (her biri ayrı titreşir ve sallanır) · toz zerreleri · ağız çizgisi · belli süre sonra kısalıp söner
+    if (beamK > 0.01) {
+      const GL = light ? '30,190,110' : '170,255,210', ie = Math.min(1, eo * 1.15);
+      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'; const y0 = -22.5, al = light ? 0.55 : 1;
+      { const bh = (30 + 70 * ie) * (0.4 + 0.6 * beamK), g = ctx.createLinearGradient(0, y0, 0, y0 - bh); g.addColorStop(0, `rgba(${light ? '40,210,130' : '120,255,190'},${0.38 * beamK * al})`); g.addColorStop(0.5, `rgba(${CURSE_RGB},${0.14 * beamK * al})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-15, y0); ctx.lineTo(15, y0); ctx.lineTo(27, y0 - bh); ctx.lineTo(-27, y0 - bh); ctx.closePath(); ctx.fill(); }   // yumuşak ana koni
+      for (let i = 0; i < 7; i++) {
+        const seed = i * 1.713 + sk, off = (i - 3) * 4.3 + Math.sin(t * 0.9 + seed) * 1.5, fl = 0.5 + 0.5 * Math.sin(t * (1.1 + i * 0.23) + seed * 2), w0 = 2 + (i % 3) * 1.1, w1 = w0 + 3.5 + (i % 2) * 3;
+        const hgt = (42 + 56 * (0.5 + 0.5 * Math.sin(seed * 3.1 + t * 0.7))) * ie * (0.35 + 0.65 * beamK), xt = off * 1.8 + Math.sin(t * 0.6 + seed) * 3;
+        const g = ctx.createLinearGradient(0, y0, 0, y0 - hgt); g.addColorStop(0, `rgba(${GL},${(0.2 + 0.26 * fl) * beamK * al})`); g.addColorStop(0.5, `rgba(${GL},${0.08 * (0.5 + fl) * beamK * al})`); g.addColorStop(1, `rgba(${GL},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(off - w0, y0); ctx.lineTo(xt - w1, y0 - hgt); ctx.lineTo(xt + w1, y0 - hgt); ctx.lineTo(off + w0, y0); ctx.closePath(); ctx.fill();
+      }
+      { const g = ctx.createRadialGradient(0, y0, 0, 0, y0, 22); g.addColorStop(0, `rgba(${light ? '90,230,160' : '170,255,212'},${0.34 * beamK * al})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.save(); ctx.translate(0, y0); ctx.scale(1.3, 0.6); ctx.translate(0, -y0); ctx.fillStyle = g; ctx.fillRect(-30, y0 - 24, 60, 48); ctx.restore(); }   // ağızdaki parlak çekirdek
+      ctx.strokeStyle = `rgba(${light ? '60,220,140' : '225,255,240'},${0.75 * beamK * al})`; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-15.5, y0 + 0.6); ctx.lineTo(15.5, y0 + 0.6); ctx.stroke();   // ağız çizgisi
+      for (let j = 0; j < 12; j++) {   // ışıkta süzülen toz zerreleri
+        const u = (t * (0.16 + 0.04 * (j % 4)) + j * 0.083 + sk * 0.07) % 1, hy = u * (18 + 70 * beamK), ex = ((j % 5) - 2) * 4.6 * (0.5 + u * 1.3) + Math.sin(t * 1.3 + j * 1.7) * 2.2, a = Math.sin(u * PI) * 0.9 * beamK;
+        ctx.fillStyle = `rgba(${light ? '20,170,100' : '225,255,240'},${a})`; ctx.beginPath(); ctx.arc(ex, y0 - hy, 0.55 + 0.5 * ((j * 7) % 3) / 2, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
     ctx.restore();
   }
   /* ---------- MİMİK: sandık taklitçisi. Normal sandık gibi vurulur; 2. ya da 3. vuruşta (şansa bağlı) ortaya çıkar ---------- */
@@ -7816,7 +7973,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function devStart() { DEVP.dn = null; if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; menuStart(); } else resumeGame(); }
   function devBack() {
     DEVP.dn = null;
-    if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; DEV.on = DEV.peace = DEV.gold = DEV.keys = DEV.arrows = DEV.tears = DEV.god = DEV.freeze = DEV.anycraft = DEV.pick = false; DEV.tspd = 1; DEV.hpbtn = true; DEV.spawn = {}; }   // menüye dönünce geliştirici modu kapanır
+    if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; DEV.on = DEV.peace = DEV.gold = DEV.keys = DEV.arrows = DEV.tears = DEV.god = DEV.freeze = DEV.anycraft = DEV.pick = false; DEV.tspd = 1; DEV.windMode = 0; DEV.hpbtn = true; DEV.spawn = {}; }   // menüye dönünce geliştirici modu kapanır
     else PAUSE.page = 'main';
   }
   function devDown(e) {   // dokunuş yukarı kalkınca çalışır; sürüklenirse içerik kayar
@@ -7919,6 +8076,14 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         const sp = [[-60, 'geri 60×'], [1, '1×'], [10, '10×'], [60, '60×'], [240, '240×']], w5 = (cw - gp * 4) / 5, sy2 = py + 34 + 44;
         sp.forEach(([v, nm], i) => ob(x0 + i * (w5 + gp), sy2, w5, 34, nm, () => { DEV.tspd = v; devToast(v === 1 ? 'zaman normal hızda' : 'zaman ' + (v < 0 ? 'geri ' : '') + Math.abs(v) + '× · oyuna dönünce izle'); }, { on: DEV.tspd === v, size: 12.5 }));
         dvText('Hız ve geçişler oyuna dönünce işler · 240× animasyonu atlar', x0, sy2 + 34 + 16, 11, 400, fg, 0.42, 0, 'left');
+        hair(y + h + 8, 0.08); y += h + 8; }
+      y += 22; y = sec('rüzgâr', y);
+      { const h = 156, wm = DEV.windMode | 0;
+        dvText('Rüzgâr', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText((CV.in ? 'mağara · cereyan  ' : 'şiddet  ') + WIND.s.toFixed(2) + (WIND.s > WIND_KILL ? '  ·  meşale söner' : ''), x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
+        const cy = y + 44, n = 4, gp = 8, cwid = (cw - gp * (n - 1)) / n;
+        [['doğal', 0], ['sakin', 1], ['esinti', 2], ['fırtına', 3]].forEach(([nm, v], i) => ob(x0 + i * (cwid + gp), cy, cwid, 34, nm, () => { DEV.windMode = v; devToast(['rüzgâr doğal akışında', 'rüzgâr sabit: sakin', 'rüzgâr sabit: esinti', 'rüzgâr sabit: fırtına · açıkta meşale söner'][v]); }, { on: wm === v, size: 12.5 }));
+        ob(x0, cy + 46, cw, 42, 'sert hamle çağır', () => { WIND.gT = 0; WIND.strong = true; WIND.ga = 1; WIND.ru = 2.5; WIND.hd = 3; WIND.rd = 3.5; WIND.warned = false; WIND.dir = Math.random() < 0.5 ? -1 : 1; DEV.windMode = 0; devToast('sert hamle başladı · oyuna dön, meşaleyi ele al'); }, { solid: true, size: 14 });
+        dvText('Fırtına modunda meşale ele alınır ama 1,5 sn sonra söner · mağarada rüzgâr yalnızca cereyan olur.', x0, cy + 108, 11, 400, fg, 0.4, 0, 'left');
         hair(y + h + 8, 0.08); y += h + 8; }
       y += 22; y = sec('para', y); y = swRow('gold', 'Sınırsız altın tozu', 'Altın tozu hiç azalmaz', y);
       { const h = 176; dvText('Altın tozu ekle', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText('envanter  ' + (DEV.gold ? '∞' : INV.dust), x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
@@ -8845,7 +9010,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
      YENİ SİLAH: RH_WEAPONS'a giriş (kind: 'sword' | 'bow' | 'axe') + rhDrawW'de sahne + RH_WD'de süre. YENİ KARAKTER: RH_CHARS'a giriş (kind: 'hero').
      YENİ HEYKEL: RH_STATUES'a giriş (kind: 'statue' | 'evil' | 'rubble') + rhDrawW'de sahne. YENİ KIYAFET: RH_OUTFITS'a giriş (kind: 'gear', gear: GEAR anahtarı). YENİ ZIRH: RH_ARMOR'a giriş.
      YENİ KATEGORİ: RH_CATS satırındaki 'on' değerini true yap, RH_LIST'e liste ekle. Sekme etiketi uzunsa girişe 'tab' alanı ver. */
-  const RH_CATS = [['play', 'Oynanış', 'dalgalar', true], ['enemies', 'Düşmanlar', '5 kayıt', true], ['weapons', 'Silahlar', '6 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true], ['items', 'Eşyalar', '5 kayıt', true], ['chests', 'Sandıklar', '2 kayıt', true]];
+  const RH_CATS = [['play', 'Oynanış', 'dalgalar', true], ['enemies', 'Düşmanlar', '5 kayıt', true], ['weapons', 'Silahlar', '6 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true], ['items', 'Eşyalar', '5 kayıt', true], ['chests', 'Sandıklar', '2 kayıt', true], ['trees', 'Ağaçlar', '6 kayıt', true]];
   const RH_RED = '224,88,74';
   const RH_ENEMIES = [
     { name: 'Çırak Büyücü', sub: 'HORTLAK  ·  SIRADAN DÜŞMAN', mode: 'rage', atkTitle: 'SALDIRILAR',
@@ -9028,10 +9193,10 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         ['Tek kullanımlık', 'Kırılan sandık yerinde enkaz olarak kalır. Çıkıp girerek yenileyemezsin.', '—', 'bir kez']],
       tips: ['Sandığa yaklaşmadan önce mağaradaki canavarlara dikkat et.', 'Canın azken sandık sana sağlık eşyası verme eğilimindedir.'] },
     { kind: 'cxchest', name: 'Lanetli Sandık', tab: 'Lanet', sub: 'SANDIK  ·  MAĞARA', atkTitle: 'LANET', noplay: true,
-      lore: 'Kara demirden ve kemikten yapılmış, çaprazlama zincirlenmiş bir sandık. Kapağında kuru bir kafatası kilit durur, gözleri yeşil yanar. Vurarak açılmaz: yanına gidip SANDIĞI AÇ düğmesine basarsın (klavyede E) ve kısa uyarıyı onaylarsın; lanetin bedelini ve ödülü ancak sandık açıldıktan sonra öğrenirsin. Kilit çatlar, kapak patlar; içinden değerli ödül saçılır ama lanet seni bulur.',
-      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%40 şansla 1'], ['Açılış', 'AÇ düğmesi + onay'], ['Bilgi kartı', 'sandık açılınca çıkar'], ['Aldığın hasar', '×2'], ['İyileşme', '×0,5'], ['Verdiğin hasar', '−%33  ·  15 → 10'], ['Lanet süresi', '10 düşman  ·  dünya dahil'], ['Ödül havuzu', 'Mor prizma  ·  %100  ·  4–6']],
+      lore: 'Kara demirden ve kemikten yapılmış, çaprazlama zincirlenmiş bir sandık. Kapağında kuru bir kafatası kilit durur, gözleri yeşil yanar. Vurarak açılmaz: yanına gidip SANDIĞI AÇ düğmesine basarsın (klavyede E) sandık hemen açılır, onay sorulmaz. Lanetin bedelini ve ödülü pencerede değil, oyun sırasında ekranın üstünde canlı olarak görürsün. Kilit çatlar, kapak patlar; içinden değerli ödül saçılır ama lanet seni bulur.',
+      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%40 şansla 1'], ['Açılış', 'basılı tut  ·  0,7 sn  ·  onaysız'], ['Bilgi', 'açılınca canlı rozetler'], ['Aldığın hasar', '×2'], ['İyileşme', '×0,5'], ['Verdiğin hasar', '−%33  ·  15 → 10'], ['Lanet süresi', '10 düşman  ·  dünya dahil'], ['Ödül havuzu', 'Mor prizma  ·  %100  ·  4–6']],
       atks: [
-        ['Onay', 'Sandığa yaklaşınca SANDIĞI AÇ düğmesi çıkar. Basınca bedeli söylemeyen kısa bir onay penceresi açılır; AÇ dersen sandık açılır, VAZGEÇ dersen hiçbir şey olmaz. Pencere açıkken sandıktan uzaklaşırsan kapanır. Lanetin etkileri ve ödül, sandık açıldıktan sonra bir bilgi kartında gösterilir (TAMAM ile kapanır).', '—', 'AÇ  ›  bilgi kartı'],
+        ['Açılış', 'Sandığa yaklaşınca SANDIĞI AÇ düğmesi çıkar. Düğmeyi kısa bir an (yaklaşık 0,7 sn) basılı tutarsan (klavyede E) onay sorulmadan kilit çatlar, kapak patlar ve lanet başlar. Etkiler ekranın üstündeki LANET rozetinin altında sırayla çipler olarak belirir; ödül sandığın üstünde yazılır.', '—', 'basılı tut'],
         ['Lanet', 'Aldığın her hasar iki katına çıkar, tüm iyileşmeler (bandaj, medkit, otlar, iksir) yarıya iner, kılıç ve diğer silahlarla verdiğin hasar üçte bir azalır. Ekranın üstünde kafatası rozeti ve ilerleme sayacı görünür, kenarlar yeşile çalar.', '×2 · ×0,5 · −%33', 'hasar · iyileşme · saldırı'],
         ['Kalkması', 'Lanet açıkken kestiğin her düşman sayılır; mağarada ya da dünyada fark etmez. 10. düşmanda lanet duman olup dağılır. Ölürsen lanet silinir. Yeni bir lanetli sandık açarsan sayaç 10\'dan yeniden başlar.', '10 düşman', 'ölümde silinir'],
         ['Ödül havuzu', 'Şimdilik tek ödül mor prizma: 4–6 adet, kesin düşer. İleride daha değerli ödüller ve silahlar eklenecek; liste burada güncellenecek.', '%100', 'mor prizma 4–6']],
@@ -9125,7 +9290,44 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     stats: [['Hasar', '30  ·  kılıcın × 1.5'], ['Ağaca hasar', '39  ·  3 vuruşta devirir'], ['Savurma süresi', Math.min(...rhAxSt).toFixed(2) + ' – ' + Math.max(...rhAxSt).toFixed(2) + ' sn'], ['Menzil', '74 birim  ·  ağaçta 90'], ['Darbe maliyeti', '−9 dayanıklılık'], ['Siper', 'yok  ·  balta siper almaz'], ['Odun', 'her darbede 1  ·  %50 fazladan'], ['Odun çantası', 'en çok 40'], ['Kılıçla değişim', 'Q  ·  iki silah da alınmışsa'], ['Kilitli darbe', RH_AX_V.filter(rhAxLock).length + '  ·  silah geliştirmesiyle açılır']],
     atks: RH_AX_V.map(i => { const q = AXV[i]; const lk = rhAxLock(i); return [RH_AX_TXT[i][0], RH_AX_TXT[i][1], q.tree ? '39' : '30', (lk ? 'silah geliştirmesiyle açılır  ·  ' : '') + 'süre ' + q.ST.toFixed(2) + ' sn  ·  menzil ' + (q.tree ? 90 : 74), lk ? 'lock' : '']; }),
     tips: ['Ağacı yalnızca balta keser: kılıç ağaçtan sekip elini sızlatır.', 'Balta kaldırılırken açıkta kalırsın; düşman çok yakınsa kılıç daha güvenlidir.', 'Ağaç üç vuruşta devrilir. Her darbe odun düşürür, çanta en çok 40 odun alır.', 'Baltayla savuşturma yok; her darbe dayanıklılık harcadığı için boş yere savurma.', 'Ağaca vururken tuşu basılı tut: üst ve alt kesik ritimle tekrarlanır.'] });
-  const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR, items: RH_ITEMS, chests: RH_CHESTS };
+  /* ----- AĞAÇLAR (Rehber): 4 tür + yosunlu varyant + kütük · rakamlar koddaki sabitlerden: TREE_HITS · TREE_HP · treeVar oranları · balta 39 hasar.
+     Ağaç özellikleri zamanla değişecek: yeni tür / özellik gelince ilgili girişi güncelle (tv = Rehber önizleme türü: sp 0 çam · 1 meşe · 2 akçaağaç · 3 huş). ----- */
+  const RH_TREE_CUT = ['Kesme', 'Ağacı yalnızca balta keser; kılıç ağaçtan sekip elini sızlatır. Her darbede gövdede kesik derinleşir, taç savrulur, kabuk, kıymık ve yaprak dökülür, içinden bir odun düşer (%50 ihtimalle bir tane daha). Son darbede ağaç çıtırdar, devrilir ve gövde kütüklere ayrılır.', '39', '3 vuruş  ·  5 aşamalı kırılma  ·  can 100'];
+  const RH_TREE_WOOD = ['Odun', 'Her darbe en az 1 odun verir, devrilince 3 odun daha saçılır. Ortalama bir ağaç yaklaşık 7–8 odun eder. Çantaya en çok 40 odun sığar; doluysa odunlar yerde kalır.', '≈7–8', 'darbe başı 1 (+%50)  ·  devrilince 3'];
+  const RH_TREE_STUMP = ['Geriye kalan', 'Devrilen ağaç yerinde taze kesitli bir kütük bırakır; kütüğün gölgesi yoktur. Yosunlu ağacın kütüğünde de yosun izi kalır.', '—', 'kütük'];
+  const RH_TREES = [
+    { kind: 'tree', tv: { sd: 0.62, sc: 1, sp: 0, vi: 1, pine: true, moss: false }, name: 'Çam', tab: 'Çam', sub: 'AĞAÇ  ·  İĞNE YAPRAKLI', atkTitle: 'ÖZELLİKLER', noplay: true,
+      lore: 'Dünyanın en yaygın ağacı. Dört katlı, koyu yeşil, sivri tepeli bir taçla yükselir; diğer ağaçlardan alçak ve dardır. Gövdesi sert olduğu için rüzgârda daha az sallanır. Vurdukça taçtan koyu yeşil iğne yaprakları dökülür.',
+      stats: [['Sıklık', 'ağaçların %45\'i'], ['Boy', '52 birim  ·  × 0,86–1,16'], ['Taç', '4 katlı, sivri'], ['Rüzgâr', 'az sallanır  ·  × 0,78'], ['Ağaca hasar', '39  ·  3 vuruşta devirir'], ['Dökülen yaprak', 'koyu yeşil'], ['Yosun', '%32 şansla']],
+      atks: [RH_TREE_CUT, RH_TREE_WOOD, RH_TREE_STUMP],
+      tips: ['En çok bulunan ağaç: odun lazımsa önce çamlara bak.', 'Rüzgârda çam az sallandığı için sert hamlede de rahat kesersin.'] },
+    { kind: 'tree', tv: { sd: 0.31, sc: 1, sp: 1, vi: 2, pine: false, moss: false }, name: 'Meşe', tab: 'Meşe', sub: 'AĞAÇ  ·  YAPRAK DÖKEN', atkTitle: 'ÖZELLİKLER', noplay: true,
+      lore: 'Geniş, yuvarlak ve gür bir taç taşıyan kalın gövdeli ağaç. Taç üç katman yeşil yaprak kümesinden oluşur; ışık sağ üstten vurur. Rüzgârı tam alır: sert hamlede tacı gecikmeli olarak savrulur.',
+      stats: [['Sıklık', 'ağaçların %22\'si'], ['Boy', '62 birim  ·  × 0,86–1,16'], ['Taç', 'geniş, 3 katman yeşil'], ['Rüzgâr', 'tam sallanır  ·  × 1'], ['Ağaca hasar', '39  ·  3 vuruşta devirir'], ['Dökülen yaprak', 'yeşil'], ['Yosun', '%32 şansla']],
+      atks: [RH_TREE_CUT, RH_TREE_WOOD, RH_TREE_STUMP],
+      tips: ['Tacı geniş olduğu için devrilirken yaprak yağmuru saçar.', 'Ağaç, kesen kişiden uzağa doğru devrilir.'] },
+    { kind: 'tree', tv: { sd: 0.27, sc: 1, sp: 2, vi: 3, pine: false, moss: false }, name: 'Sonbahar Akçaağacı', tab: 'Akçaağaç', sub: 'AĞAÇ  ·  YAPRAK DÖKEN', atkTitle: 'ÖZELLİKLER', noplay: true,
+      lore: 'Kızıl kahve gövdeli, kırmızı ve turuncu tacıyla karanlıkta bile göze çarpan ağaç. Taçtan tek tük sarı yaprak sarkar. Vurdukça etrafa kızıl-turuncu yapraklar savrulur.',
+      stats: [['Sıklık', 'ağaçların %20\'si'], ['Boy', '62 birim  ·  × 0,86–1,16'], ['Taç', 'kızıl, turuncu, sarı'], ['Gövde', 'kızıl kahve'], ['Rüzgâr', 'tam sallanır  ·  × 1'], ['Ağaca hasar', '39  ·  3 vuruşta devirir'], ['Dökülen yaprak', 'kızıl · turuncu · sarı'], ['Yosun', '%32 şansla']],
+      atks: [RH_TREE_CUT, RH_TREE_WOOD, RH_TREE_STUMP],
+      tips: ['Renkli yaprakları uzaktan görünür: ağaç ararken işe yarar.', 'Kütüğü de gövdesi gibi kızıl kahve kalır.'] },
+    { kind: 'tree', tv: { sd: 0.74, sc: 1, sp: 3, vi: 4, pine: false, moss: false }, name: 'Huş', tab: 'Huş', sub: 'AĞAÇ  ·  BEYAZ GÖVDE', atkTitle: 'ÖZELLİKLER', noplay: true,
+      lore: 'İnce, uzun ve beyaz gövdeli ağaç; gövdesinde koyu yatay izler vardır. Taç açık, sarımsı yeşil yaprak kümelerinden oluşur. En nadir ağaçtır ve diğerlerinden biraz daha uzundur.',
+      stats: [['Sıklık', 'ağaçların %13\'ü  ·  en nadir'], ['Boy', '66 birim  ·  × 0,86–1,16'], ['Taç', 'açık sarımsı yeşil'], ['Gövde', 'beyaz  ·  koyu izli'], ['Rüzgâr', 'tam sallanır  ·  × 1'], ['Ağaca hasar', '39  ·  3 vuruşta devirir'], ['Dökülen yaprak', 'açık yeşil'], ['Yosun', '%32 şansla']],
+      atks: [RH_TREE_CUT, RH_TREE_WOOD, RH_TREE_STUMP],
+      tips: ['Beyaz gövdesi karanlıkta bile seçilir.', 'En nadir tür: gördüğünde kesmeyi unutma.'] },
+    { kind: 'tree', tv: { sd: 0.27, sc: 1, sp: 1, vi: 2, pine: false, moss: true }, name: 'Yosunlu Ağaç', tab: 'Yosunlu', sub: 'AĞAÇ  ·  VARYANT', atkTitle: 'ÖZELLİKLER', noplay: true,
+      lore: 'Herhangi bir türden ağaç yosunlu doğabilir: gövdesinin alt yarısını yeşil yosun kümeleri sarar. Vurdukça kümeler üstten başlayarak dökülür; son vuruştan önce gövdede yalnızca dipteki yosun tutamı kalır. Yosun çantada Yosun olarak toplanır ve Craft malzemesidir.',
+      stats: [['Sıklık', 'ağaçların %32\'si  ·  her türde'], ['Yosun / ağaç', 'en çok 2'], ['Darbede düşme', '%25 şans  ·  en fazla 1'], ['Devrilince', '1–2 yosun'], ['Yosun çantası', 'en çok 12'], ['Ağaca hasar', '39  ·  3 vuruşta devirir']],
+      atks: [['Yosun dökülmesi', 'Her darbede gövdeden yosun kırıntıları uçuşur; kesik açılan yerde yosun kalmaz. Toplanabilir yosun azdır: ağaç başına en çok 2 tane, bir darbede en fazla 1.', '—', 'darbede %25  ·  en fazla 1'], ['Devrilince', 'Yosunlu ağaç yere çarpınca kalan yosun kümeleri kopar; 1 (bazen 2) yosun ve bir sürü kırıntı saçılır.', '1–2', 'toplam ağaç başına en çok 2'], RH_TREE_CUT, RH_TREE_WOOD],
+      tips: ['Yosun lazımsa yosunlu ağacın düşmesini bekle; darbeden gelen şans küçük.', 'Yosunu yerden üzerinden geçerek toplarsın.'] },
+    { kind: 'stump', tv: { sd: 0.27, sc: 1, sp: 1, vi: 2, pine: false, moss: false }, name: 'Kütük', tab: 'Kütük', sub: 'AĞAÇ  ·  KALINTI', atkTitle: 'DAVRANIŞ', noplay: true,
+      lore: 'Devrilen her ağacın yerinde kalan taze kesitli kütük: halkaları, kök sivrilikleri ve etrafında saçılmış kıymıkları vardır. Gölgesi yoktur. Tek başına bir işe yaramaz, ağaç kesildiğinin izidir.',
+      stats: [['Oluşum', 'ağaç devrilince'], ['Gölge', 'yok'], ['Renk', 'ağacın türüne göre'], ['Yosunlu ağaç', 'kütükte de yosun izi']],
+      atks: [['Kalıntı', 'Ağaç kesildikten sonra yerinde kütük durur. Rengi ağacın türünü taşır: huşun açık, akçaağacın kızıl kahve kütüğü olur.', '—', 'ağaç türüne göre'], ['Dünyada', 'Yalnızca vurulan ağaçların durumu kaydedilir; kesilmemiş ağaçlar dünya tohumundan aynı yerde üretilir.', '—', 'dünya tohumu']],
+      tips: ['Kütüğe vurmanın bir faydası yok; yeni ağaç ara.'] }
+  ];
+  const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR, items: RH_ITEMS, chests: RH_CHESTS, trees: RH_TREES };
   const RH_WD = { sword: [1.1, 1.9, 1.6, 2.8], bow: [1.7, 2.6, 2.2, 2.4], axe: RH_AX_V.map(i => AXV[i].ST / RH_AX_TS + 0.55) };   // silah önizlemesi: hareket süreleri (sn)
   const RH = { tsx: 0, tsv: 0, tsT: null, ltei: -1, tmax: 0, tby0: 0, tby1: 0, view: 'home', tv: 'home', ei: 0, tei: 0, ca: 0, ina: 0, scroll: 0, tg: 0, vel: 0, max: 0, dn: null, ux: -1, uw: 0, t: 0, sc: null, rage: false, hits: 0, wc: new Map(), capS: '', capA: 0, last: 0 };
   const RH_CAP = { wind: 'uyarı', strike: 'vuruş', rec: 'soluklanıyor  ·  vurursan +%50 hasar', fren: 'çan çaldı  ·  daire belirdi', fslam: 'daireye atılıyor', bo: 'dumana dönüşür', iv: 'görünmez  ·  vurulamaz', bi: 'belirir', rev: 'maske düşüyor', stuck: 'dil siperde yapıştı', dz: 'sersem  ·  vurursan +%50 hasar' };
@@ -9163,7 +9365,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   /* ---- sahne: önizlemedeki canlı varlık ---- */
   function rhScene() {
     RH.sc = null; RH.rage = false; RH.hits = 0; RH.capS = ''; RH.capA = 0; if (RH.view === 'home' || RH.view === 'play') return;
-    if (RH.view !== 'enemies') { const ent = RH_LIST[RH.view][RH.ei]; RH.sc = { w: true, kind: ent.kind, gear: ent.gear, item: ent.item, t: 0, play: null, sel: -1, idle: 0.7, fa: 1, cap: '', dir: -1, yaw: 0 }; if (ent.kind === 'evil') { EV.delete('rhs'); const es = evState('rhs'); es.aw = 1; es.t = rnd(0, 20); RH.sc.s = es; } return; }
+    if (RH.view !== 'enemies') { const ent = RH_LIST[RH.view][RH.ei]; RH.sc = { w: true, kind: ent.kind, gear: ent.gear, item: ent.item, tv: ent.tv, t: 0, play: null, sel: -1, idle: 0.7, fa: 1, cap: '', dir: -1, yaw: 0 }; if (ent.kind === 'evil') { EV.delete('rhs'); const es = evState('rhs'); es.aw = 1; es.t = rnd(0, 20); RH.sc.s = es; } return; }
     const i = RH.ei, sc = { i, t: 0, play: null, sel: -1, idle: 0.7, bolts: [], coins: [], ring: null, minion: null, fa: 0, fade: { dir: 1 }, cap: '' };
     if (i === 0) { const e = newEnemy(0, 0, undefined, 1); e.em = 1; e.face = 0.1; sc.e = e; }
     else if (i === 1) { const e = newMimic(0, 0, 1); e.em = 1; e.face = 0.1; e.lg = 1; sc.e = e; }
@@ -9416,6 +9618,10 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         else if (sc.kind === 'cxchest') drawChest(0, 0, 'cbxrh', false, light);
         else { drawChest(0, 0, 'cbvrh', false, light); }
       }
+      else if (sc.kind === 'tree' || sc.kind === 'stump') {   // ağaçlar: oyunun kendi çizimi · tür TV_OVR ile sabitlenir
+        ctx.translate(cx, gy); const ks = sc.kind === 'stump' ? 2.6 : 0.78; ctx.scale(S * ks, S * ks);
+        TV_OVR = sc.tv; try { if (sc.kind === 'stump') drawStump(0, 0, tPal(light), 'rht', false); else drawTree(0, 0, 'rht', light); } finally { TV_OVR = null; }
+      }
       else if (sc.kind === 'statue' || sc.kind === 'evil' || sc.kind === 'rubble') {   // heykeller: oyunun kendi çizimleri
         ctx.translate(cx, gy); ctx.scale(S, S);
         if (sc.kind === 'statue') drawStatue(0, 0, SS, light ? '105,105,105' : '150,150,150', light);
@@ -9651,27 +9857,78 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   // gece (koyu zemin): hafif karartı + az sayıda küçük net ateş böceği
   /* ---------- MEŞALE: elde tutulunca çevresindeki gece karartısını açar, ışığın erdiği yerde gölgeler azalır · alev sağa-sola sallanır ---------- */
   const TORCH_CAP = 64, CAMP_LR = 270, RUIN_LR = 250, MUM_LR = 240, LT = [];   // LT: ışık kaynakları {x, y, R, a, k}
-  const TORCH = { on: false, w: 0, vis: 0, lit: 0, wx: 0, wy: 0, str: 1, R: 215, ph: Math.random() * 6 };   // w: elde tutma ağırlığı · lit: ışık şiddeti · wx/wy: alevin dünya konumu · R: ışık yarıçapı (dünya birimi)
+  let TORCH_NF = false;   // true: meşale alevsiz çizilir
+  const TORCH = { hold: 0, fly: null, S: 1.6, doom: 0, on: false, w: 0, vis: 0, lit: 0, wx: 0, wy: 0, str: 1, R: 215, ph: Math.random() * 6, st: 0, fk: 1 };   // st: rüzgârda çırpınma (0–1) · fk: ışık titremesi
+  /* ---------- RÜZGÂR: açıkta yavaşça dalgalanan esinti + ara sıra gelen hamleler (sert hamle ≈ %30) · alevler rüzgâr yönüne yatar · sert hamlede elde tutulan meşale söner (bir meşale harcanır) · mağarada yalnızca hafif cereyan ---------- */
+  const WIND = { t: Math.random() * 50, base: 0.2, ga: 0, gT: -1, ru: 2.8, hd: 1.8, rd: 3.5, next: rnd(40, 70), dir: Math.random() < 0.5 ? -1 : 1, dx: 1, s: 0.2, g: 0, kill: 0, warned: false, k: 1, strong: false, h: 0, hn: false };   // s: etkin şiddet (0–1,3) · dx: yön (−1 sol, +1 sağ) · kill: söndürme sayacı
+  const WIND_KILL = 0.95, WIND_KILL_T = 1.5;   // sert rüzgârda (şiddet > 0,95) meşale ele alınabilir ama 1,5 sn sonra söner
+  function windTick(dt) {
+    WIND.t += dt; const t = WIND.t, dm = DEV.on ? DEV.windMode | 0 : 0;
+    WIND.base = Math.max(0, 0.02 + 0.03 * Math.sin(t * 0.11) + 0.015 * Math.sin(t * 0.29 + 1.3));   // doğal hâl: durgun hava
+    if (WIND.gT < 0) { if ((WIND.next -= dt) <= 0) { WIND.strong = Math.random() < 0.3; WIND.ga = WIND.strong ? rnd(0.85, 1.1) : rnd(0.3, 0.5); WIND.ru = rnd(2.2, 3.2); WIND.hd = WIND.strong ? rnd(1.8, 3) : rnd(0.8, 2); WIND.rd = rnd(3, 4.5); WIND.gT = 0; WIND.dir = Math.random() < 0.5 ? -1 : 1; WIND.warned = false; } }
+    else { WIND.gT += dt; if (WIND.gT > WIND.ru + WIND.hd + WIND.rd) { WIND.gT = -1; WIND.next = rnd(70, 140); } }
+    const g = WIND.gT < 0 ? 0 : sstep(0, WIND.ru, WIND.gT) * (1 - sstep(WIND.ru + WIND.hd, WIND.ru + WIND.hd + WIND.rd, WIND.gT));
+    WIND.dx += (WIND.dir - WIND.dx) * dmp(0.8, dt);
+    const turb = (0.5 + 0.5 * Math.sin(t * 3.1 + Math.sin(t * 1.3) * 2)) * (0.03 + 0.1 * g) + 0.04 * Math.sin(t * 7.3) * g;   // hamle sırasında hızlı dalgalanma
+    WIND.k += ((CV.in ? 0.18 : 1) - WIND.k) * dmp(2.5, dt);
+    WIND.fo = (WIND.fo || 0) + ((dm === 1 ? 0.02 : dm === 2 ? 0.55 : dm === 3 ? 1.3 : 0) - (WIND.fo || 0)) * dmp(2, dt);   // geliştirici: sabit rüzgâr
+    WIND.g = g; WIND.s = (dm ? Math.max(0, WIND.fo + (dm > 1 ? turb * 0.6 : 0)) : Math.max(0, WIND.base + WIND.ga * g + turb)) * WIND.k; window.WINDX = WIND.s; window.WINDDX = WIND.dx;
+  }
+  function torchBlowOut() {   // sert rüzgâr: alev söner, meşale harcanır
+    WIND.kill = 0; TORCH.doom = 0; TORCH.on = false; TORCH.hold = 0.6; TORCH.lit *= 0.3; TORCH.st = 0; INV.torch = Math.max(0, INV.torch - 1);   // alev söner, meşale bir an elde kalır, sonra rüzgâr onu elden kapar
+    try { AU.sfx('torchOut', TORCH.wx, TORCH.wy); } catch (_) {}
+    try { smoke(TORCH.wx, TORCH.wy, 6, 34, 3, 2); sparks(TORCH.wx, TORCH.wy, 7, 110, -PI / 2 + WIND.dx * 0.8, 1.3); } catch (_) {}
+    ftext(player.x, player.y - 62, INV.torch > 0 ? 'Meşale söndü' : 'Meşale söndü · meşalen kalmadı', '#c99a52');
+    if (WIND.gT >= 0) WIND.ga *= 0.35;   // söndükten sonra rüzgâr biraz yatışır
+  }   // w: elde tutma ağırlığı · lit: ışık şiddeti · wx/wy: alevin dünya konumu · R: ışık yarıçapı (dünya birimi)
+  function torchLaunch() {   // sönmüş meşale elden fırlar, yapraklarla rüzgârın yönünde uçar
+    const d = WIND.dx >= 0 ? 1 : -1; TORCH.fly = { x: TORCH.wx, y: TORCH.wy, vx: d * 140, vy: -170, r: -0.2 * d, vr: d * 7, t: 0, lt: 0 };
+    try { AU.sfx('leafBurst', TORCH.wx, TORCH.wy, 1.2); } catch (_) {}
+    const n0 = LV.length; leafFx(TORCH.wx, TORCH.wy - 6, 14, 90, 16, player.y + 14, 2); for (let i = n0; i < LV.length; i++) { LV[i].vx += d * rnd(140, 300); LV[i].vy -= rnd(20, 90); }
+  }
   function torchToggle() {
-    if (F.death >= 0) return;
+    if (F.death >= 0 || TORCH.hold > 0) return;
     if (INV.torch <= 0) { ftext(player.x, player.y - 62, 'Meşalen yok', '#c99a52'); return; }
+    if (!TORCH.on && !CV.in && WIND.s > WIND_KILL) { TORCH.doom = WIND_KILL_T; ftext(player.x, player.y - 62, 'Rüzgâr çok sert · meşale sönecek', '#9fc3d9'); }   // sert rüzgârda ele alınabilir ama tam 1,5 sn sonra söner
+    else if (TORCH.on) TORCH.doom = 0;
     TORCH.on = !TORCH.on; try { AU.sfx('sheath'); } catch (_) {}
   }
   function torchTick(dt, DK) {
+    windTick(dt);
     if (INV.torch <= 0 || F.death >= 0) TORCH.on = false;
-    TORCH.w += ((TORCH.on ? 1 : 0) - TORCH.w) * (1 - Math.exp(-9 * dt));
+    if (F.death >= 0) { TORCH.hold = 0; TORCH.fly = null; }
+    if (!TORCH.on) TORCH.doom = 0;
+    if (TORCH.hold > 0) { TORCH.hold -= dt; if (Math.random() < dt * 16) try { smoke(TORCH.wx, TORCH.wy, 1, 24, 2, 2); } catch (_) {} if (TORCH.hold <= 0) torchLaunch(); }
+    if (TORCH.fly) {
+      const f = TORCH.fly; f.t += dt; f.lt -= dt; const d = WIND.dx >= 0 ? 1 : -1;
+      f.vx += (d * (320 + 200 * WIND.s) - f.vx) * dmp(1.6, dt); f.vy += (170 - 120 * Math.min(1.3, WIND.s) * (0.5 + 0.5 * Math.sin(f.t * 5))) * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt;
+      if (f.lt <= 0) { f.lt = 0.07; const n0 = LV.length; leafFx(f.x, f.y, 1, 20, 6, f.y + 40, 2); for (let i = n0; i < LV.length; i++) LV[i].vx += d * rnd(80, 200); }   // izinde yaprak bırakır
+      if (f.t > 2.6) TORCH.fly = null;
+    }
+    TORCH.w += (((TORCH.on || TORCH.hold > 0) ? 1 : 0) - TORCH.w) * (1 - Math.exp(-9 * dt));
     TORCH.vis = TORCH.w * (1 - sstep(0.05, 0.5, BOW.out)) * (1 - sstep(0.05, 0.5, HEAL.w));
-    TORCH.lit += ((TORCH.vis > 0.5 ? 1 : 0) - TORCH.lit) * (1 - Math.exp(-5 * dt));
+    TORCH.lit += ((TORCH.vis > 0.5 && !(TORCH.hold > 0) ? 1 : 0) - TORCH.lit) * (1 - Math.exp(-5 * dt));
     TORCH.str = 0.3 + 0.7 * (1 - sstep(0.05, 0.85, DK));   // gündüz etkisi hafif, gece tam
-    if (TORCH.w < 0.01 && !TORCH.on) TORCH.w = 0;
+    if (TORCH.w < 0.01 && !TORCH.on && !(TORCH.hold > 0)) TORCH.w = 0;
+    if (TORCH.on && TORCH.w > 0.5 && !CV.in && F.death < 0) {   // rüzgâr: uyarı → çırpınma → sönme
+      if (WIND.strong && WIND.g > 0.15 && !WIND.warned) { WIND.warned = true; ftext(player.x, player.y - 62, 'Sert rüzgâr geliyor', '#9fc3d9'); }
+      if (WIND.s > WIND_KILL) WIND.kill += dt; else WIND.kill = Math.max(0, WIND.kill - dt * 0.8);
+      if (TORCH.doom > 0) { TORCH.doom -= dt; if (TORCH.doom <= 0) { torchBlowOut(); return; } }   // ele alınırken rüzgâr sertse geri sayım rüzgâr yatışsa da sürer
+      if (WIND.kill > WIND_KILL_T) torchBlowOut();
+    } else WIND.kill = Math.max(0, WIND.kill - dt);
+    TORCH.st = Math.max(sstep(0.55, 1, WIND.s) * (CV.in ? 0 : 1), sstep(0, 1, WIND.kill / WIND_KILL_T), TORCH.doom > 0 ? sstep(0, 1, 1 - TORCH.doom / WIND_KILL_T) : 0);   // alev sönmeye yaklaştıkça çırpınır
+    TORCH.fk = (1 - 0.1 * WIND.s - 0.2 * TORCH.st) + (0.012 + 0.05 * WIND.s) * Math.sin(WIND.t * 19) * Math.sin(WIND.t * 6.1);   // ışık yarıçapı rüzgârda titrer
+  }
+  function drawTorchFly() {   // elden fırlayan sönmüş meşale
+    const f = TORCH.fly; if (!f) return; ctx.save(); ctx.globalAlpha = clamp((2.6 - f.t) / 0.7, 0, 1); ctx.translate(f.x, f.y); ctx.rotate(f.r); ctx.scale(TORCH.S || 1.6, TORCH.S || 1.6); TORCH_NF = true; torchBody(WIND.t, TORCH.ph, 0, 0); TORCH_NF = false; ctx.restore();
   }
   function torchK(x, y) {   // 0 = ışık yok · 1 = tam aydınlık (gölgeyi siler)
     let m = 0;
     for (const l of LT) { if (l.k < 0.01) continue; const d = Math.hypot(x - l.x, (y - l.y) * 1.15), v = l.k * (1 - sstep(l.R * 0.2, l.R, d)); if (v > m) m = v; }
     return m;
   }
-  function torchBody(t, ph) {   // meşale gövdesi: kavrama noktası (0,0), yukarı = -y · uzunluk 10 birim · iki tonlu odun, deri sargı, demir bilezik, zift sarılı baş, çok dilli alev
-    const L = 10, ln = '#2a1d10';
+  function torchBody(t, ph, wl, st) {   // wl: rüzgârla yatma (−1…1) · st: çırpınma (0–1)   // meşale gövdesi: kavrama noktası (0,0), yukarı = -y · uzunluk 10 birim · iki tonlu odun, deri sargı, demir bilezik, zift sarılı baş, çok dilli alev
+    const L = 10, ln = '#2a1d10'; wl = wl || 0; st = st || 0;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     // sap (konik, iki tonlu)
     ctx.beginPath(); ctx.moveTo(-1.05, 3); ctx.lineTo(-1.55, -L + 3.4); ctx.lineTo(0, -L + 3.4); ctx.lineTo(0, 3); ctx.closePath(); ctx.fillStyle = '#b48c52'; ctx.fill();
@@ -9686,20 +9943,58 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     ctx.beginPath(); ctx.moveTo(-1.9, -L + 3.1); ctx.bezierCurveTo(-3.1, -L + 1.6, -2.9, -L - 0.6, -1.3, -L - 1.3); ctx.lineTo(1.3, -L - 1.3); ctx.bezierCurveTo(2.9, -L - 0.6, 3.1, -L + 1.6, 1.9, -L + 3.1); ctx.closePath();
     ctx.fillStyle = '#3a2a1c'; ctx.fill(); ctx.strokeStyle = ln; ctx.lineWidth = 0.55; ctx.stroke();
     ctx.strokeStyle = '#6a5036'; ctx.lineWidth = 0.35; ctx.beginPath(); for (const yy of [2.3, 1.2, 0.1, -0.9]) { ctx.moveTo(-2.7 + (2 - yy) * 0.05, -L + yy); ctx.lineTo(2.8 - (2 - yy) * 0.05, -L + yy - 0.45); } ctx.stroke();   // bez sargı
+    if (TORCH_NF) return;   // sönmüş meşale: alev, kor ve kıvılcım yok
     const gl = 0.6 + 0.4 * Math.sin(t * 9 + ph); ctx.fillStyle = `rgba(255,140,40,${0.85 * gl})`; ctx.beginPath(); ctx.ellipse(0, -L - 1.1, 2.0, 0.85, 0, 0, TAU); ctx.fill();   // kor
     // alev: üç dil (orta uzun, yanlar kısa), sürekli sağa-sola yalpalar
-    const bx = 0, by = -L - 1.0, sw = Math.sin(t * 4.6 + ph) * 1.7 + Math.sin(t * 9.4) * 0.8 + Math.sin(t * 2.3) * 0.7;
+    const bx = 0, by = -L - 1.0, sw = Math.sin(t * 4.6 + ph) * 1.7 + Math.sin(t * 9.4) * 0.8 + Math.sin(t * 2.3) * 0.7 + wl * 2.4 + st * 1.2 * Math.sin(t * 37 + ph);
     const tongue = (ox, h, w, sg, cols) => { for (const [k, col] of cols) { ctx.beginPath(); ctx.moveTo(bx + ox - w * k, by); ctx.quadraticCurveTo(bx + ox - w * k * 1.15 + sg * 0.2 * k, by - h * k * 0.55, bx + ox + sg * k, by - h * k); ctx.quadraticCurveTo(bx + ox + w * k * 1.15 + sg * 0.2 * k, by - h * k * 0.55, bx + ox + w * k, by); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); } };
-    const f1 = 0.8 + 0.14 * Math.sin(t * 13 + ph) + 0.08 * Math.sin(t * 23.7), f2 = 0.8 + 0.2 * Math.sin(t * 17 + ph * 2), f3 = 0.8 + 0.2 * Math.sin(t * 19 + ph * 3);
+    const hs = (1 - 0.28 * Math.abs(wl)) * (1 - 0.5 * st), fx = (0.04 * Math.abs(wl) + 0.3 * st) * Math.sin(t * 41 + ph);
+    const f1 = (0.8 + 0.14 * Math.sin(t * 13 + ph) + 0.08 * Math.sin(t * 23.7) + fx) * hs, f2 = (0.8 + 0.2 * Math.sin(t * 17 + ph * 2) + fx) * hs, f3 = (0.8 + 0.2 * Math.sin(t * 19 + ph * 3) - fx) * hs;
+    ctx.save(); ctx.globalAlpha *= 1 - 0.5 * st * (0.5 + 0.5 * Math.sin(t * 34 + ph)); ctx.translate(bx, by); ctx.transform(1, 0, -wl * 0.5, 1, 0, 0); ctx.translate(-bx, -by);   // alev rüzgâr yönüne yatar, sertte kısalıp kesik kesik yanar
     tongue(-1.5, 4.2 * f2, 1.1, sw * 0.8 - 0.6, [[1, '#d9622a']]); tongue(1.5, 3.8 * f3, 1.0, sw * 0.9 + 0.6, [[1, '#d9622a']]);
     tongue(0, 7.6 * f1, 2.5, sw, [[1, '#e0832e'], [0.74, '#f2b53f'], [0.42, '#fff0b8']]);
+    ctx.restore();
     // iki küçük kıvılcım (çok hafif)
-    for (let i = 0; i < 2; i++) { const u = ((t * 0.7 + i * 0.5 + ph * 0.1) % 1), a = Math.sin(PI * u) * 0.75; ctx.fillStyle = `rgba(255,190,90,${a})`; ctx.beginPath(); ctx.arc(bx + Math.sin(t * 3 + i * 3) * 1.4 + sw * u * 0.5, by - 4 - u * 8, 0.32, 0, TAU); ctx.fill(); }
+    for (let i = 0; i < 2; i++) { const u = ((t * 0.7 + i * 0.5 + ph * 0.1) % 1), a = Math.sin(PI * u) * 0.75; ctx.fillStyle = `rgba(255,190,90,${a})`; ctx.beginPath(); ctx.arc(bx + Math.sin(t * 3 + i * 3) * 1.4 + sw * u * 0.5 + wl * u * 9, by - 4 - u * 8, 0.32, 0, TAU); ctx.fill(); }
   }
   function drawTorchHeld(hx, hy, vis, fl, S) {   // hero yerel uzayında (elin ucunda)
     const t = performance.now() / 1000, mv = hero.move || 0, a = -0.2 + Math.sin(t * 1.6) * 0.035 + mv * 0.09 * Math.sin((hero.phase || 0) * 2), L = 10, sa = Math.sin(a), ca = Math.cos(a);
-    ctx.save(); ctx.globalAlpha = vis; ctx.translate(hx, hy); ctx.rotate(a); torchBody(t, TORCH.ph); ctx.restore();
+    ctx.save(); ctx.globalAlpha = vis; ctx.translate(hx, hy); ctx.rotate(a); TORCH_NF = TORCH.hold > 0; TORCH.S = S; torchBody(t, TORCH.ph, clamp(WIND.s, 0, 1.2) * WIND.dx * fl, TORCH.st); TORCH_NF = false; ctx.restore();
     TORCH.wx = player.x + fl * S * (hx + sa * L); TORCH.wy = player.y + S * (hy - ca * L - 3.5);
+  }
+  /* ---------- RÜZGÂR GÖRSELİ: şiddet arttıkça ekranı yaprak sürüsü + eğri rüzgâr çizgileri (kıvrımlı) geçer · ağaçlardan yaprak kopar · ana ekrandaki sonbahar rüzgârının oyun içi karşılığı ---------- */
+  const WFX = { lv: [], st: [], la: 0, sa: 0, tt: 0, t: 0 };
+  function wfxUpdate(dt) {
+    if (CV.in || dt <= 0) { if (CV.in) { WFX.lv.length = 0; WFX.st.length = 0; } return; }
+    dt = Math.min(dt, 0.05); const s = WIND.s, e = sstep(0.34, 1.1, s), es = sstep(0.2, 0.95, s), u = clamp(Math.min(W, H) / 640, 0.75, 1.5), sdr = WIND.dir; WFX.t += dt;
+    WFX.la += dt * (e * e * 46 + (s > 0.28 ? 0.8 : 0)); let n = 0;
+    while (WFX.la >= 1) { WFX.la--; if (WFX.lv.length >= 84) break; const z = Math.random() < 0.3, big = Math.random() < 0.3;
+      WFX.lv.push({ x: sdr > 0 ? -rnd(20, 120) : W + rnd(20, 120), y: rnd(-0.05, 1.05) * H, vx: sdr * s * rnd(300, 440) * u, k: rnd(520, 1000) * u, ph: rnd(0, 6.3), fr: rnd(1.6, 4.2), am: rnd(24, 80) * u, sp: rnd(-6, 6), r: rnd(0, 6.3), fl: rnd(2, 6), ty: (Math.random() * 3) | 0, sz: (z ? rnd(15, 22) : big ? rnd(10, 14) : rnd(5.5, 8.5)) * u, c: LEAFC[(Math.random() * LEAFC.length) | 0], t: 0, life: rnd(4.5, 9), z, f: 1 }); }
+    for (let i = WFX.lv.length - 1; i >= 0; i--) {
+      const p = WFX.lv[i]; p.t += dt * (e < 0.12 ? 3 : 1); const tg = WIND.dx * s * p.k;   // rüzgâr dinince yapraklar yavaşlar ve söner
+      p.vx += (tg - p.vx) * dmp(2.4, dt); p.x += p.vx * dt; p.y += (Math.sin(WFX.t * p.fr + p.ph) * p.am * (0.4 + e) + (24 + 30 * (1 - e)) * u) * dt; p.r += p.sp * dt * (1 + 2.2 * e) + p.vx * 0.0016 * dt * 60 * 0.1; p.f = 0.4 + 0.6 * Math.abs(Math.cos(WFX.t * p.fl + p.ph));
+      if (p.t > p.life || p.x < -140 || p.x > W + 140 || p.y > H + 60) WFX.lv.splice(i, 1);
+    }
+    WFX.sa += dt * (es * 20); while (WFX.sa >= 1) { WFX.sa--; if (WFX.st.length >= 22) break;
+      const ln = rnd(110, 320) * u * (0.7 + 0.5 * es); WFX.st.push({ x: sdr > 0 ? -ln * 0.6 : W + ln * 0.6, y: rnd(0.04, 0.96) * H, ln, sp: sdr * rnd(0.8, 1.5), ph: rnd(0, 6.3), wob: rnd(5, 16) * u, cur: Math.random() < 0.35 ? rnd(8, 18) * u : 0, a: rnd(0.5, 1), t: 0, life: rnd(0.7, 1.3), d: sdr }); }
+    for (let i = WFX.st.length - 1; i >= 0; i--) { const p = WFX.st[i]; p.t += dt; p.x += p.d * (360 + 700 * s) * p.sp * dt; if (p.t > p.life) WFX.st.splice(i, 1); }
+    WFX.tt -= dt;   // sert rüzgârda yapraklı ağaçlardan yaprak kopar
+    if (WFX.tt <= 0 && e > 0.25) { WFX.tt = 0.16 / (0.3 + e); try { const L = treesIn(cam.x - 60, cam.y - 60, cam.x + W / ZOOM + 60, cam.y + H / ZOOM + 80).filter(q => { const v = treeVar(q[0], q[1]), ts = TST.get(q[2]); return !v.pine && !(ts && (ts.dead || ts.dying >= 0)); }); if (L.length) { const q = L[(Math.random() * L.length) | 0], v = treeVar(q[0], q[1]); leafFx(q[0] + rnd(-12, 12), q[1] - 80 * v.sc, e > 0.7 ? 2 : 1, 25, 20, q[1], v.sp); } } catch (_) {} }
+  }
+  function wfxDraw(fg) {
+    if (CV.in || (!WFX.lv.length && !WFX.st.length)) return; const s = WIND.s, es = sstep(0.18, 0.9, s);
+    ctx.save(); ctx.lineCap = 'round';
+    for (const p of WFX.st) {   // rüzgâr çizgileri: ince, dalgalı, bazıları ortada küçük bir kıvrım yapar
+      const q = p.t / p.life, al = Math.sin(Math.PI * q) * (0.12 + 0.3 * es) * p.a, d = p.d, N = 14; if (al < 0.004) continue;
+      const g = ctx.createLinearGradient(p.x, 0, p.x + d * p.ln, 0); g.addColorStop(0, `rgba(${fg},0)`); g.addColorStop(0.55, `rgba(${fg},${al})`); g.addColorStop(1, `rgba(${fg},0)`); ctx.strokeStyle = g; ctx.lineWidth = 1.3 + 1.3 * es;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) { const u = i / N; let ox = d * u * p.ln, oy = Math.sin(u * 5 + p.ph + WFX.t * 2) * p.wob * (0.4 + u * 0.6);
+        if (p.cur && u > 0.4 && u < 0.68) { const a = (u - 0.4) / 0.28 * TAU; ox += d * p.cur * Math.sin(a); oy += p.cur * (1 - Math.cos(a)) * 0.9; }
+        i ? ctx.lineTo(p.x + ox, p.y + oy) : ctx.moveTo(p.x + ox, p.y + oy); }
+      ctx.stroke();
+    }
+    ctx.restore();
+    for (const p of WFX.lv) { const a = Math.min(1, p.t / 0.35) * clamp((p.life - p.t) / 0.9, 0, 1); drawLeaf(p.x, p.y, p.r, p.sz, p.c[0], p.c[1], a * (p.z ? 0.95 : 0.8), p.f, p.ty); }
   }
   const ATM = { t: 0, ev: false, fl: [], mo: [], lf: [], cl: [], ms: [], br: [], brT: 7, dk: null, dkx: null, gl: null };
   for (let i = 0; i < 34; i++) ATM.fl.push({ x: Math.random(), y: Math.random(), ph: rnd(0, 6.3), sp: rnd(0.4, 1.2), r: rnd(1.1, 2.1), dr: rnd(8, 26) });
@@ -9786,7 +10081,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     ATM.t += dt; const t = ATM.t, z = ZOOM, nW = 1 - sstep(0.1, 0.95, DK), dW = sstep(0.3, 0.95, DK), tw = 1 - Math.abs(2 * DK - 1), ev = GCLK.f >= 0.5;
     const sxp = (f, vx, par, span, pad) => amod(f * span + vx * t - cam.x * z * par, span) - pad, syp = (f, vy, par, span, pad) => amod(f * span + vy * t - cam.y * z * par, span) - pad;
     LT.length = 0;   // ışık kaynakları: elde meşale + yanan kamp ateşleri (gölgeler de bunlara göre azalır)
-    if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R, a: TORCH.lit, k: TORCH.lit * TORCH.str });
+    if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R * TORCH.fk, a: TORCH.lit, k: TORCH.lit * TORCH.str });
     for (const c of camps) {   // tüm ateşler meşale gibi çevresindeki karartıyı açar ve gölgeleri azaltır (meşaleden bir tık güçlü: R 215 → 250–270)
       const fk = 0.95 + 0.05 * Math.sin(t * 9 + c.x) * Math.sin(t * 5.3 + c.y);
       if (!c.ruin) { LT.push({ x: c.x, y: c.y - 10, R: CAMP_LR * fk, a: 1, k: nW }); continue; }   // kamp ateşi
@@ -9975,8 +10270,12 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (m > 1) { ix /= m; iy /= m; }
     if (keys['shift']) { const mm = Math.hypot(ix, iy); if (mm > 0.45) { ix *= 0.45 / mm; iy *= 0.45 / mm; } } // Shift = yürü (masaüstü testi)
 
+    // karşı rüzgâr: sert rüzgârda rüzgârın tersine yürümek zorlaşır (yavaşlar, yorulur, el alına siper olur) · mağarada yok
+    { const wS = (CV.in || F.death >= 0) ? 0 : sstep(0.45, 1.15, WIND.s), tg = clamp(-ix * WIND.dx, 0, 1) * wS;
+      WIND.h += (tg - WIND.h) * (1 - Math.exp(-5 * sdt));
+      if (WIND.h > 0.45 && !WIND.hn) { WIND.hn = true; ftext(player.x, player.y - 62, 'Karşı rüzgâr · zorlanıyorsun', '#9fc3d9'); } else if (WIND.s < 0.4) WIND.hn = false; }
     // yumuşak ivmelenme
-    const t = 1 - Math.exp(-14 * sdt), spd = SPEED * gearM('speed') * (F.guarding ? 0.75 + gearA('guard') : 1) * (1 - 0.45 * BOW.aimw) * (1 - 0.5 * BEAM.w) * (F.kd >= 2.1 ? 0.5 : 1) * (HEAL.use && HEAL.use.ph === 'wrap' ? 0.5 : 1) * (1 - 0.7 * Math.min(F.slow, 2) / 2);   // siperdeyken yavaş
+    const t = 1 - Math.exp(-14 * sdt), spd = SPEED * gearM('speed') * (1 - 0.4 * WIND.h) * (F.guarding ? 0.75 + gearA('guard') : 1) * (1 - 0.45 * BOW.aimw) * (1 - 0.5 * BEAM.w) * (F.kd >= 2.1 ? 0.5 : 1) * (HEAL.use && HEAL.use.ph === 'wrap' ? 0.5 : 1) * (1 - 0.7 * Math.min(F.slow, 2) / 2);   // siperdeyken yavaş
     player.vx += (ix * spd - player.vx) * t;
     player.vy += (iy * spd - player.vy) * t;
     player.x += player.vx * sdt; player.y += player.vy * sdt;
@@ -10023,10 +10322,11 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     drawSparks(fg); drawHealFx();
     allO.filter(o => o.y >= player.y).forEach(o => o.f());
     drawArrows(fg); drawPrismFx(fg); drawCampShield(campV);
-    drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawRockFx(light); drawChestPieces(light); drawChestFx(light); drawCurseFx(light); drawRings(); drawDmgNums(fg); drawFT(fg);
+    drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawTorchFly(); drawRockFx(light); drawChestPieces(light); drawChestFx(light); drawCurseFx(light); drawRings(); drawDmgNums(fg); drawFT(fg);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     try { if (CV.in) drawCaveAtmo(dt); else drawAtmo(dt, DK, campV); } catch (_) {}
+    try { wfxUpdate(dt); wfxDraw(light ? '0,0,0' : '255,255,255'); } catch (_) {}   // rüzgâr: yaprak sürüsü + rüzgâr çizgileri
     cvOverlay();
     if (DNT.on && !CV.in) { try { dnOverlay(); } catch (_) {} }   // gün/gece geçişi: oyunun üstünde yumuşak, sade animasyon   // gece / gündüz atmosferi (HUD'dan önce)
     if (light && DBG) {
