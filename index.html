@@ -1551,7 +1551,7 @@
   }
   function swingHit() {
     const pcx = player.x, pcy = player.y - 22, hits = [];
-    for (const e of E) {
+    for (const e of CV.in ? [] : E) {   // mağarada dünya düşmanlarına vurulmaz
       if (F.hit.includes(e) || e.em < 1 || e.ghost) continue;   // yeni doğan (belirmekte olan) yaratığa vurulmaz
       const dx = e.x - pcx, dy = e.y - 20 - pcy;
       if (Math.hypot(dx, dy) > 74 || Math.abs(wrap(Math.atan2(dy, dx) - F.aim)) > 1.6) continue;
@@ -1560,7 +1560,7 @@
     hits.forEach(e => hitEnemy(e, 20 * wpnDmg(), Math.atan2(e.y - player.y, e.x - player.x)));
     if (AX.on && hits.length) hitFx(0.1, 6);
     swingChests(pcx, pcy); swingTrees(pcx, pcy); swingRocks(pcx, pcy); swingCampStones(pcx, pcy); swingCaves(pcx, pcy);
-    for (let i = EP.length - 1; i >= 0; i--) { const bl = EP[i], bx = bl.x - pcx, by = bl.y - 22 - pcy; if (Math.hypot(bx, by) < 86 && Math.abs(wrap(Math.atan2(by, bx) - F.aim)) < 1.7) { sparks(bl.x, bl.y - 22, 8, 200, F.aim, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(i, 1); } }   // kılıç kara küreleri keser
+    if (!CV.in) for (let i = EP.length - 1; i >= 0; i--) { const bl = EP[i], bx = bl.x - pcx, by = bl.y - 22 - pcy; if (Math.hypot(bx, by) < 86 && Math.abs(wrap(Math.atan2(by, bx) - F.aim)) < 1.7) { sparks(bl.x, bl.y - 22, 8, 200, F.aim, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(i, 1); } }   // kılıç kara küreleri keser
     for (const [sx, sy, id, ev] of statuesIn(pcx - 170, pcy - 120, pcx + 170, pcy + 170)) {   // kötücül heykel
       if (!ev) continue;
       const s = evState(id); if (s.dead || s.dying >= 0 || F.hit.includes(s)) continue;
@@ -2890,6 +2890,7 @@
   const CH = 400;
   const hashN = (i, j, s) => { const x = Math.sin(i * 127.1 + j * 311.7 + s * 74.7 + SEED * 1.2345) * 43758.5453; return x - Math.floor(x); };
   function statuesIn(x0, y0, x1, y1) {
+    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = [];
     baseStatues.forEach(s => { if (s[0] > x0 && s[0] < x1 && s[1] > y0 && s[1] < y1) out.push(s); });
     for (let ci = Math.floor(x0 / CH); ci <= Math.floor(x1 / CH); ci++)
@@ -2930,6 +2931,7 @@
     return { x, y, pr: hashN(ci, cj, 70) };
   }
   function campsIn(x0, y0, x1, y1) {
+    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = [];
     baseCamps.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push({ x: c[0], y: c[1], id: c[2], fl: 1, pot: true, ruin: false, burn: false, bk: 0, sd: 0.5 }); });
     for (let ci = Math.floor(x0 / CAMPC); ci <= Math.floor(x1 / CAMPC); ci++) for (let cj = Math.floor(y0 / CAMPC); cj <= Math.floor(y1 / CAMPC); cj++) {
@@ -2963,6 +2965,7 @@
     if (m.size > 600) m.clear(); m.set(key, r); return r;
   }
   function cavesIn(x0, y0, x1, y1) {
+    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = []; for (let i = Math.floor(x0 / CVC); i <= Math.floor(x1 / CVC); i++) for (let j = Math.floor(y0 / CVC); j <= Math.floor(y1 / CVC); j++) { const c = cvCand(i, j); if (c && c.x > x0 && c.x < x1 && c.y > y0 && c.y < y1) out.push(c); }
     return out;
   }
@@ -3264,6 +3267,7 @@
     sparks(x, y, 9, 210, ang + PI, 1.1); if (Math.hypot(x - player.x, y - player.y) < 320) hitFx(0.03, 2 + pw * 2); AU.sfx('stoneHit', x, y, pw);   // her vuruşta ses
   }
   function swingCampStones(pcx, pcy) {
+    if (CV.in) return;
     for (const c of CAMP.list) {
       if (Math.abs(c.x - pcx) > 520 || Math.abs(c.y - pcy) > 420) continue;
       for (const q of campPillars(c)) {
@@ -4159,6 +4163,7 @@
   const INV = { dust: 0, ingot: 0, keys: 0, gp: 0, kp: 0, ever: false, band: 0, medk: 0, elix: 0, herb: 0, resin: 0, prism: 0, parr: 0, pbomb: 0, pbeam: 0, wood: 0, moss: 0, torch: 0, coal: 0, stone: 0 }, LOOT = [], WD = [], FT = [];
   const WCOL = ['#6a5744', '#44372b', '#6d7079', '#8c7455', null, '#b9935c', '#d6b883'], GOLD = '#f0c24a';
   function chestsIn(x0, y0, x1, y1) {
+    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = [];
     baseChests.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push(c); });
     xChests.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push(c); });
@@ -4401,6 +4406,7 @@
   const treeVar = (x, y) => ({ sd: hashN(x | 0, y | 0, 66), sc: 0.86 + 0.3 * hashN(x | 0, y | 0, 67), pine: hashN(x | 0, y | 0, 68) < 0.6, moss: hashN(x | 0, y | 0, 69) < 0.32 });   // moss: gövdesi yosun kaplı ağaç (~%32)
   const chestNear = (x, y, r) => chestsIn(x - r, y - r, x + r, y + r).length > 0;
   function treesIn(x0, y0, x1, y1) {
+    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = [];
     for (let ci = Math.floor(x0 / TC); ci <= Math.floor(x1 / TC); ci++) for (let cj = Math.floor(y0 / TC); cj <= Math.floor(y1 / TC); cj++) {
       const k = ci + ',' + cj; let c = treeCache.get(k);
@@ -4653,6 +4659,7 @@
   const pickOn = () => (AX.on && AX.k === 'pick') || DEV.pick;   // elde KAZMA varsa (ya da geliştirici testi açıksa) kaya kazılır
   const RST = new Map(), rockCache = new Map(), rkGeo = new Map(), RS = [];   // RST: vurulan kayaların durumu · RS: kopan taş parçaları
   function rocksIn(x0, y0, x1, y1) {
+    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = [];
     for (let ci = Math.floor(x0 / ROCK_CELL); ci <= Math.floor(x1 / ROCK_CELL); ci++) for (let cj = Math.floor(y0 / ROCK_CELL); cj <= Math.floor(y1 / ROCK_CELL); cj++) {
       const k = ci + ',' + cj; let c = rockCache.get(k);
@@ -6146,7 +6153,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       const a = AR[i], x0 = a.x, y0 = a.y; a.t += dt; a.x += a.vx * dt; a.y += a.vy * dt;
       a.tr.unshift({ x: x0, y: y0 }); if (a.tr.length > 6) a.tr.pop();
       let stop = false, rec = 0.5;
-      for (const e of E.slice()) {   // düşmanlar (delme: a.pen)
+      for (const e of CV.in ? [] : E.slice()) {   // düşmanlar (delme: a.pen)
         if (a.pen <= 0) break;
         if (e.em < 1 || e.ghost || a.hit.includes(e) || !inEll(x0, y0, a.x, a.y, e.x, e.y, 25, 17)) continue;
         a.hit.push(e); hitEnemy(e, a.dmg * gearM('arrow'), a.a, true);
@@ -6154,7 +6161,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         if (a.perf && a.hit.length === 1) ftext(e.x, e.y - 78, 'Tam isabet!', GOLD);
         if (--a.pen <= 0) { stop = true; rec = 0.3; }
       }
-      if (!stop) for (let j = EP.length - 1; j >= 0; j--) {   // kara küreleri havada keser
+      if (!stop && !CV.in) for (let j = EP.length - 1; j >= 0; j--) {   // kara küreleri havada keser
         const bl = EP[j]; if (!inEll(x0, y0, a.x, a.y, bl.x, bl.y, 20, 18)) continue;
         sparks(bl.x, bl.y - 22, 8, 200, a.a, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(j, 1);
         if (--a.pen <= 0) { stop = true; rec = 0.7; } break;
@@ -6171,7 +6178,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         else { sparks(a.x, a.y - 26, 6, 160, a.a + PI, 0.8); AU.sfx('arrowTink', a.x, a.y); }
         break;
       }
-      if (!stop) for (const c of CAMP.list) {   // kamp taşları ve mühür çizgisi: dışarıdan gelen ok kalkana çarpıp düşer
+      if (!stop && !CV.in) for (const c of CAMP.list) {   // kamp taşları ve mühür çizgisi: dışarıdan gelen ok kalkana çarpıp düşer
         if (Math.abs(c.x - a.x) > 420 || Math.abs(c.y - a.y) > 320) continue;
         let hit = campN(c, a.x, a.y) < CAMP_R, hx = a.x, hy = a.y - 22;
         if (!hit) for (const q of campPillars(c)) if (inEll(x0, y0, a.x, a.y, q[0], q[1] - 1, 22 * CP_SC[q[2]], 8)) { hit = true; hx = q[0]; hy = q[1] - CP_MID; break; }
@@ -6821,7 +6828,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const R = BOMB_R;
     PBX.push({ x: b.x, y: b.y, t: 0, life: 0.6, r: R }); CFX.push({ k: 'flash', x: b.x, y: b.y - 14, t: 0, life: 0.35 });
     sparks(b.x, b.y - 14, 16, 300, 0, TAU); smoke(b.x, b.y - 10, 6, 50, 12); hitFx(0.1, 7); try { AU.sfx('boltBreak', b.x, b.y); AU.sfx('guardBreak', b.x, b.y); } catch (_) {}
-    for (const e of E.slice()) {
+    for (const e of CV.in ? [] : E.slice()) {
       if (e.em < 1 || e.st === 'die') continue;
       const dx = e.x - b.x, dy = e.y - b.y; if (Math.hypot(dx, dy / 0.8) > R) continue;
       const ang = Math.atan2(dy, dx); hitEnemy(e, BOMB_DMG, ang);
@@ -6830,7 +6837,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         else if (!e.armor) { e.stun = 0.8; e.kx = Math.cos(ang) * 380; e.ky = Math.sin(ang) * 300; e.st = 'chase'; e.atk = ''; }
       }
     }
-    for (let i = EP.length - 1; i >= 0; i--) if (Math.hypot(EP[i].x - b.x, (EP[i].y - b.y) / 0.8) < R) { sparks(EP[i].x, EP[i].y - 22, 6, 160, 0, TAU); EP.splice(i, 1); }
+    if (!CV.in) for (let i = EP.length - 1; i >= 0; i--) if (Math.hypot(EP[i].x - b.x, (EP[i].y - b.y) / 0.8) < R) { sparks(EP[i].x, EP[i].y - 22, 6, 160, 0, TAU); EP.splice(i, 1); }
     for (const [sx, sy, id, ev] of statuesIn(b.x - R - 40, b.y - R - 60, b.x + R + 40, b.y + R + 100)) { if (!ev) continue; const s = evState(id); if (s.dead || s.dying >= 0 || Math.hypot(sx - b.x, (sy - b.y) / 0.8) > R + 28) continue; hitEvil(s, sx, sy, Math.atan2(sy - b.y, sx - b.x)); }
     for (const [cx, cy, id, lk] of chestsIn(b.x - R, b.y - R, b.x + R, b.y + R + 40)) { const s = chState(id, lk); if (s.dead || s.dying >= 0 || Math.hypot(cx - b.x, (cy - b.y) / 0.8) > R) continue; hitChest(s, cx, cy, Math.atan2(cy - b.y, cx - b.x)); }
     const pd = Math.hypot(player.x - b.x, (player.y - b.y) / 0.8);
@@ -6840,7 +6847,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const P = BEAM, A = P.aim, ca = Math.cos(A), sa = Math.sin(A), line = (x, y) => { const dx = x - player.x, dy = y - player.y; return [dx * ca + dy * sa, -dx * sa + dy * ca]; };
     P.n++;
     const offs = beamOffs(P.streak), inBeam = (x, y, w, l0) => offs.some(o => { const dx = x - player.x, dy = y - player.y, c = Math.cos(A + o), s = Math.sin(A + o), al = dx * c + dy * s, pp = -dx * s + dy * c; return al > l0 && al < beamLen(P.streak) + 12 && Math.abs(pp) < w; });
-    for (const e of E.slice()) {   // deldiği herkes: darbe + erimeye başlar (ışın çekilse de bir süre erimeye devam eder); düşman başına tek darbe
+    for (const e of CV.in ? [] : E.slice()) {   // deldiği herkes: darbe + erimeye başlar (ışın çekilse de bir süre erimeye devam eder); düşman başına tek darbe
       if (e.em < 1 || e.ghost || e.st === 'die') continue;
       if (inBeam(e.x, e.y, beamW(P.streak), 8)) {
         e.melt = MELT_T; const big = P.streak >= BEAM_S3, ang = big ? Math.atan2(e.y - player.y, e.x - player.x) : A;
@@ -6848,7 +6855,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         if (P.streak >= BEAM_S5 && e.st !== 'die' && E.includes(e)) { e.kx += Math.cos(ang) * 260; e.ky += Math.sin(ang) * 260; }
       }
     }
-    for (let i = EP.length - 1; i >= 0; i--) { if (inBeam(EP[i].x, EP[i].y, 14 + 10 * beamU(P.streak), 0)) { sparks(EP[i].x, EP[i].y - 22, 6, 160, A, 0.8); EP.splice(i, 1); } }
+    if (!CV.in) for (let i = EP.length - 1; i >= 0; i--) { if (inBeam(EP[i].x, EP[i].y, 14 + 10 * beamU(P.streak), 0)) { sparks(EP[i].x, EP[i].y - 22, 6, 160, A, 0.8); EP.splice(i, 1); } }
     if (P.n % 3 === 1) {   // heykel ve sandıklara her 0.9 sn'de bir
       const BL = beamLen(P.streak), x1 = player.x + ca * BL, y1 = player.y + sa * BL;
       for (const [sx, sy, id, ev] of statuesIn(Math.min(player.x, x1) - 40, Math.min(player.y, y1) - 60, Math.max(player.x, x1) + 40, Math.max(player.y, y1) + 100)) { if (!ev) continue; const s = evState(id); if (s.dead || s.dying >= 0) continue; const [al, pp] = line(sx, sy); if (al > 0 && al < BL + 20 && Math.abs(pp) < 34) hitEvil(s, sx, sy, A); }
@@ -6888,7 +6895,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const e of E) if (e.melt > 0) {   // erime: mor damlalar süzülür, 0.3 sn'de bir hasar
       e.melt -= dt; if (Math.random() < dt * 16) sparks(e.x + rnd(-8, 8), e.y - rnd(8, 34), 1, 40, PI / 2, 0.6);
     }
-    P.mt -= dt; if (P.mt <= 0) { P.mt = 0.3; for (const e of E.slice()) if (e.melt > 0 && e.st !== 'die' && !e.ghost) hitEnemy(e, MELT_DMG * beamMul(P.streak) * wpnDmg(), PI / 2, 'soft'); }
+    P.mt -= dt; if (P.mt <= 0) { P.mt = 0.3; for (const e of CV.in ? [] : E.slice()) if (e.melt > 0 && e.st !== 'die' && !e.ghost) hitEnemy(e, MELT_DMG * beamMul(P.streak) * wpnDmg(), PI / 2, 'soft'); }
   }
   function drawPrismFx(fg) {
     for (const b of BM) {   // bombalar
@@ -9283,14 +9290,17 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   const dnE3 = u => u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
   function dnStart(kind) { if (DNT.on) return; DNT.on = true; DNT.kind = kind; DNT.t = 0; DNT.snd = {}; DNT.tk = -1; GCLK.f = DN_CFG[kind].f0; }
   function dnCheck(f0) {   // saat 18:00 (gün batımı) / 06:00 (gün doğumu) çizgisini ileri doğru geçince başlar (geliştirici: ≥240× hızda ve geri sarmada atlanır)
+    if (CV.in || CV.st !== 'idle') { DNT.pend = null; return; }   // mağarada (ve kapı geçişinde) gün/gece animasyonu YOK, geçmiş geçmiştir: saat akmaya devam eder, dışarı çıkınca animasyon tekrar oynamaz
     if (DNT.on || F.death >= 0 || DEATH.on) return;
-    if (DNT.pend) { if (CV.in) return; const k = DNT.pend; DNT.pend = null; dnStart(k); return; }   // mağaradaysan animasyon dışarı çıkınca oynar (içeride çizilmediği için kaçıyordu)
+    if (DNT.pend) { const k = DNT.pend; DNT.pend = null; dnStart(k); return; }
     const sp = DEV.on ? DEV.tspd : 1; if (sp <= 0 || sp >= 240) return;
     const f1 = GCLK.f, crossed = h => { const a = h / 24; return f1 >= f0 ? (f0 < a && f1 >= a) : (f0 < a || f1 >= a); };
-    const kd = crossed(18) ? 'dusk' : crossed(6) ? 'dawn' : null; if (kd) { if (CV.in) DNT.pend = kd; else dnStart(kd); }
+    if (crossed(18)) dnStart('dusk'); else if (crossed(6)) dnStart('dawn');
   }
   function dnTick(dt) {   // her karede: oyun saatini yumuşakça sarar, sesleri tetikler, süre dolunca bitirir
-    const c = DN_CFG[DNT.kind], T = (DNT.t += dt), uc = clamp((T - 1.0) / 3.0, 0, 1);
+    const c = DN_CFG[DNT.kind];
+    if (CV.in) { DNT.on = false; GCLK.f = c.f1; try { AU.setTime(GCLK.f, true); } catch (_) {} return; }   // animasyon sürerken mağaraya girildiyse: yarıda kesilir, saat bitiş noktasına oturur (geri sarma yok)
+    const T = (DNT.t += dt), uc = clamp((T - 1.0) / 3.0, 0, 1);
     GCLK.f = lerp(c.f0, c.f1, dnE3(uc));
     try {
       const sd = DNT.snd;
@@ -9547,7 +9557,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (!CV.in) { campBarrier(); caveBarrier(); updateBolts(fz ? 0 : sdt); updateEvil(fz ? 0 : sdt); updateChests(sdt); updateTrees(sdt); updateRocks(sdt); }
     { const ft0 = FX.t; updateFx(dt, sdt); if (fz) FX.t = ft0; }
     let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
-    try { AU.setMode(F.death >= 0.6 ? 'death' : 'game'); AU.setListener(player.x, player.y); AU.setTime(GCLK.f, DNT.on); AU.update(dt, CAMP.in ? 0 : clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
+    try { AU.setMode(F.death >= 0.6 ? 'death' : 'game'); AU.setListener(player.x, player.y); AU.setTime(GCLK.f, DNT.on || CV.in); AU.update(dt, CAMP.in ? 0 : clamp(alert, 0, 1)); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
 
     joy.alpha += ((joy.active ? 1 : 0) - joy.alpha) * (1 - Math.exp(-16 * dt));
 
