@@ -84,7 +84,7 @@
 
   /* ---------- Canvas ---------- */
   const cv = document.getElementById('c');
-  const ctx = cv.getContext('2d', { alpha: false });
+  const ctx = cv.getContext('2d');
   /* YARI SAYDAM YAZI YOK: yazı rengi alfalıysa zemin rengiyle karıştırılıp opak renge çevrilir (globalAlpha geçiş animasyonlarına dokunulmaz) */
   { const _ft = ctx.fillText.bind(ctx), RX = /^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/;
     ctx.fillText = function (t, x, y, mw) {
@@ -97,21 +97,6 @@
     };
   }
   let W = 0, H = 0, DPR = 1;
-  const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const PX_BUDGET = IS_IOS ? 4.6e6 : 2.1e6;   // iOS'ta eskisi gibi; Android'de ~2,1 milyon piksel üst sınır
-  let DQ = 1; try { DQ = parseFloat(localStorage.getItem('hlkDQ')) || window.__hlkDQ || 1; } catch (_) { DQ = window.__hlkDQ || 1; }
-  DQ = Math.max(0.5, Math.min(1, DQ));
-  let pwN = 0, pwSum = 0, pwSkip = 90;   // kare süresi izleme (ilk kareler atlanır)
-  function perfWatch(ms) {
-    if (ms > 100) { pwSkip = 30; pwN = 0; pwSum = 0; return; }   // sekme geçişi / duraklama: ölçme
-    if (pwSkip > 0) { pwSkip--; return; }
-    pwSum += ms; if (++pwN < 45) return;
-    const avg = pwSum / pwN; pwN = 0; pwSum = 0;
-    if (avg > 21 && DPR > 0.8) {   // ~48 FPS altı: çözünürlüğü kademeli düşür
-      DQ = Math.max(0.5, DQ * 0.82); window.__hlkDQ = DQ; try { localStorage.setItem('hlkDQ', DQ); } catch (_) {}
-      resize(); pwSkip = 60;
-    }
-  }
   let VPW = 0, VPH = 0, ROT = false, PORTRAIT = false;   // PORTRAIT: dokunmatik cihaz dikey tutuluyor → oyun çizilmez, 'telefonu yatay çevir' animasyonu gösterilir
      // PW/PH: fiziksel görünüm alanı · ROT: fiziksel ekran dikeyse oyun 90° döndürülmüş yatay çizilir
   let SAS = 0;   // yatay güvenli alan payı (çentik / dinamik ada / yuvarlak köşe): sayfa içerikleri ve sağ düğmeler bu kadar içeriden başlar
@@ -123,11 +108,8 @@
   const setBase = () => ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, -cam.x * DPR * ZOOM, -cam.y * DPR * ZOOM);   // dünya -> ekran
 
   function resize() {
-    VPW = window.innerWidth; VPH = window.innerHeight;
-    /* PERFORMANS: Android tabletler 2.0-2.6 DPR ile çok büyük bir tuval (4-6 milyon piksel) çizmek zorunda kalıyordu.
-       Android'de toplam piksel sayısı sınırlandı; ayrıca kare süresi yüksekse çözünürlük otomatik düşer (DQ). */
     DPR = Math.min(window.devicePixelRatio || 1, 3);
-    DPR = Math.max(0.75, Math.min(DPR, Math.sqrt(PX_BUDGET / Math.max(1, VPW * VPH))) * DQ);
+    VPW = window.innerWidth; VPH = window.innerHeight;
     // iOS ana ekran modunda innerHeight alt güvenli alanı (home indicator) hariç tutabiliyor;
     // bu durumda gerçek ekran yüksekliğini kullanıp tuvali tam boyuta uzatıyoruz.
     if (navigator.standalone === true) {
@@ -9591,7 +9573,6 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   /* ---------- Döngü ---------- */
   let last = performance.now();
   function frame(now) {
-    perfWatch(now - last);
     const dt = Math.min((now - last) / 1000, 0.05); last = now;
     if (PORTRAIT) { try { AU.update(dt, 0); } catch (_) {} drawRotatePrompt(dt); requestAnimationFrame(frame); return; }   // dikey: oyun donar, yönlendirme ekranı
     if (INTRO.on) { introDraw(dt); requestAnimationFrame(frame); return; }   // yatay ama henüz dokunulmadı: karanlık açılış ekranı (ses kilidi de burada açılır)
