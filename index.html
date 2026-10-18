@@ -8891,7 +8891,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   // gündüz (açık zemin): sıcak krem ışık, güneş hüzmeleri, bulut gölgeleri, polen, savrulan yapraklar, uçan kuşlar · şafak / akşam: altın saat
   // gece (koyu zemin): hafif karartı + az sayıda küçük net ateş böceği
   /* ---------- MEŞALE: elde tutulunca çevresindeki gece karartısını açar, ışığın erdiği yerde gölgeler azalır · alev sağa-sola sallanır ---------- */
-  const TORCH_CAP = 64, CAMP_LR = 270, LT = [];   // LT: ışık kaynakları {x, y, R, a, k}
+  const TORCH_CAP = 64, CAMP_LR = 270, RUIN_LR = 250, MUM_LR = 240, LT = [];   // LT: ışık kaynakları {x, y, R, a, k}
   const TORCH = { on: false, w: 0, vis: 0, lit: 0, wx: 0, wy: 0, str: 1, R: 215, ph: Math.random() * 6 };   // w: elde tutma ağırlığı · lit: ışık şiddeti · wx/wy: alevin dünya konumu · R: ışık yarıçapı (dünya birimi)
   function torchToggle() {
     if (F.death >= 0) return;
@@ -9025,7 +9025,21 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const sxp = (f, vx, par, span, pad) => amod(f * span + vx * t - cam.x * z * par, span) - pad, syp = (f, vy, par, span, pad) => amod(f * span + vy * t - cam.y * z * par, span) - pad;
     LT.length = 0;   // ışık kaynakları: elde meşale + yanan kamp ateşleri (gölgeler de bunlara göre azalır)
     if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R, a: TORCH.lit, k: TORCH.lit * TORCH.str });
-    for (const c of camps) { if (c.ruin) continue; const fk = 0.95 + 0.05 * Math.sin(t * 9 + c.x) * Math.sin(t * 5.3 + c.y); LT.push({ x: c.x, y: c.y - 10, R: CAMP_LR * fk, a: 1, k: nW }); }
+    for (const c of camps) {   // tüm ateşler meşale gibi çevresindeki karartıyı açar ve gölgeleri azaltır (meşaleden bir tık güçlü: R 215 → 250–270)
+      const fk = 0.95 + 0.05 * Math.sin(t * 9 + c.x) * Math.sin(t * 5.3 + c.y);
+      if (!c.ruin) { LT.push({ x: c.x, y: c.y - 10, R: CAMP_LR * fk, a: 1, k: nW }); continue; }   // kamp ateşi
+      if (!c.burn) continue;   // sönmüş harabe: ışık yok
+      const P = campParts(c), bp = [P.tent, P.crates, P.table][c.bk], bk = 0.93 + 0.07 * Math.sin(t * 8 + c.sd * 50) * Math.sin(t * 4.7 + c.x);
+      LT.push({ x: bp[0], y: bp[1] - 10, R: RUIN_LR * bk, a: 1, k: nW });   // yanan çadır / kasa / tezgah
+      LT.push({ x: P.fire[0], y: P.fire[1] - 4, R: RUIN_LR * 0.7 * fk, a: 0.8, k: nW });   // kor halindeki ocak
+      if (hashN(c.sd * 50, 3, 8) < 0.6) LT.push({ x: P.lamp2[0], y: P.lamp2[1] - 14, R: RUIN_LR * 0.55 * fk, a: 0.7, k: nW });   // hâlâ yanan fener
+    }
+    for (const e of E) {   // Eriyen Mum: başındaki fener alevi meşale gibi çevresini aydınlatır (ölürken ve eriyip kayarken azalır, öfkede biraz büyür)
+      if (e.kind !== 'mum') continue;
+      const em = Math.min(1, e.em || 0) * (e.st === 'die' ? 1 - sstep(1.2, 2.0, e.t) : e.st === 'mel' ? 0.4 : 1); if (em < 0.02) continue;
+      const mk = 0.94 + 0.06 * Math.sin(t * 9 + e.x * 0.01) * Math.sin(t * 5.1 + (e.vp || 0));
+      LT.push({ x: e.x, y: e.y - 84, R: MUM_LR * (e.rage ? 1.12 : 1) * mk, a: em, k: nW * em });
+    }
     ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // (şafak / alacakaranlık gökyüzü tonu kaldırıldı: gün ile gece arası geçiş ekranı kaplayan güneş / ay animasyonuyla yapılır)
     if (nW > 0.01) {   // gece: hafif karartı · elde meşale varsa çevresindeki karartı kalkar (renkli ışık / parıltı yok, yalnızca karartı açılır)
