@@ -188,6 +188,7 @@
     if (MENU.on && PAUSE.on) { pauseDown(e); return; }   // ana menüden açılan kıyafet sayfası
     if (MENU.on) { menuTap(e.clientX, e.clientY); return; }   // ana menü açıkken dokunuşlar yalnızca menüye gider
     if (PAUSE.on) { pauseDown(e); return; }   // duraklatılmışken dokunuşlar yalnızca menüye gider
+    if (curseTapUI(e.clientX, e.clientY)) return;   // lanetli sandık: AÇ düğmesi + onay penceresi
     { const dpz = Math.hypot(e.clientX - AU.btn.x, e.clientY - AU.btn.y), dbg = bagHit(e.clientX, e.clientY), rh = AU.btn.r * HUD_S + 14; if (dbg < rh && dbg < dpz) { openBag(); return; } if (dpz < rh) { togglePause(); return; } }   // çanta / duraklatma düğmesi (yakın olan)
     { const hs = hotbarAt(e.clientX, e.clientY); if (hs) { hotbarDown(hs, e); return; } }   // hızlı slot çubuğu
     if (RAD.id === null && SWB.v > 0.6 && Math.hypot(e.clientX - SWB.x, e.clientY - SWB.y) < SWB.r + 12) { RAD.id = e.pointerId; RAD.t = 0; RAD.on = false; RAD.sel = null; RAD.px = e.clientX; RAD.py = e.clientY; try { e.target.setPointerCapture(e.pointerId); } catch (_) {} return; }   // alet düğmesi: kısa dokun = takas · basılı tut = radyal seçim
@@ -378,6 +379,8 @@
       },
       chestHit(d, t, h) { tone(d, 'sine', 150, 60, t, 0.14, 0.8); nz(d, t, 0.12, 0.7, 'bandpass', 900, 300, 1.2); nz(d, t, 0.05, 0.4, 'highpass', 2400, 2400, 0.7); tone(d, 'triangle', 520 + (h || 0) * 60, 260, t, 0.09, 0.2); [1900, 2500].forEach((f, i) => tone(d, 'sine', f, f * 0.99, t + 0.01 + i * 0.02, 0.25, 0.06)); },
       chestBreak(d, t) { tone(d, 'sine', 110, 38, t, 0.5, 1.0); nz(d, t, 0.45, 0.9, 'lowpass', 2800, 200, 0.8); for (let i = 0; i < 7; i++) nz(d, t + 0.02 + i * 0.045 + Math.random() * 0.03, 0.06, 0.45, 'bandpass', 500 + Math.random() * 1800, 350, 2.5); [1568, 2093, 2637, 3136].forEach((f, i) => tone(d, 'sine', f, f, t + 0.08 + i * 0.06, 0.6, 0.1)); },
+      curseOn(d, t) { tone(d, 'sine', 95, 30, t, 1.2, 0.9); tone(d, 'triangle', 233, 220, t, 0.9, 0.16); tone(d, 'triangle', 247, 233, t + 0.02, 0.9, 0.16); nz(d, t, 0.9, 0.6, 'lowpass', 1800, 120, 0.9); },
+      curseEnd(d, t) { [392, 523, 659, 784].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.07, 0.8, 0.12)); nz(d, t, 0.5, 0.22, 'highpass', 3000, 6000, 0.7); },
       axeRaise(d, t, w) { w = w || 0.27; nz(d, t, w + 0.05, 0.22, 'bandpass', 260, 800, 1.2, 0.12); tone(d, 'sine', 120, 210, t, w + 0.03, 0.1); nz(d, t + w, 0.14, 0.4, 'bandpass', 2600, 500, 1.1, 0.03); },
       axeYank(d, t) { tone(d, 'sawtooth', 210, 110, t, 0.2, 0.09, { lp: 700, vib: [30, 10] }); nz(d, t, 0.14, 0.4, 'bandpass', 900, 320, 1.6); tone(d, 'sine', 150, 80, t + 0.12, 0.08, 0.3); },
       axeSwish(d, t) { nz(d, t, 0.16, 0.35, 'bandpass', 1800, 700, 1.0, 0.02); tone(d, 'sine', 160, 90, t, 0.12, 0.25); },   // kaldırırken hışırtı, inerken keskin ıslık
@@ -1587,7 +1590,7 @@
     const kill = e.hp <= 0; sparks(e.x - Math.cos(ang) * 8, e.y - 24, kill ? 12 : 7, 200, ang, 0.9); hitFx(kill ? 0.12 : 0.07, kill ? 5 : 3);
     AU.sfx(ranged ? 'arrowHit' : 'hit', e.x, e.y, kill);
     if (kill && e.kind === 'sentinel') sentKill(e, ang);
-    else if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10, e.kind === 'mum' ? 2 : undefined); AU.sfx(e.kind === 'mum' ? 'mumDie' : e.kind === 'bellman' ? 'eBellDie' : 'eDie', e.x, e.y, e); if (e.kind === 'bellman' || e.kind === 'mum') { e.hp = 0; e.st = 'die'; e.t = 0; e.did = false; e.d2 = false; e.stun = 0; e.atk = ''; e.armor = 0; e.ghost = true; } else E.splice(E.indexOf(e), 1); STAT.kills[e.kind] = (STAT.kills[e.kind] || 0) + 1; if (e.kind === 'mimic') { mimicDie(e); dropXp(e.x, e.y, XP_MIMIC); } else if (e.kind === 'mum') mumDie(e); else if (e.kind === 'ghost') ghostDrops(e); else if (e.kind === 'bellman') bellmanDie(e); else if (e.kind === 'bellet') dropXp(e.x, e.y, 3); if (!e.src && e.kind === 'ghost') E.spawnT = 2.5; }
+    else if (kill) { burst(e.x, e.y - 20, 12, 70); smoke(e.x, e.y - 22, 6, 45, 10, e.kind === 'mum' ? 2 : undefined); AU.sfx(e.kind === 'mum' ? 'mumDie' : e.kind === 'bellman' ? 'eBellDie' : 'eDie', e.x, e.y, e); if (e.kind === 'bellman' || e.kind === 'mum') { e.hp = 0; e.st = 'die'; e.t = 0; e.did = false; e.d2 = false; e.stun = 0; e.atk = ''; e.armor = 0; e.ghost = true; } else E.splice(E.indexOf(e), 1); STAT.kills[e.kind] = (STAT.kills[e.kind] || 0) + 1; curseKill(); if (e.kind === 'mimic') { mimicDie(e); dropXp(e.x, e.y, XP_MIMIC); } else if (e.kind === 'mum') mumDie(e); else if (e.kind === 'ghost') ghostDrops(e); else if (e.kind === 'bellman') bellmanDie(e); else if (e.kind === 'bellet') dropXp(e.x, e.y, 3); if (!e.src && e.kind === 'ghost') E.spawnT = 2.5; }
     else {
       AU.sfx(e.kind === 'mum' ? 'mumHurt' : e.kind === 'bellman' ? 'eBellHurt' : 'eHurt', e.x, e.y, e);   // vuruş sarsıntısı
       if (e.kind === 'mum') mumPressure(e, ang);
@@ -1723,7 +1726,8 @@
     { id: 'sifa', name: 'Şifalı Eller', cost: 2, desc: 'Sağlık ekipmanları kalıcı olarak %25 daha güçlü iyileştirir: bandaj %10 yerine %12,5, medkit %50 yerine %62,5 can yeniler. Şifa Hilali de aynı oranda güçlenir.', buff: { healMul: 1.25 }, cls: 'hero', req: [], ico: 'heal' },
     { id: 'hisim', name: 'Kor Hışım', cost: 2, desc: 'Verdiğin hasar %20 artar (kılıç, ok, bomba, ışın). Yan etki olarak dayanıklılık %6 daha hızlı yenilenir, siper ve prizma ışını %5 daha az yorar.', buff: { dmgDealt: 1.2, stamRegen: 1.06, stamCost: 0.95 }, cls: 'hero', req: [], ico: 'dmg' }
   ];   // yeni beceri eklemek için buraya bir kayıt + ağaçtaki düğüm konumu yeterli · cls: 'hero' (Halaskar) | 'sword' (Kılıç) | 'bow' (Yay) · req: önce açık olması gereken becerilerin id'leri (Güçlendirmeler sayfasında bağlantı çizgisi olarak görünür; sınıflar arası da olabilir)
-  const skM = n => { let m = 1; for (const q of SKILLS) if (SK.own[q.id] && q.buff[n] !== undefined) m *= q.buff[n]; return m; };   // beceri çarpanları (gearM ile birlikte okunur)
+  const CURSE = { on: false, kills: 0, need: 10, t: 0, fl: 0, vg: 0, pulse: 0, done: 0, ask: null, av: 0, bv: 0, nr: null, p: [] }, CURSE_M = { dmgTaken: 2, healMul: 0.5, dmgDealt: 2 / 3 };   // lanet: alınan hasar ×2 · iyileşme ×0,5 · verilen hasar ×⅔ (15 → 10)
+  const skM = n => { let m = 1; for (const q of SKILLS) if (SK.own[q.id] && q.buff[n] !== undefined) m *= q.buff[n]; if (CURSE.on && CURSE_M[n]) m *= CURSE_M[n]; return m; };   // beceri çarpanları (gearM ile birlikte okunur)
   const skSpent = () => SKILLS.reduce((a, q) => a + (SK.own[q.id] ? q.cost : 0), 0);
   function skReset() { SK.pts = 0; SK.own = {}; SK.sel = 0; SK.flash = 0; SK.msg = ''; SK.mt = 0; SK.fx = []; SK.gl = SK.pgl = 0; }
   function skLoad(sv) { skReset(); (sv.sk || []).forEach(id => { if (SKILLS.some(q => q.id === id)) SK.own[id] = true; }); SK.pts = isFinite(sv.tp) ? Math.max(0, sv.tp | 0) + (sv.sk || []).filter(id => id === 'soluk').length : Math.max(0, LVL.lv - 1 - skSpent()); }   // eski kayıtlarda tp yoksa: seviye - 1 puan hakkı
@@ -1742,7 +1746,7 @@
   }
   /* ---------- İSTATİSTİK ve ÖLÜM EKRANI ---------- */
   const STAT = { kills: { ghost: 0, mimic: 0, sentinel: 0, mum: 0 }, statues: { evil: 0 }, got: { dust: 0, ingot: 0, keys: 0, prism: 0, band: 0, medk: 0, herb: 0, resin: 0, arrows: 0, bow: 0, charms: [] } };
-  function statReset() { STAT.kills = { ghost: 0, mimic: 0, sentinel: 0, mum: 0 }; STAT.statues = { evil: 0 }; STAT.got = { dust: 0, ingot: 0, keys: 0, prism: 0, band: 0, medk: 0, herb: 0, resin: 0, arrows: 0, bow: 0, charms: [] }; }
+  function statReset() { curseReset(); STAT.kills = { ghost: 0, mimic: 0, sentinel: 0, mum: 0 }; STAT.statues = { evil: 0 }; STAT.got = { dust: 0, ingot: 0, keys: 0, prism: 0, band: 0, medk: 0, herb: 0, resin: 0, arrows: 0, bow: 0, charms: [] }; }
   const KILL_NAME = { ghost: 'Çırak Büyücü', mimic: 'Mimik', sentinel: 'Nöbetçi', bellman: 'Çancı', bellet: 'Çan Kafa', mum: 'Eriyen Mum' }, STATUE_NAME = { evil: 'Kötücül Heykel' };
   function statLoot(l) {   // toplanan eşyaları say
     const k = l.k, n = l.n || 1, g = STAT.got;
@@ -3248,6 +3252,61 @@
     k.restore(); k.strokeStyle = 'rgba(8,4,2,0.55)'; k.lineWidth = 5; k.beginPath(); k.moveTo(-CV_SW, -150); k.lineTo(-CV_SW, 72); k.moveTo(CV_SW, -150); k.lineTo(CV_SW, 72); k.stroke(); k.strokeStyle = `rgba(${tan},0.7)`; k.lineWidth = 2; k.stroke();
     g.img = cv;
   }
+  /* ---------- Mağara ÖDÜL SANDIĞI: normal sandıkla aynı yapı (vurulunca kırılır) · altın bantlı, aura ve parıltılı · mağara duvarına yaslı · mağara başına 0–1 (çok şanslıysan 2) ---------- */
+  function cvChests(c) {
+    const g = cvGeo(c); if (g.chs) return g.chs;
+    const N = CVN, G = g.G, out = [], H = (i, k) => hashN(c.sd, 70 + i, k), cand = g.rooms.filter(r => r.kind !== 'start');
+    let n = 0; if (cand.length && H(1, 3) < luckP(0.6)) { n = 1; if (H(2, 3) < luckP(0.02) && cand.length > 1) n = 2; }   // 2. sandık: çok yüksek şans / ileride şans eşyası
+    const kinds = []; for (let i = 0; i < n; i++) kinds.push('v'); if (cand.length > kinds.length && H(3, 3) < 0.4) kinds.push('x');   // 'x' = lanetli sandık (%40)
+    const at = (x, y) => G[y * N + x] === 1, usedR = new Set();
+    for (let i = 0; i < kinds.length; i++) {
+      const r0 = Math.floor(H(5 + i, 7) * cand.length); let found = null;
+      for (let q = 0; q < cand.length && !found; q++) {
+        const ri = (r0 + q) % cand.length; if (usedR.has(ri)) continue; const R = cand[ri], spots = [];
+        for (let gy = Math.floor(R.cy - R.rh * 1.3); gy <= Math.ceil(R.cy + R.rh * 1.3); gy++) for (let gx = Math.floor(R.cx - R.rw * 1.3); gx <= Math.ceil(R.cx + R.rw * 1.3); gx++) {
+          if (gx < 4 || gy < 4 || gx > N - 5 || gy > N - 5) continue;
+          if (!at(gx, gy) || !at(gx - 1, gy) || !at(gx + 1, gy) || !at(gx, gy + 1) || !at(gx - 1, gy + 1) || !at(gx + 1, gy + 1) || at(gx, gy - 1) || at(gx - 1, gy - 1) || at(gx + 1, gy - 1)) continue;   // üstü duvar, önü ve yanları zemin
+          const lx = CVGX + (gx + 0.5) * CVS, ly = CVGY + gy * CVS + 22;
+          if (g.tor.some(T => Math.hypot(T.x - lx, T.y - ly) < 60)) continue;
+          if (cvWalk(c, lx, ly + 40) && cvWalk(c, lx - 30, ly + 40) && cvWalk(c, lx + 30, ly + 40)) spots.push({ lx, ly });
+        }
+        if (spots.length) { found = spots[Math.floor(H(9 + i, 11) * spots.length)]; usedR.add(ri); }
+      }
+      if (found) out.push({ id: 'cb' + kinds[i] + c.id + '#' + i, lx: found.lx, ly: found.ly });
+    }
+    return g.chs = out;
+  }
+  function cvChestList(x0, y0, x1, y1) {   // chestsIn'in mağara sürümü: normal sandık kayıtlarıyla aynı biçim [x, y, id, zincirli]
+    if (!CV.c) return []; const out = [];
+    for (const ch of cvChests(CV.c)) { const x = CVO.x + ch.lx, y = CVO.y + ch.ly; if (x > x0 && x < x1 && y > y0 && y < y1) out.push([x, y, ch.id, false]); }
+    return out;
+  }
+  function cvLootSettle(l) {   // yerde kalan ganimet yürünebilir bir noktada dursun: duvara yakınsa mağaranın içine (aşağı / yana) kaydırılır
+    const ok = (x, y) => cvWalk(CV.c, x - CVO.x, y - CVO.y); if (ok(l.x, l.y)) return;
+    for (let r = 4; r <= 80; r += 4) for (const [dx, dy] of [[0, 1], [-0.7, 0.7], [0.7, 0.7], [-1, 0], [1, 0], [0, -1]]) { const x = l.x + dx * r, y = l.y + dy * r; if (ok(x, y)) { l.x = x; l.y = y; return; } }
+  }
+  function cvChestLoot(x, y) {   // kırılınca: altın tozu 8–20 · %15 külçe · kemik 2–6 · duruma uygun sağlık eşyası
+    const sp = (k, vz) => LOOT.push({ k, n: 1, cv: 1, x: x + rnd(-8, 8), y: y + 14, z: 30, vx: rnd(-90, 90), vy: rnd(40, 120), vz: vz || rnd(340, 520), t: 0, ph: rnd(0, 6), b: 0, rest: false });
+    const nd = 8 + (Math.random() * 13 | 0); for (let i = 0; i < nd; i++) sp('coin');
+    if (Math.random() < luckP(0.15)) sp('ingot', 560);
+    const nb = 2 + (Math.random() * 5 | 0); for (let i = 0; i < nb; i++) sp('bone');
+    const low = F.hpMax > 0 ? clamp(1 - F.hp / F.hpMax, 0, 1) : 0, pH = low > 0.65 ? 0.7 : low > 0.3 ? 0.35 : 0.1;
+    if (Math.random() < luckP(pH)) sp(Math.random() < (low > 0.8 ? 0.4 : 0.2) ? 'medk' : 'band', 520);
+    if (Math.random() < luckP(0.03)) sp('elix', 560);
+  }
+  function drawBoneIcon(x, y, s) {   // kemik: iki başlı, her ucunda çift yumru
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(-0.5); ctx.lineJoin = ctx.lineCap = 'round';
+    const knob = (px, py) => { ctx.beginPath(); ctx.arc(px, py, 2.6, 0, TAU); ctx.fill(); ctx.stroke(); };
+    ctx.strokeStyle = '#6b6254'; ctx.fillStyle = '#ece5d2'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.rect(-8, -1.8, 16, 3.6); ctx.fill(); ctx.stroke();
+    knob(-9, -2.2); knob(-9, 2.2); knob(9, -2.2); knob(9, 2.2);
+    ctx.fillStyle = '#c9c0a8'; ctx.fillRect(-7, 0.4, 14, 1.2); ctx.restore();
+  }
+  function drawBoneLoot(l) {
+    const sh = 1 / (1 + l.z * 0.02), gy = l.y - l.z - (l.rest ? 3 + Math.sin(l.t * 2.4 + l.ph) * 1 : 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(l.x, l.y + 1, 7 * sh, 2.4 * sh, 0, 0, TAU); ctx.fill();
+    ctx.save(); ctx.translate(l.x, gy - 5); ctx.rotate(l.rest ? 0 : l.t * 7); drawBoneIcon(0, 0, 0.9); ctx.restore();
+  }
   function cvObjs(fg) {   // mağara içi y-sıralı nesneler: duvar meşaleleri
     const c = CV.c; if (!c) return []; const g = cvGeo(c), t = ATM.t || 0;
     return g.tor.map(T => ({ y: CVO.y + T.y, f: () => {
@@ -3285,6 +3344,7 @@
     ATM.t += dt; const t = ATM.t, z = ZOOM; LT.length = 0;
     if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R, a: TORCH.lit, k: TORCH.lit * TORCH.str });
     { const cg = CV.c ? cvGeo(CV.c) : null; if (cg) for (const T of cg.tor) { if (Math.abs(T.x - (player.x - CVO.x)) > 900 || Math.abs(T.ly - (player.y - CVO.y)) > 700) continue; const fk = 0.95 + 0.05 * Math.sin(t * 9 + T.ph * 3) * Math.sin(t * 5.3 + T.ph); LT.push({ x: CVO.x + T.x, y: CVO.y + T.ly, R: CAMP_LR * 0.8 * fk, a: 1, k: 1 }); } }
+    if (CV.c) for (const ch of cvChests(CV.c)) { const cs = chState(ch.id, false), k = cs.dead ? Math.max(0, 1 - cs.dd / 3) : cs.dying >= 0 ? 1 : 0.35 + 0.12 * cs.hits; if (cs.gone) continue; LT.push({ x: CVO.x + ch.lx, y: CVO.y + ch.ly - 24, R: 120 + 90 * k + 10 * Math.sin(t * 2.2 + cs.t), a: 1, k: 0.45 + 0.5 * k }); }   // ödül sandığı kendi altın ışığını yayar: vurdukça, kırılırken parlar
     LT.push({ x: CVO.x, y: CVO.y + 10, R: 220, a: 0.9, k: 0.9 });
     ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     const sw = Math.ceil(W / 4), sh = Math.ceil(H / 4); if (!ATM.dk) { ATM.dk = document.createElement('canvas'); ATM.dkx = ATM.dk.getContext('2d'); } if (ATM.dk.width !== sw || ATM.dk.height !== sh) { ATM.dk.width = sw; ATM.dk.height = sh; }
@@ -4221,10 +4281,10 @@
   /* ---------- Ganimet sandıkları: kılıçla vurulur, her darbede sarsılır, son darbede parçalanır · zincirli sandık yalnızca altın anahtarla açılır ---------- */
   const CHS = 1.05, CH_HITS = 4, CH_HP = CH_HITS * 20, CC = 320;
   const CST = new Map(), chestCache = new Map(), baseChests = [], xChests = [];   // sabit başlangıç sandıkları kaldırıldı: sandıklar da rastgele
-  const INV = { dust: 0, ingot: 0, keys: 0, gp: 0, kp: 0, ever: false, band: 0, medk: 0, elix: 0, herb: 0, resin: 0, prism: 0, parr: 0, pbomb: 0, pbeam: 0, wood: 0, moss: 0, torch: 0, coal: 0, stone: 0 }, LOOT = [], WD = [], FT = [];
+  const INV = { dust: 0, ingot: 0, keys: 0, gp: 0, kp: 0, ever: false, band: 0, medk: 0, elix: 0, herb: 0, resin: 0, prism: 0, parr: 0, pbomb: 0, pbeam: 0, wood: 0, moss: 0, torch: 0, coal: 0, stone: 0, bone: 0 }, LOOT = [], WD = [], FT = [];
   const WCOL = ['#6a5744', '#44372b', '#6d7079', '#8c7455', null, '#b9935c', '#d6b883'], GOLD = '#f0c24a';
   function chestsIn(x0, y0, x1, y1) {
-    if (CV.in) return [];   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
+    if (CV.in) return cvChestList(x0, y0, x1, y1);   // mağaranın içi dünya koordinatlarında görünmez nesnelerle çakışıyordu (kılıç / ok boşa çarpıyordu)
     const out = [];
     baseChests.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push(c); });
     xChests.forEach(c => { if (c[0] > x0 && c[0] < x1 && c[1] > y0 && c[1] < y1) out.push(c); });
@@ -4244,7 +4304,7 @@
   }
   function chState(id, lk) {
     let s = CST.get(id);
-    if (!s) CST.set(id, s = { hp: CH_HP, hits: 0, chain: lk, locked: lk, unl: -1, dying: -1, dead: false, sq: 0, rot: 0, rv: 0, lid: 0, lv: 0, flash: 0, glow: 0, shk: 0, t: rnd(0, 9), sd: rnd(0, 50), hint: 0, ct: 0, kx: 0, ky: 0, dd: 0, mimic: !lk && !/^(cb|dm)/.test(id) && DEV.spawn.mimic !== false && Math.random() < DEV.mimic / 100, mAt: Math.random() < 0.5 ? 2 : 3, mc: 0, dm: 0, gone: false });
+    if (!s) CST.set(id, s = { hp: CH_HP, hits: 0, chain: lk, locked: lk, unl: -1, dying: -1, dead: false, sq: 0, rot: 0, rv: 0, lid: 0, lv: 0, flash: 0, glow: 0, shk: 0, t: rnd(0, 9), sd: rnd(0, 50), hint: 0, ct: 0, kx: 0, ky: 0, dd: 0, mimic: !lk && !/^(cb|dm)/.test(id) && DEV.spawn.mimic !== false && Math.random() < DEV.mimic / 100, mAt: Math.random() < 0.5 ? 2 : 3, mc: 0, dm: 0, gone: false, curse: id.startsWith('cbx'), cop: -1 });
     return s;
   }
   function nearestChest(r) {
@@ -4340,6 +4400,7 @@
     }
   }
   function hitChest(s, x, y, ang) {
+    if (s.curse) { curseTap(s, x, y, ang); return; }   // lanetli sandık vurularak açılmaz
     const hx = x + clamp(player.x - x, -16, 16), hy = y - rnd(10, 30);
     s.rv += Math.cos(ang) * 2.2 + rnd(-0.2, 0.2); s.sq = 1; s.flash = 0.1; F.fx = { x: hx, y: hy, t: 0, k: 'hit' };
     if (s.locked) {   // zincirli: kılıç sekiyor, hasar yok
@@ -4370,6 +4431,7 @@
     CFX.push({ k: 'flash', x, y: y - 22, t: 0, life: 0.42 }, { k: 'beam', x, y: y - 10, t: 0, life: 0.6 }, { k: 'ring', x, y: y + 2, r: 70, t: 0, life: 0.55 }, { k: 'ring', x, y: y + 2, r: 40, t: 0, life: 0.35 });
     cdust(x, y + 2, 9, 1.3); gsp(x, y - 22, 26, 340, 140);
     sparks(x, y - 18, 16, 280, 0, TAU); smoke(x, y - 14, 3, 40, 10); hitFx(0.2, 10);
+    if (id.startsWith('cbv')) { cvChestLoot(x, y - 8); return; }   // mağara ödül sandığı: kendi ganimet tablosu
     const n = s.chain ? 8 + (Math.random() * 7 | 0) : 3 + (Math.random() * 4 | 0);
     for (let i = 0; i < n; i++) LOOT.push({ k: 'coin', x, y: y + 4, z: 14, vx: rnd(-150, 150), vy: rnd(-70, 70), vz: rnd(230, 420), t: 0, ph: rnd(0, 6), b: 0, rest: false });
     bowDrops(x, y, s);   // yay / cephane: şansa bağlı
@@ -4379,7 +4441,7 @@
   }
   function updateChests(dt) {
     INV.gp = Math.max(0, INV.gp - dt * 3); INV.kp = Math.max(0, INV.kp - dt * 2.5);
-    updateChestFx(dt);
+    updateChestFx(dt); curseUpdate(dt);
     for (const [cx, cy, id, lk] of chestsIn(player.x - 760, player.y - 760, player.x + 760, player.y + 760)) {
       const s = chState(id, lk);
       s.t += dt; s.flash = Math.max(0, s.flash - dt); s.glow = Math.max(0, s.glow - dt * 2); s.shk = Math.max(0, s.shk - dt * 2.5); s.sq = Math.max(0, s.sq - dt * 5); s.hint = Math.max(0, s.hint - dt);
@@ -4403,8 +4465,16 @@
       }
     }
     for (let i = LOOT.length - 1; i >= 0; i--) {   // ganimet: havaya fırlar, yere düşer, yaklaşınca oyuncuya çekilir
-      const l = LOOT[i]; l.t += dt; if (l.k === 'arrow' && l.t > 28) { LOOT.splice(i, 1); continue; } const key = l.k === 'key';
-      if (!l.rest) { l.vz -= 900 * dt; l.z += l.vz * dt; l.x += l.vx * dt; l.y += l.vy * dt; if (l.z <= 0) { l.z = 0; if (l.vz < -120 && l.b < 3) { l.vz *= -0.42; l.vx *= 0.6; l.vy *= 0.6; l.b++; } else l.rest = true; } }
+      const l = LOOT[i]; if (!!l.cv !== CV.in) continue; l.t += dt; if (l.k === 'arrow' && l.t > 28) { LOOT.splice(i, 1); continue; } const key = l.k === 'key';
+      if (!l.rest) {
+        l.vz -= 900 * dt; l.z += l.vz * dt;
+        if (l.cv && CV.c) {   // mağara içi ganimet duvarın içine / dışına düşmez: yürünemeyen yere giren eksen yansır
+          const ok = (x, y) => cvWalk(CV.c, x - CVO.x, y - CVO.y), was = ok(l.x, l.y), nx = l.x + l.vx * dt, ny = l.y + l.vy * dt;
+          if (ok(nx, l.y)) l.x = nx; else if (was) l.vx *= -0.4;
+          if (!was ? ny >= l.y || ok(l.x, ny) : ok(l.x, ny)) l.y = ny; else l.vy *= -0.4;
+        } else { l.x += l.vx * dt; l.y += l.vy * dt; }
+        if (l.z <= 0) { l.z = 0; if (l.vz < -120 && l.b < 3) { l.vz *= -0.42; l.vx *= 0.6; l.vy *= 0.6; l.b++; } else { l.rest = true; if (l.cv && CV.c) cvLootSettle(l); } }
+      }
       const d = Math.hypot(player.x - l.x, player.y - l.y);
       if (d > 1500) { if (l.k === 'charm') EVL.miss = Math.max(EVL.miss, 6); LOOT.splice(i, 1); continue; }   // uzakta kalan tılsım kaybolur ama sonraki düşüş şansı yükselir
       if (l.t > 0.45 && F.death < 0 && lootOk(l)) {
@@ -4414,6 +4484,7 @@
           if (l.k === 'log') { INV.ever = true; INV.wood++; LOOT.splice(i, 1); AU.sfx('woodGet', l.x, l.y); woodGain(); continue; }   // odun: envantere girer
           if (l.k === 'moss') { INV.ever = true; INV.moss++; LOOT.splice(i, 1); AU.sfx('woodGet', l.x, l.y); sparks(l.x, l.y - 8, 4, 90, -PI / 2, 0.9); ftext(player.x, player.y - 62, '+1 Yosun', '#8fbf55'); continue; }   // yosun: envantere girer
           if (l.k === 'coal' || l.k === 'stone') { INV.ever = true; INV[l.k]++; LOOT.splice(i, 1); AU.sfx('oreGet', l.x, l.y); sparks(l.x, l.y - 8, 4, 90, -PI / 2, 0.9); ftext(player.x, player.y - 62, l.k === 'coal' ? '+1 Kömür' : '+1 Taş', l.k === 'coal' ? '#aab0c6' : '#c4c7d0'); continue; }   // kömür / taş: envantere girer
+          if (l.k === 'bone') { INV.ever = true; INV.bone++; LOOT.splice(i, 1); AU.sfx('oreGet', l.x, l.y); sparks(l.x, l.y - 8, 4, 90, -PI / 2, 0.9); ftext(player.x, player.y - 62, '+1 Kemik', '#ece5d2'); continue; }   // kemik: envantere girer
           if (lootBow(l)) { statLoot(l); LOOT.splice(i, 1); continue; }
           if (lootHeal(l)) { statLoot(l); LOOT.splice(i, 1); continue; }
           if (lootSpecial(l)) { statLoot(l); LOOT.splice(i, 1); continue; }
@@ -5027,10 +5098,21 @@
     });
     ctx.restore();
   }
-  function drawChest(x, y, id, lk, light) {
+  function drawChest(x, y, id, lk, light) {   // 'cbx…' = lanetli sandık
+    if (id.startsWith('cbx')) { drawCursedChest(x, y, id, lk, light); return; }
+    // 'cbv…' = mağara ÖDÜL sandığı: aynı sandık, altın bantlı + altın aura + yükselen parıltılar
+    if (!id.startsWith('cbv')) { drawChestBase(x, y, id, lk, light); return; }
+    const s = chState(id, lk), t = performance.now() / 1000;
+    if (!s.dead) { const pu = 0.5 + 0.5 * Math.sin(t * 2.2 + s.sd), r = 64 + 10 * s.glow; ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, y - 18, 4, x, y - 18, r); g.addColorStop(0, `rgba(${GOLDRGB},${0.26 + 0.14 * pu + 0.3 * s.glow})`); g.addColorStop(1, `rgba(${GOLDRGB},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - 18 - r, 2 * r, 2 * r); ctx.restore(); }
+    drawChestBase(x, y, id, lk, light);
+    if (!s.dead) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (let i = 0; i < 5; i++) { const ph = (t * 0.45 + i * 0.2 + s.sd) % 1, px = x + Math.sin(i * 2.4 + t * 0.7) * 18, py = y - 22 - ph * 38, a = Math.sin(ph * PI), z = 1.2 + (i % 2); ctx.fillStyle = `rgba(255,232,150,${0.9 * a})`; ctx.fillRect(px - z / 2, py - z / 2, z, z); ctx.fillRect(px - z * 1.6, py - 0.4, z * 3.2, 0.8); ctx.fillRect(px - 0.4, py - z * 1.6, 0.8, z * 3.2); } ctx.restore(); }
+  }
+  function drawChestBase(x, y, id, lk, light) {
     const s = chState(id, lk);
     if (s.dead) { if (!s.gone) drawChestRubble(x, y, light, s); return; }
     const hv = s.hits, fl = s.flash > 0, C = chPal(light);
+    const pz = id.startsWith('cbv');
+    if (pz) { C.w1 = light ? '#8a4524' : '#7a3b1e'; C.w2 = light ? '#6f3519' : '#5f2e18'; C.ln = '#1a0b05'; C.pl = 'rgba(38,14,5,0.55)'; C.fe = light ? '#c99a2e' : '#d4a23a'; C.fh = '#fff0a8'; C.br = '#f4c94e'; C.bd = '#b2822c'; C.st = '#ffe9a0'; C.gl = '255,205,100'; }   // ödül sandığı: sıcak maun ahşap + altın bantlar; kapakta yakut işleme
     if (fl) C.w1 = C.w2 = C.fe = C.fh = C.br = C.bd = C.fl;
     const DK = C.ln, IN = '#050403';
     const lift = clamp(s.lid, 0, 1.3) * 6 + (hv >= 2 ? 1.2 : 0) + (hv >= 3 ? 1.8 : 0) + (s.dying >= 0 ? 2.5 : 0), gl = clamp(0.1 * hv + s.glow * 0.5 + (s.dying >= 0 ? 0.3 + 0.6 * sstep(0, 0.42, s.dying) : 0), 0, 0.9);
@@ -5107,7 +5189,23 @@
     lcuts.forEach(edge);
     if (hv >= 2) crk([[2.5, -35.5], [1, -31], [2.4, -27.4], [0.5, -23.5]], 1.1);   // sığ kapak çatlağı
     ctx.fillStyle = C.fe; ctx.fillRect(-18.5, -21.5, 37, 2.4); ctx.strokeStyle = DK; ctx.lineWidth = 0.8; ctx.strokeRect(-18.5, -21.5, 37, 2.4);
-    if (!s.locked) { ctx.fillStyle = C.br; ctx.fillRect(-3.5, -25, 7, 7); ctx.strokeRect(-3.5, -25, 7, 7); ctx.fillStyle = C.bd; ctx.fillRect(-3.5, -21.4, 7, 3.4); ctx.fillStyle = IN; ctx.beginPath(); ctx.arc(0, -22.5, 1.2, 0, TAU); ctx.fill(); }
+    if (pz && !s.locked) {   // yakut işlemeli kapak: koyu kızıl kuşak + yakut baklavalar + merkezde büyük yakut
+      const gem = (gx, gy, r) => {   // yakut: koyu kenar, kızıl gövde, açık yüz, parıltı
+        ctx.save(); ctx.translate(gx, gy);
+        ctx.fillStyle = fl ? C.fl : '#e0183c'; ctx.strokeStyle = DK; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.8, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        if (!fl) {
+          ctx.fillStyle = '#ff6a84'; ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#8a0c22'; ctx.beginPath(); ctx.moveTo(0, r); ctx.lineTo(-r * 0.8, 0); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = 'rgba(255,230,236,0.95)'; ctx.fillRect(-r * 0.3, -r * 0.55, r * 0.28, r * 0.28);
+        }
+        ctx.restore();
+      };
+      ctx.strokeStyle = DK; ctx.lineWidth = 0.8; ctx.fillStyle = C.br; ctx.beginPath(); ctx.moveTo(-5.8, -27.6); ctx.lineTo(5.8, -27.6); ctx.lineTo(5.8, -21.4); ctx.lineTo(0, -17.6); ctx.lineTo(-5.8, -21.4); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C.bd; ctx.beginPath(); ctx.moveTo(-5.8, -21.4); ctx.lineTo(0, -17.6); ctx.lineTo(5.8, -21.4); ctx.lineTo(0, -20); ctx.closePath(); ctx.fill();
+      if (!fl) { ctx.fillStyle = `rgba(255,50,85,${0.2 + 0.1 * Math.sin(s.t * 3)})`; ctx.beginPath(); ctx.arc(0, -24, 7.5, 0, TAU); ctx.fill(); }
+      gem(0, -24.1, 4.3, 0);
+    } else if (!s.locked) { ctx.fillStyle = C.br; ctx.fillRect(-3.5, -25, 7, 7); ctx.strokeRect(-3.5, -25, 7, 7); ctx.fillStyle = C.bd; ctx.fillRect(-3.5, -21.4, 7, 3.4); ctx.fillStyle = IN; ctx.beginPath(); ctx.arc(0, -22.5, 1.2, 0, TAU); ctx.fill(); }
     ctx.restore();
     if (s.locked) {   // zincirler + asma kilit (sönük pirinç)
       const cu = s.unl < 0 ? 1 : 1 - sstep(0.38, 0.95, s.unl), fall = s.unl < 0 ? 0 : sstep(0.38, 1, s.unl) * 16;
@@ -5133,6 +5231,193 @@
     [-13, 8.8].forEach(sx => { ctx.fillRect(sx, -5.5, 4.2, 5.5); ctx.strokeRect(sx, -5.5, 4.2, 5.5); });
     if (dd < 3) { const a = 0.4 * (1 - dd / 3), g = ctx.createRadialGradient(0, -4, 0, 0, -4, 22); g.addColorStop(0, `rgba(${C.gl},${a})`); g.addColorStop(1, `rgba(${C.gl},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -4, 22, 0, TAU); ctx.fill(); }
     for (let i = 0; i < 8; i++) { ctx.save(); ctx.translate(-24 + hashN(k, i, 2) * 48, -2 + hashN(k, i, 3) * 9); ctx.rotate(hashN(k, i, 4) * 3.1); ctx.fillStyle = i === 7 ? C.rb[2] : i % 3 ? C.rb[0] : C.rb[1]; ctx.fillRect(-6, -1.6, 12 * (0.5 + hashN(k, i, 5) * 0.6), 3.2); ctx.restore(); }
+    ctx.restore();
+  }
+  /* ---------- LANETLİ SANDIK (mağara): 'cbx…' · E / düğme → onay → açılır, lanet başlar: hasar alma ×2 · iyileşme ×0,5 · verilen hasar ×⅔ · 10 düşman kesince kalkar ---------- */
+  const CURSE_RGB = '96,255,160', CURSE_N = 10;
+  const curseKill = () => { if (!CURSE.on) return; CURSE.kills++; CURSE.pulse = 1; if (CURSE.kills >= CURSE.need) curseEnd(true); };
+  function curseReset() { CURSE.on = false; CURSE.kills = 0; CURSE.ask = null; CURSE.p.length = 0; CURSE.fl = 0; }
+  function curseEnd(win) {
+    CURSE.on = false; CURSE.ask = null;
+    if (!win) return;
+    CURSE.fl = 0.7; CURSE.done = 2.6; hitFx(0.1, 5);
+    for (let i = 0; i < 18; i++) CURSE.p.push({ k: 'wisp', x: player.x + rnd(-12, 12), y: player.y - rnd(0, 40), vx: rnd(-25, 25), vy: -rnd(30, 90), t: 0, l: rnd(1.0, 1.8), s: rnd(3, 7), w: 1 });
+    CURSE.p.push({ k: 'ring', x: player.x, y: player.y + 2, r: 70, t: 0, l: 0.7, w: 1 });
+    try { AU.sfx('curseEnd', player.x, player.y - 20); } catch (_) {}
+    ftext(player.x, player.y - 70, 'Lanet kalktı', '#7dffb4');
+  }
+  function curseOpenFx(s, x, y) {   // kapak patlar: kafatası parçalanır, zincir kopar, lanet başlar, ödül saçılır
+    for (let i = 0; i < 9; i++) CURSE.p.push({ k: 'bone', x: x + rnd(-6, 6), y: y - 28, vx: rnd(-150, 150), vy: -rnd(170, 330), gy: y + rnd(4, 14), t: 0, l: 3.2, r: rnd(0, TAU), vr: rnd(-9, 9), w: rnd(2, 4.2), h: rnd(1.6, 3), c: i % 3 ? '#e2dac2' : '#a79e86', b: 0 });
+    for (let i = 0; i < 8; i++) CURSE.p.push({ k: 'bone', x: x + rnd(-14, 14), y: y - rnd(4, 18), vx: rnd(-120, 120), vy: -rnd(100, 240), gy: y + rnd(4, 14), t: 0, l: 3.2, r: rnd(0, TAU), vr: rnd(-9, 9), w: 3, h: 1.6, c: '#77737f', b: 0 });
+    for (let i = 0; i < 16; i++) CURSE.p.push({ k: 'wisp', x: x + rnd(-14, 14), y: y - 22, vx: rnd(-40, 40), vy: -rnd(30, 110), t: 0, l: rnd(0.9, 1.7), s: rnd(3, 8), w: 0 });
+    CURSE.p.push({ k: 'ring', x, y: y + 2, r: 120, t: 0, l: 0.8, w: 0 }, { k: 'ring', x, y: y + 2, r: 70, t: 0, l: 0.5, w: 0 });
+    CURSE.on = true; CURSE.kills = 0; CURSE.need = CURSE_N; CURSE.fl = 1; CURSE.pulse = 1; hitFx(0.2, 10);
+    try { AU.sfx('curseOn', x, y - 20); } catch (_) {}
+    ftext(x, y - 70, 'LANET!', '#7dffb4');
+    for (let i = 0, n = 4 + (Math.random() * 3 | 0); i < n; i++) LOOT.push({ k: 'prism', n: 1, cv: 1, x: x + rnd(-10, 10), y: y + 14, z: 30, vx: rnd(-90, 90), vy: rnd(40, 120), vz: rnd(380, 540), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // ödül havuzu: şimdilik yalnızca mor prizma (4–6)
+  }
+  function curseTap(s, x, y, ang) {   // vurulan lanetli sandık açılmaz: yalnızca zıplar
+    s.shk = 1; s.sq = 1; sparks(x + clamp(player.x - x, -16, 16), y - rnd(10, 30), 5, 170, ang + PI, 0.9); try { AU.sfx('chainClank', x, y - 14); } catch (_) {}
+    if (s.cop < 0 && s.hint <= 0) { s.hint = 2.5; ftext(x, y - 58, 'Vurarak açılmaz', '#7dffb4'); }
+  }
+  const curseBtnRect = () => ({ x: W / 2 - 78, y: H - 104, w: 156, h: 42 });
+  function curseDlg() {
+    const w = Math.min(430, W - 28), h = Math.min(H - 20, 262), x = W / 2 - w / 2, y = H / 2 - h / 2, bh = 38, bw = (w - 44) / 2;
+    return { x, y, w, h, no: { x: x + 16, y: y + h - bh - 16, w: bw, h: bh }, yes: { x: x + w - 16 - bw, y: y + h - bh - 16, w: bw, h: bh } };
+  }
+  const inR = (r, px, py, m) => px >= r.x - m && px <= r.x + r.w + m && py >= r.y - m && py <= r.y + r.h + m;
+  function curseAccept() { const s = CURSE.ask; if (!s) return; CURSE.ask = null; if (s.cop < 0) { s.cop = 0; try { AU.sfx('chainClank', player.x, player.y - 20); } catch (_) {} } }
+  function curseTapUI(px, py) {   // true = dokunuş harcandı
+    if (CURSE.ask) { if (CURSE.av < 0.6) return true; const d = curseDlg(); if (inR(d.yes, px, py, 4)) curseAccept(); else if (inR(d.no, px, py, 4)) CURSE.ask = null; return true; }
+    if (CURSE.nr && CURSE.bv > 0.6 && F.death < 0 && inR(curseBtnRect(), px, py, 8)) { CURSE.ask = CURSE.nr.s; return true; }
+    return false;
+  }
+  addEventListener('keydown', e => {
+    if (MENU.on || PAUSE.on || e.repeat) return; const k = e.key.toLowerCase();
+    if (CURSE.ask) { if (k === 'e' || k === 'enter') curseAccept(); else if (k === 'escape' || k === 'q') CURSE.ask = null; }
+    else if (k === 'e' && CURSE.nr && F.death < 0) CURSE.ask = CURSE.nr.s;
+  });
+  function curseUpdate(dt) {
+    CURSE.t += dt; CURSE.pulse = Math.max(0, CURSE.pulse - dt * 1.6); CURSE.fl = Math.max(0, CURSE.fl - dt * 1.5); CURSE.done = Math.max(0, CURSE.done - dt);
+    CURSE.vg += ((CURSE.on ? 1 : 0) - CURSE.vg) * dmp(3, dt); if (CURSE.vg < 0.004) CURSE.vg = 0;
+    if (CURSE.on && F.death >= 0) curseEnd(false);   // ölünce lanet silinir
+    if (CURSE.on && Math.random() < dt * 5) CURSE.p.push({ k: 'wisp', x: player.x + rnd(-9, 9), y: player.y - rnd(6, 38), vx: rnd(-8, 8), vy: -rnd(18, 46), t: 0, l: rnd(0.7, 1.2), s: rnd(2, 4), w: 0 });
+    for (let i = CURSE.p.length - 1; i >= 0; i--) {
+      const p = CURSE.p[i]; p.t += dt; if (p.t >= p.l) { CURSE.p.splice(i, 1); continue; }
+      if (p.k === 'bone') { if (p.b < 3) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt; if (p.y > p.gy) { p.y = p.gy; if (p.vy > 120) { p.vy *= -0.3; p.vx *= 0.55; p.vr *= 0.5; p.b++; } else { p.b = 3; p.vr = 0; } } } }
+      else if (p.k === 'wisp') { p.x += (p.vx + Math.sin(p.t * 5 + i) * 10) * dt; p.y += p.vy * dt; p.vy *= 1 - dt * 0.6; }
+    }
+    if (CURSE.p.length > 160) CURSE.p.splice(0, CURSE.p.length - 160);
+    let nr = null;
+    if (CV.in && CV.c) for (const ch of cvChests(CV.c)) {
+      if (!ch.id.startsWith('cbx')) continue;
+      const x = CVO.x + ch.lx, y = CVO.y + ch.ly, s = chState(ch.id, false);
+      if (s.cop >= 0) {
+        const c0 = s.cop; s.cop += dt;
+        if (c0 < 0.8 && Math.random() < dt * 30) CURSE.p.push({ k: 'wisp', x: x + rnd(-15, 15), y: y - rnd(10, 30), vx: rnd(-20, 20), vy: -rnd(20, 60), t: 0, l: 0.6, s: rnd(2, 4), w: 0 });
+        if (c0 < 0.8 && s.cop >= 0.8) curseOpenFx(s, x, y);
+        if (s.cop >= 0.8 && Math.random() < dt * 2.2) CURSE.p.push({ k: 'wisp', x: x + rnd(-12, 12), y: y - 24, vx: rnd(-10, 10), vy: -rnd(18, 40), t: 0, l: rnd(1.2, 2.2), s: rnd(3, 6), w: 0 });
+        continue;
+      }
+      if (Math.random() < dt * 1.3 && Math.hypot(x - player.x, y - player.y) < 700) CURSE.p.push({ k: 'wisp', x: x + rnd(-14, 14), y: y - rnd(18, 34), vx: rnd(-8, 8), vy: -rnd(14, 34), t: 0, l: rnd(1.2, 2.0), s: rnd(2, 4), w: 0 });
+      const d = Math.hypot(player.x - x, (player.y - y) * 1.3);
+      if (F.death < 0 && d < 72 && (!nr || d < nr.d)) nr = { s, x, y, d };
+    }
+    CURSE.nr = nr; if (CURSE.ask && (!nr || nr.s !== CURSE.ask || F.death >= 0)) { const near2 = CURSE.ask && nr && Math.hypot(player.x - nr.x, (player.y - nr.y) * 1.3) < 110; if (!near2) CURSE.ask = null; }
+    CURSE.bv += ((nr && !CURSE.ask ? 1 : 0) - CURSE.bv) * dmp(12, dt); if (CURSE.bv < 0.01) CURSE.bv = 0;
+    CURSE.av += ((CURSE.ask ? 1 : 0) - CURSE.av) * dmp(14, dt); if (CURSE.av < 0.01) CURSE.av = 0;
+  }
+  function drawCurseFx(light) {   // dünya katmanı: yeşil duman, kemik / zincir parçaları, halkalar
+    if (!CURSE.p.length) return;
+    ctx.save();
+    for (const p of CURSE.p) {
+      const u = p.t / p.l;
+      if (p.k === 'wisp') {
+        const a = Math.sin(Math.min(1, u) * PI) * (light ? 0.55 : 0.8), r = p.s * (0.7 + u * 1.2);
+        ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2); g.addColorStop(0, `rgba(${light ? '30,190,110' : '150,255,200'},${a})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(p.x - r * 2, p.y - r * 2, r * 4, r * 4);
+      } else if (p.k === 'ring') {
+        ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'; ctx.strokeStyle = `rgba(${light ? '20,170,100' : CURSE_RGB},${(1 - u) * 0.7})`; ctx.lineWidth = 2.2 * (1 - u) + 0.6; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r * Math.sqrt(u), p.r * Math.sqrt(u) * 0.4, 0, 0, TAU); ctx.stroke();
+      } else if (p.k === 'bone') {
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = Math.min(1, (p.l - p.t) / 0.7); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.strokeStyle = '#08070b'; ctx.lineWidth = 0.7; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.strokeRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+  function drawCurseHud(fg, dt) {   // ekran katmanı: yeşil kenar karartması · sayaç rozeti · SANDIĞI AÇ düğmesi · onay penceresi
+    const light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0', G = light ? '16,150,90' : CURSE_RGB;
+    if (CURSE.vg > 0.01) { const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75); g.addColorStop(0, `rgba(${G},0)`); g.addColorStop(1, `rgba(${G},${(0.2 + 0.1 * CURSE.pulse) * CURSE.vg})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+    if (CURSE.fl > 0.01) { ctx.fillStyle = `rgba(${light ? '120,230,170' : '150,255,200'},${Math.min(0.45, CURSE.fl * 0.4)})`; ctx.fillRect(0, 0, W, H); }
+    if (CURSE.on || CURSE.done > 0) {   // rozet: kafatası + ilerleme
+      const q = HUD_S, w = 138 * q, h = 28 * q, x = W / 2 - w / 2, y = HUD_Y - 22 * q, a = CURSE.on ? 1 : Math.min(1, CURSE.done / 0.8);
+      ctx.save(); ctx.globalAlpha = a; rr(x, y, w, h, h / 2); ctx.fillStyle = `rgba(${bgc},0.6)`; ctx.fill(); ctx.fillStyle = `rgba(${G},${0.1 + 0.12 * CURSE.pulse})`; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(${G},${0.6 + 0.3 * CURSE.pulse})`; ctx.stroke();
+      const sx = x + 16 * q, sy = y + h / 2; ctx.fillStyle = `rgba(${G},0.95)`; ctx.beginPath(); ctx.arc(sx, sy - 1.5 * q, 5.2 * q, 0, TAU); ctx.fill(); ctx.fillRect(sx - 3 * q, sy + 2 * q, 6 * q, 3.4 * q); ctx.fillStyle = `rgba(${bgc},0.95)`; ctx.beginPath(); ctx.arc(sx - 2 * q, sy - 2 * q, 1.4 * q, 0, TAU); ctx.arc(sx + 2 * q, sy - 2 * q, 1.4 * q, 0, TAU); ctx.fill();
+      dvText(CURSE.on ? 'LANET' : 'LANET KALKTI', x + 29 * q, sy + 0.5, 10.5 * q, 600, G, 1, 2 * q, 'left');
+      if (CURSE.on) { dvText(CURSE.kills + ' / ' + CURSE.need, x + w - 12 * q, sy + 0.5, 12 * q, 700, fg, 0.95, 0.5, 'right'); const bw = w - 40 * q; ctx.fillStyle = `rgba(${fg},0.12)`; ctx.fillRect(x + 20 * q, y + h - 4.5 * q, bw, 2 * q); ctx.fillStyle = `rgba(${G},0.9)`; ctx.fillRect(x + 20 * q, y + h - 4.5 * q, bw * CURSE.kills / CURSE.need, 2 * q); }
+      ctx.restore();
+    }
+    if (CURSE.bv > 0.01) {
+      const r = curseBtnRect(); ctx.save(); ctx.globalAlpha = CURSE.bv; ctx.translate(0, (1 - CURSE.bv) * 8);
+      rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = `rgba(${bgc},0.62)`; ctx.fill(); ctx.fillStyle = `rgba(${G},0.12)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = `rgba(${G},0.8)`; ctx.stroke();
+      dvText('SANDIĞI AÇ', r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13.5, 600, G, 1, 3, 'center'); ctx.restore();
+    }
+    if (CURSE.av > 0.01) {
+      const d = curseDlg(), a = CURSE.av; ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = `rgba(0,0,0,${light ? 0.35 : 0.55})`; ctx.fillRect(0, 0, W, H);
+      ctx.translate(0, (1 - a) * 10); rr(d.x, d.y, d.w, d.h, 16); ctx.fillStyle = `rgba(${light ? '246,248,246' : '10,14,12'},0.96)`; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${G},0.75)`; ctx.stroke();
+      const cx = d.x + d.w / 2; let y = d.y + 28;
+      dvText('LANETLİ SANDIK', cx, y, 15, 700, G, 1, 4, 'center'); y += 20; dvText('Açarsan lanet seni bulur', cx, y, 11.5, 400, fg, 0.6, 0.5, 'center'); y += 28;
+      const red = light ? '200,40,40' : '255,96,90', rows = [['Aldığın hasar', '×2', red], ['İyileşme', '×0,5', red], ['Verdiğin hasar', '−%33  ·  15 → 10', red]];
+      for (const [n, v, c] of rows) { dvText(n, d.x + 26, y, 12.5, 400, fg, 0.8, 0.3, 'left'); dvText(v, d.x + d.w - 26, y, 13, 700, c, 1, 0.3, 'right'); ctx.fillStyle = `rgba(${fg},0.1)`; ctx.fillRect(d.x + 22, y + 11, d.w - 44, 1); y += 24; }
+      y += 6; dvText('Lanet 10 düşman kesince kalkar  ·  ölürsen silinir', cx, y, 11, 400, fg, 0.65, 0.2, 'center'); y += 18; dvText('Ödül: Mor Prizma', cx, y, 11.5, 600, '170,130,255', 1, 0.8, 'center');
+      for (const [r, txt, yes] of [[d.no, 'VAZGEÇ', 0], [d.yes, 'KABUL ET', 1]]) { rr(r.x, r.y, r.w, r.h, r.h / 2); ctx.fillStyle = yes ? `rgba(${G},0.2)` : `rgba(${fg},0.06)`; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = yes ? `rgba(${G},0.9)` : `rgba(${fg},0.3)`; ctx.stroke(); dvText(txt, r.x + r.w / 2, r.y + r.h / 2 + 0.5, 13, 700, yes ? G : fg, yes ? 1 : 0.75, 2.5, 'center'); }
+      ctx.restore();
+    }
+  }
+  function drawCursedChest(x, y, id, lk, light) {
+    const s = chState(id, lk), t = performance.now() / 1000, cop = s.cop, sk = s.sd;
+    const op = cop < 0.8 ? 0 : clamp((cop - 0.8) / 0.4, 0, 1), eo = op ? 1 - Math.pow(1 - op, 3) + Math.sin(op * PI) * 0.12 : 0;
+    const pre = cop >= 0 && cop < 0.8 ? cop / 0.8 : 0, ts = (t + sk) % 5.5, idle = cop < 0 && ts < 0.4 ? Math.sin(ts * 70) * 0.9 * (1 - ts / 0.4) : 0, pu = 0.5 + 0.5 * Math.sin(t * 2.4 + sk);
+    const W1 = light ? '#2a2830' : '#1c1b21', W2 = light ? '#211f27' : '#15141a', BN = light ? '#d4ccb2' : '#e2dac2', BS = light ? '#9a917a' : '#a79e86', DK = '#08070b', GR = '#5dffa6';
+    const eye = cop < 0 ? 0.5 + 0.5 * pu : cop < 0.8 ? 1 : 0, mouth = Math.max(eo, 0);
+    ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';   // yeşil hayalet aurası
+    { const r = 62 + 10 * pu + 22 * (pre + eo), g = ctx.createRadialGradient(x, y - 18, 4, x, y - 18, r); g.addColorStop(0, `rgba(${light ? '30,200,120' : CURSE_RGB},${(light ? 0.2 : 0.2) + 0.1 * pu + 0.28 * (pre + eo * 0.7)})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - 18 - r, 2 * r, 2 * r); }
+    ctx.restore();
+    ctx.fillStyle = light ? 'rgba(30,20,60,0.2)' : 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 24 * CHS, 6 * CHS, 0, 0, TAU); ctx.fill();
+    ctx.save(); ctx.translate(x + (pre ? Math.sin(t * 95) * (0.5 + 1.8 * pre) : idle), y + (pre ? Math.sin(t * 71) * 0.5 * pre : 0)); ctx.scale(CHS * (1 + 0.06 * s.sq), CHS * (1 - 0.08 * s.sq)); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // arkada sönük hayalet alevleri
+    ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
+    for (const fx of [-17, 17]) for (let k = 0; k < 2; k++) { const bx = fx + (k ? Math.sign(fx) * 3 : 0), h = (13 + 5 * Math.sin(t * 6 + fx + k * 2) + 8 * eo) * (k ? 0.7 : 1), sw = Math.sin(t * 3.1 + fx * 0.4 + k) * 2.2, by = -15, g = ctx.createLinearGradient(0, by, 0, by - h); g.addColorStop(0, `rgba(${light ? '30,190,110' : '120,255,190'},${0.55})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(bx - 3.4, by); ctx.quadraticCurveTo(bx - 4.2, by - h * 0.55, bx + sw, by - h); ctx.quadraticCurveTo(bx + 4.2, by - h * 0.5, bx + 3.4, by); ctx.fill(); }
+    ctx.restore();
+    // gövde
+    ctx.strokeStyle = DK; ctx.lineWidth = 1; ctx.fillStyle = W1; ctx.fillRect(-18, -20, 36, 20); ctx.fillStyle = W2; ctx.fillRect(-18, -13.5, 36, 6.5); ctx.strokeRect(-18, -20, 36, 20);
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -13.5); ctx.lineTo(18, -13.5); ctx.moveTo(-18, -7); ctx.lineTo(18, -7); ctx.stroke();
+    ctx.strokeStyle = `rgba(${CURSE_RGB},${0.35 + 0.25 * pu + 0.3 * pre})`; ctx.lineWidth = 0.6;   // ahşap çatlaklarından sızan ışık
+    ctx.beginPath(); ctx.moveTo(-6.5, -18); ctx.lineTo(-4.4, -14.6); ctx.lineTo(-6.2, -11.4); ctx.lineTo(-4.6, -8.4); ctx.moveTo(4.6, -12.6); ctx.lineTo(6.6, -9.8); ctx.lineTo(5, -7.6); ctx.stroke();
+    ctx.strokeStyle = DK; ctx.lineWidth = 0.7; ctx.fillStyle = BN;   // kemik bantlar
+    ctx.fillRect(-18, -3.2, 36, 3.2); ctx.strokeRect(-18, -3.2, 36, 3.2);
+    [-13, 8.8].forEach(sx => { ctx.fillRect(sx, -20, 4.2, 17); ctx.strokeRect(sx, -20, 4.2, 17); });
+    ctx.fillStyle = BS; [-13, 8.8].forEach(sx => ctx.fillRect(sx + 3.1, -19.6, 1, 16.4)); ctx.fillRect(-17.6, -1, 35.2, 0.9);
+    ctx.fillStyle = GR; [[-11, -16], [11, -16], [-11, -6.5], [11, -6.5]].forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 0.95, 0, TAU); ctx.fill(); });
+    // açık ağız: içeriden yeşil ışık
+    if (eo > 0.02) {
+      ctx.fillStyle = '#04140c'; ctx.fillRect(-16.5, -21.2, 33, 2.2 + 2 * eo);
+      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter'; const bh = 26 + 52 * eo, g = ctx.createLinearGradient(0, -21, 0, -21 - bh); g.addColorStop(0, `rgba(${light ? '40,210,130' : '140,255,200'},${0.75 * eo})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-15, -21); ctx.lineTo(15, -21); ctx.lineTo(26, -21 - bh); ctx.lineTo(-26, -21 - bh); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    // kapak (arka menteşe soldan yukarı döner)
+    ctx.save(); ctx.translate(-18, -20); ctx.rotate(-0.34 * eo); ctx.translate(18, 20 - 3 * eo);
+    ctx.beginPath(); ctx.moveTo(-18, -20); ctx.lineTo(-18, -25); ctx.quadraticCurveTo(-18, -36, 0, -36); ctx.quadraticCurveTo(18, -36, 18, -25); ctx.lineTo(18, -20); ctx.closePath();
+    ctx.fillStyle = W2; ctx.fill(); ctx.strokeStyle = DK; ctx.lineWidth = 1; ctx.stroke();
+    ctx.save(); ctx.clip();
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-18, -28.5); ctx.lineTo(18, -28.5); ctx.stroke();
+    ctx.fillStyle = BN; ctx.fillRect(-13, -40, 4.2, 22); ctx.fillRect(8.8, -40, 4.2, 22); ctx.strokeStyle = DK; ctx.lineWidth = 0.7; ctx.strokeRect(-13, -40, 4.2, 22); ctx.strokeRect(8.8, -40, 4.2, 22);
+    ctx.fillStyle = BS; ctx.fillRect(-9.9, -40, 1, 22); ctx.fillRect(12, -40, 1, 22);
+    if (!light) { ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-15.5, -27); ctx.quadraticCurveTo(-14.5, -33, -6, -34.2); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = BN; ctx.fillRect(-18.5, -21.5, 37, 2.4); ctx.strokeStyle = DK; ctx.lineWidth = 0.8; ctx.strokeRect(-18.5, -21.5, 37, 2.4);
+    // zincir (iki çapraz): açılırken kopar
+    const ca = cop < 0 ? 1 : clamp(1 - (cop - 0.45) / 0.35, 0, 1);
+    if (ca > 0.01) {
+      ctx.save(); ctx.globalAlpha = ca;
+      for (const sg of [1, -1]) { const x0 = -17 * sg, y0 = -3, x1 = 17 * sg, y1 = -19, an = Math.atan2(y1 - y0, x1 - x0), n = 8;
+        for (let i = 0; i <= n; i++) { const u = i / n, px = lerp(x0, x1, u), py = lerp(y0, y1, u) + Math.sin(u * PI) * 0.8; ctx.save(); ctx.translate(px, py); ctx.rotate(an + (i % 2 ? PI / 2 : 0)); ctx.strokeStyle = DK; ctx.lineWidth = 2.1; ctx.beginPath(); ctx.ellipse(0, 0, 2.1, 1.1, 0, 0, TAU); ctx.stroke(); ctx.strokeStyle = i % 2 ? '#8b8794' : '#6f6b78'; ctx.lineWidth = 0.95; ctx.stroke(); ctx.restore(); } }
+      ctx.restore();
+    }
+    // kuru kafa kilit
+    if (cop < 0.8) {
+      const kx = 0, ky = -27.5; ctx.strokeStyle = DK; ctx.lineWidth = 0.9; ctx.fillStyle = BN;
+      ctx.beginPath(); ctx.ellipse(kx, ky - 1.2, 5.6, 5.2, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(kx - 3.4, ky + 2); ctx.lineTo(kx - 3.4, ky + 5.4); ctx.lineTo(kx + 3.4, ky + 5.4); ctx.lineTo(kx + 3.4, ky + 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = BS; ctx.beginPath(); ctx.ellipse(kx + 1.8, ky - 0.6, 3.4, 3.8, 0, -1.1, 1.3); ctx.lineTo(kx + 1.4, ky); ctx.fill();
+      ctx.fillStyle = '#05080a'; ctx.beginPath(); ctx.ellipse(kx - 2.3, ky - 1.4, 1.6, 1.9, 0, 0, TAU); ctx.ellipse(kx + 2.3, ky - 1.4, 1.6, 1.9, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(kx, ky + 0.6); ctx.lineTo(kx - 0.9, ky + 2); ctx.lineTo(kx + 0.9, ky + 2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = DK; ctx.lineWidth = 0.5; ctx.beginPath(); for (const dx of [-1.1, 1.1]) { ctx.moveTo(kx + dx, ky + 3); ctx.lineTo(kx + dx, ky + 5.2); } ctx.moveTo(kx, ky + 3); ctx.lineTo(kx, ky + 5.2); ctx.stroke();
+      ctx.save(); ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';   // yanan gözler
+      for (const ex of [-2.3, 2.3]) { const g = ctx.createRadialGradient(kx + ex, ky - 1.4, 0, kx + ex, ky - 1.4, 4.6); g.addColorStop(0, `rgba(${light ? '40,220,130' : '170,255,210'},${eye})`); g.addColorStop(1, `rgba(${CURSE_RGB},0)`); ctx.fillStyle = g; ctx.fillRect(kx + ex - 5, ky - 6.4, 10, 10); }
+      ctx.restore();
+      if (pre > 0) { ctx.strokeStyle = `rgba(${CURSE_RGB},${pre})`; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(kx - 1, ky - 6.2); ctx.lineTo(kx + 0.6, ky - 3.4); ctx.lineTo(kx - 0.8, ky - 0.6); ctx.lineTo(kx + 0.4, ky + 2); ctx.stroke(); ctx.strokeStyle = `rgba(0,0,0,${pre})`; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(kx - 1.6, ky - 6); ctx.lineTo(kx, ky - 3.2); ctx.lineTo(kx - 1.4, ky - 0.4); ctx.stroke(); }
+    }
+    ctx.restore();
     ctx.restore();
   }
   /* ---------- MİMİK: sandık taklitçisi. Normal sandık gibi vurulur; 2. ya da 3. vuruşta (şansa bağlı) ortaya çıkar ---------- */
@@ -6071,6 +6356,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     }
   }
   function drawLoot(l) {
+    if (l.k === 'bone') { drawBoneLoot(l); return; }
     if (l.k === 'log') { drawLogLoot(l); return; }
     if (l.k === 'moss') { drawMossLoot(l); return; }
     if (l.k === 'coal' || l.k === 'stone') { drawOreLoot(l); return; }
@@ -6466,12 +6752,12 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function devHpAct(k) {
     DEVH.f[k] = 1; if (F.death >= 0) return;
     if (k === 'dmg') {
-      F.hp = Math.max(0, F.hp - 10); F.flash = 0.3; F.wince = 0.6; try { bowInterrupt(); } catch (_) {} healCancel(true, 10); try { AU.sfx('hurt'); } catch (_) {}
+      F.hp = Math.max(0, F.hp - 10 * (CURSE.on ? 2 : 1)); F.flash = 0.3; F.wince = 0.6; try { bowInterrupt(); } catch (_) {} healCancel(true, 10); try { AU.sfx('hurt'); } catch (_) {}
       sparks(player.x, player.y - 22, 6, 150, -PI / 2, 2.2); ftext(player.x, player.y - 62, '−10 Can', GCOL.redL);
       if (F.hp <= 0) { F.hp = 0; F.death = 0; try { AU.sfx('playerDeath'); } catch (_) {} F.fall = 1; F.guarding = false; F.pt = -1; F.buf = false; F.ds = null; sparks(player.x, player.y - 22, 14, 220, 0, TAU); }
     } else {
       if (F.hp >= 100) { ftext(player.x, player.y - 62, 'Canın dolu', null); return; }
-      const g = Math.min(10, 100 - F.hp); F.hp += g; HEAL.fx = 1; try { AU.sfx('pickup'); } catch (_) {} ftext(player.x, player.y - 62, '+' + Math.round(g) + ' Can', GCOL.green);
+      const g = Math.min(10 * (CURSE.on ? 0.5 : 1), 100 - F.hp); F.hp += g; HEAL.fx = 1; try { AU.sfx('pickup'); } catch (_) {} ftext(player.x, player.y - 62, '+' + Math.round(g) + ' Can', GCOL.green);
     }
   }
   function drawDevHp(fg, dt) {
@@ -6504,7 +6790,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     ctx.font = `700 11px ${UIF}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = `rgba(${fg},${wrap ? 0.5 : 0.9})`; ctx.fillText(HEAL.hr, x0 + pw - 11, cy + 0.5);
     ctx.restore();
   }
-  function drawItemIcon(k, x, y, s) {   // eşya simgesi: yerde, düğmede, Rehber ve Craft sayfasında aynı çizim (düz, opak renkler)
+  function drawItemIcon(k, x, y, s) {
+    if (k === 'bone') { drawBoneIcon(x, y, s * 1.5); return; }   // eşya simgesi: yerde, düğmede, Rehber ve Craft sayfasında aynı çizim (düz, opak renkler)
     if (k === 'torch' || k === 'coal') {
       ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       if (k === 'torch') { ctx.translate(-4, 12.5); ctx.rotate(0.3); ctx.scale(1.55, 1.55); torchBody(performance.now() / 1000, 1.3);
@@ -6776,7 +7063,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   }
   function sentKill(e, ang) {   // ölüm: ortadan kalkmaz; C hâline geçer, ödül kısa bir sunuştan sonra düşer
     e.hp = 0; e.st = 'die'; e.t = 0; e.did = false; e.atk = ''; e.stun = 0; e.rage = e.rg = true;
-    STAT.kills.sentinel = (STAT.kills.sentinel || 0) + 1;
+    STAT.kills.sentinel = (STAT.kills.sentinel || 0) + 1; curseKill();
     AU.sfx('eDie', e.x, e.y, e); chips(e.x, e.y - 30, 8, 190, ang + PI, 1.2, e.y + 8); smoke(e.x, e.y - 30, 5, 40, 10); burst(e.x, e.y - 30, 8, 60); hitFx(0.14, 6);
   }
   function sentReward(e) {   // prizma kafası ödülü sunar: 2–4 mor prizma + toz + XP
@@ -7381,7 +7668,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const c = CAMP.last; if (!c || MENU.on || F.death >= 0) return;
     try {
       const dead = m => { const a = []; m.forEach((s, id) => { if (s.dead) a.push(id); }); return a; };
-      const inv = {}; for (const k of ['dust', 'ingot', 'keys', 'band', 'medk', 'elix', 'herb', 'resin', 'prism', 'parr', 'pbomb', 'pbeam', 'wood', 'moss', 'torch', 'coal', 'stone']) inv[k] = INV[k] | 0;
+      const inv = {}; for (const k of ['dust', 'ingot', 'keys', 'band', 'medk', 'elix', 'herb', 'resin', 'prism', 'parr', 'pbomb', 'pbeam', 'wood', 'moss', 'torch', 'coal', 'stone', 'bone']) inv[k] = INV[k] | 0;
       inv.dust += (SM.load | 0) + ((SM.run || SM.stage === 'pour') ? (SM.n | 0) * SM_RATE : 0);   // eritme kabındaki toz kaybolmaz: kayıtta toz olarak saklanır
       const sv = { v: SAVE_V, seed: SEED, x: c.x - c.fl * 10, y: c.y + 100, inv, own: Object.keys(OWN).filter(k => OWN[k]), lv: LVL.lv, xp: LVL.xp | 0, tp: SK.pts | 0, sk: Object.keys(SK.own).filter(k => SK.own[k]), sword: !!G.has, hs: !!G.hs, ha: !!G.ha, hk: !!G.hk, bk: BK.pair.slice(), ax: AX.on ? 1 : 0, ak: AX.on ? AX.k : '', bow: BOW.has ? BOW.ammo | 0 : -1, t: TM.t, pt: PLAY.t, ck: GCLK.f, evDead: dead(EV), chDead: dead(CST), trDead: dead(TST), rkDead: dead(RST), looted: [...CAMP.looted], ts: Date.now() };
       localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); SAVED = sv;
@@ -8037,6 +8324,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       { k: 'torch', cat: 'wpn', name: 'Meşale', rgb: '240,170,70', n: INV.torch, cap: TORCH_CAP, own: INV.torch > 0, eq: TORCH.on, tag: TORCH.on ? 'ELDE' : '', desc: 'Elde tutulunca çevreni sınırlı bir alanda aydınlatır; gece karartısı kalkar, ışığın erdiği yerde gölgeler azalır. Klavyede T tuşu.' },
       { k: 'coal', cat: 'mat', name: 'Kömür', rgb: '150,155,170', n: INV.coal, own: INV.coal > 0, cap: ORE_CAP, desc: 'Meşale yapımında odunla birlikte kullanılır. Kömürlü kaya madenlerini kazarken düşer. Çanta en fazla ' + ORE_CAP + ' kömür taşır.' },
       { k: 'stone', cat: 'mat', name: 'Taş', rgb: '150,154,166', n: INV.stone, cap: ORE_CAP, own: INV.stone > 0, desc: 'Kaya madenlerini kazarken düşer. Çanta en fazla ' + ORE_CAP + ' taş taşır. Henüz bir işe yaramıyor.' },
+      { k: 'bone', cat: 'mat', name: 'Kemik', rgb: '226,220,200', n: INV.bone, own: INV.bone > 0, desc: 'Mağaralardaki ödül sandıklarından çıkar. İleride Craft sisteminde kullanılacak.' },
       { k: 'moss', cat: 'mat', name: 'Yosun', rgb: '124,176,70', n: INV.moss, cap: MOSS_CAP, own: INV.moss > 0, desc: 'Yosun kaplı ağaçları keserken düşer. Nemli, yumuşak bir doğa malzemesi.' }
     ];
   }
@@ -8506,7 +8794,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
      YENİ SİLAH: RH_WEAPONS'a giriş (kind: 'sword' | 'bow' | 'axe') + rhDrawW'de sahne + RH_WD'de süre. YENİ KARAKTER: RH_CHARS'a giriş (kind: 'hero').
      YENİ HEYKEL: RH_STATUES'a giriş (kind: 'statue' | 'evil' | 'rubble') + rhDrawW'de sahne. YENİ KIYAFET: RH_OUTFITS'a giriş (kind: 'gear', gear: GEAR anahtarı). YENİ ZIRH: RH_ARMOR'a giriş.
      YENİ KATEGORİ: RH_CATS satırındaki 'on' değerini true yap, RH_LIST'e liste ekle. Sekme etiketi uzunsa girişe 'tab' alanı ver. */
-  const RH_CATS = [['play', 'Oynanış', 'dalgalar', true], ['enemies', 'Düşmanlar', '5 kayıt', true], ['weapons', 'Silahlar', '6 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true], ['items', 'Eşyalar', '5 kayıt', true]];
+  const RH_CATS = [['play', 'Oynanış', 'dalgalar', true], ['enemies', 'Düşmanlar', '5 kayıt', true], ['weapons', 'Silahlar', '6 kayıt', true], ['chars', 'Karakterler', '1 kayıt', true], ['statues', 'Heykeller', '3 kayıt', true], ['outfits', 'Kıyafetler', '4 kayıt', true], ['armor', 'Zırhlar', '1 kayıt', true], ['items', 'Eşyalar', '5 kayıt', true], ['chests', 'Sandıklar', '2 kayıt', true]];
   const RH_RED = '224,88,74';
   const RH_ENEMIES = [
     { name: 'Çırak Büyücü', sub: 'HORTLAK  ·  SIRADAN DÜŞMAN', mode: 'rage', atkTitle: 'SALDIRILAR',
@@ -8668,6 +8956,34 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       tips: ['Zırhlı bir düşmana vurmak onu durdurmaz; vuruşunu savuşturma anına sakla.', 'Mimik öfkelendiğinde zırhı kapağıyla birlikte uçar; o andan sonra sendeler.', 'Çırak Büyücü\'nün ağır ezmesi sırasında vurmak yerine yoldan çekil.', 'Zırh parçaları eklendiğinde bu sayfa güncellenecek.'] }
   ];
 
+  const RH_CHESTS = [
+    { kind: 'chest', name: 'Normal Sandık', tab: 'Normal', sub: 'SANDIK  ·  DÜNYA', atkTitle: 'KULLANIM', noplay: true,
+      lore: 'Dünyanın her yerine serpiştirilmiş eski ahşap sandık. Kilidi yoktur; sağlam olduğu kadar da kırılgandır. Vurdukça parçaları kopar, son darbede dağılıp içindekini saçar. Zincirli olanlar daha dolgundur ama altın anahtar ister.',
+      stats: [['Dünya şansı', '%20  ·  zincirli %30'], ['Açılış', 'kırılarak'], ['Altın tozu', '%100  ·  3–6  ·  zincirli 8–14'], ['Odun', '%55  ·  1–3'], ['Altın anahtar', '%30  ·  zincirli %22'], ['Bandaj · otlar · yay · cephane', 'şansa bağlı  ·  eşya sayfalarına bak']],
+      atks: [
+        ['Kırılma', 'Sandığa her vuruşta gövdeden ya da kapaktan gerçek bir parça kopar ve yere düşer. Yeterli vuruştan sonra sandık dağılır, ganimet havaya fırlar.', '—', 'vuruşla'],
+        ['Zincir', 'Zincirli sandık anahtar olmadan açılmaz. Altın anahtarla zincir çözülür; içindeki ganimet daha zengindir.', '—', 'altın anahtar'],
+        ['Mimik tehlikesi', 'Zincirsiz sandıkların bir kısmı mimiktir. Vurunca ortaya çıkıp saldırır.', '—', 'şansa bağlı']],
+      tips: ['Sandığa vurmadan önce canını kontrol et: mimik olabilir.', 'Zincirli sandık için altın anahtarı sakla.'] },
+    { kind: 'cvchest', name: 'Ödül Sandığı', tab: 'Ödül', sub: 'SANDIK  ·  MAĞARA', atkTitle: 'İÇERİK', noplay: true,
+      lore: 'Mağaraların derinliğinde saklı, bronz bantlı koyu meşe sandık. Mağara duvarına yaslanmış durur. Normal sandıkla aynı yapıdadır ve aynı şekilde vurularak açılır; ayırt etmek için demir bantları altındır, çevresinde altın bir ışık ve yükselen parıltılar vardır. Son darbede dağılır, ganimet havaya fırlayıp yere saçılır; üzerinden geçerek toplarsın.',
+      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%60 şansla 1'], ['İkinci sandık', 'çok şanslıysan  ·  %2'], ['Açılış', 'vurarak  ·  4 darbe'], ['Altın tozu', '%100  ·  8–20'], ['Altın külçe', '%15  ·  1'], ['Kemik', '%100  ·  2–6'], ['Bandaj / medkit', 'can <%35: %70  ·  <%70: %35  ·  üstü: %10'], ['Şifa iksiri', '%3']],
+      atks: [
+        ['Altın', 'Her ödül sandığı 8–20 altın tozu verir. Nadiren bunların yanında bir de altın külçe çıkar.', '—', 'toz 8–20  ·  külçe %15'],
+        ['Kemik', 'Her sandıktan 2–6 kemik düşer. Kemikler ileride Craft sisteminde kullanılacak.', '—', '2–6 kemik'],
+        ['Duruma uygun eşya', 'Canın düştükçe sağlık eşyası çıkma şansı artar. Bandaj yaygındır, medkit daha nadirdir. Çok düşük şansla şifa iksiri bile çıkabilir.', '—', 'can <%35: %70  ·  <%70: %35  ·  üstü: %10'],
+        ['Tek kullanımlık', 'Kırılan sandık yerinde enkaz olarak kalır. Çıkıp girerek yenileyemezsin.', '—', 'bir kez']],
+      tips: ['Sandığa yaklaşmadan önce mağaradaki canavarlara dikkat et.', 'Canın azken sandık sana sağlık eşyası verme eğilimindedir.'] },
+    { kind: 'cxchest', name: 'Lanetli Sandık', tab: 'Lanet', sub: 'SANDIK  ·  MAĞARA', atkTitle: 'LANET', noplay: true,
+      lore: 'Kara demirden ve kemikten yapılmış, çaprazlama zincirlenmiş bir sandık. Kapağında kuru bir kafatası kilit durur, gözleri yeşil yanar. Vurarak açılmaz: yanına gidip SANDIĞI AÇ düğmesine basarsın (klavyede E) ve çıkan uyarıyı onaylarsın. Kilit çatlar, kapak patlar; içinden değerli ödül saçılır ama lanet seni bulur.',
+      stats: [['Yerleşim', 'duvara yaslı'], ['Mağarada', '%40 şansla 1'], ['Açılış', 'AÇ düğmesi + onay'], ['Aldığın hasar', '×2'], ['İyileşme', '×0,5'], ['Verdiğin hasar', '−%33  ·  15 → 10'], ['Lanet süresi', '10 düşman  ·  dünya dahil'], ['Ödül havuzu', 'Mor prizma  ·  %100  ·  4–6']],
+      atks: [
+        ['Onay', 'Sandığa yaklaşınca SANDIĞI AÇ düğmesi çıkar. Basınca lanetin bedelini gösteren bir pencere açılır; KABUL ET dersen sandık açılır, VAZGEÇ dersen hiçbir şey olmaz. Pencere açıkken sandıktan uzaklaşırsan kapanır.', '—', 'AÇ  ›  KABUL ET'],
+        ['Lanet', 'Aldığın her hasar iki katına çıkar, tüm iyileşmeler (bandaj, medkit, otlar, iksir) yarıya iner, kılıç ve diğer silahlarla verdiğin hasar üçte bir azalır. Ekranın üstünde kafatası rozeti ve ilerleme sayacı görünür, kenarlar yeşile çalar.', '×2 · ×0,5 · −%33', 'hasar · iyileşme · saldırı'],
+        ['Kalkması', 'Lanet açıkken kestiğin her düşman sayılır; mağarada ya da dünyada fark etmez. 10. düşmanda lanet duman olup dağılır. Ölürsen lanet silinir. Yeni bir lanetli sandık açarsan sayaç 10\'dan yeniden başlar.', '10 düşman', 'ölümde silinir'],
+        ['Ödül havuzu', 'Şimdilik tek ödül mor prizma: 4–6 adet, kesin düşer. İleride daha değerli ödüller ve silahlar eklenecek; liste burada güncellenecek.', '%100', 'mor prizma 4–6']],
+      tips: ['Lanetliyken canını koru: aldığın hasar iki kat, iyileşme yarım.', 'Düşmanları dar yerlerde ve siperle karşıla; savuşturma hasarı tamamen engeller.', 'Lanet açıkken dışarıdaki düşmanlar da sayıldığı için mağaradan çıkıp kesebilirsin.'] }
+  ];
   const RH_ITEMS = [
     { kind: 'item', item: 'band', name: 'Bandaj', tab: 'Bandaj', sub: 'EŞYA  ·  SARF MALZEMESİ', atkTitle: 'KULLANIM', noplay: true,
       lore: 'Sandıklardan çıkan temiz bir bez sargı. Tek kullanımlıktır ve canının onda birini yavaş yavaş geri getirir. Kolunu sararken yavaşlarsın; sargı kolda kalır, can dolarken vurulursan kazanç azalır.',
@@ -8756,7 +9072,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     stats: [['Hasar', '30  ·  kılıcın × 1.5'], ['Ağaca hasar', '39  ·  3 vuruşta devirir'], ['Savurma süresi', Math.min(...rhAxSt).toFixed(2) + ' – ' + Math.max(...rhAxSt).toFixed(2) + ' sn'], ['Menzil', '74 birim  ·  ağaçta 90'], ['Darbe maliyeti', '−9 dayanıklılık'], ['Siper', 'yok  ·  balta siper almaz'], ['Odun', 'her darbede 1  ·  %50 fazladan'], ['Odun çantası', 'en çok 40'], ['Kılıçla değişim', 'Q  ·  iki silah da alınmışsa'], ['Kilitli darbe', RH_AX_V.filter(rhAxLock).length + '  ·  silah geliştirmesiyle açılır']],
     atks: RH_AX_V.map(i => { const q = AXV[i]; const lk = rhAxLock(i); return [RH_AX_TXT[i][0], RH_AX_TXT[i][1], q.tree ? '39' : '30', (lk ? 'silah geliştirmesiyle açılır  ·  ' : '') + 'süre ' + q.ST.toFixed(2) + ' sn  ·  menzil ' + (q.tree ? 90 : 74), lk ? 'lock' : '']; }),
     tips: ['Ağacı yalnızca balta keser: kılıç ağaçtan sekip elini sızlatır.', 'Balta kaldırılırken açıkta kalırsın; düşman çok yakınsa kılıç daha güvenlidir.', 'Ağaç üç vuruşta devrilir. Her darbe odun düşürür, çanta en çok 40 odun alır.', 'Baltayla savuşturma yok; her darbe dayanıklılık harcadığı için boş yere savurma.', 'Ağaca vururken tuşu basılı tut: üst ve alt kesik ritimle tekrarlanır.'] });
-  const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR, items: RH_ITEMS };
+  const RH_LIST = { enemies: RH_ENEMIES, weapons: RH_WEAPONS, chars: RH_CHARS, statues: RH_STATUES, outfits: RH_OUTFITS, armor: RH_ARMOR, items: RH_ITEMS, chests: RH_CHESTS };
   const RH_WD = { sword: [1.1, 1.9, 1.6, 2.8], bow: [1.7, 2.6, 2.2, 2.4], axe: RH_AX_V.map(i => AXV[i].ST / RH_AX_TS + 0.55) };   // silah önizlemesi: hareket süreleri (sn)
   const RH = { tsx: 0, tsv: 0, tsT: null, ltei: -1, tmax: 0, tby0: 0, tby1: 0, view: 'home', tv: 'home', ei: 0, tei: 0, ca: 0, ina: 0, scroll: 0, tg: 0, vel: 0, max: 0, dn: null, ux: -1, uw: 0, t: 0, sc: null, rage: false, hits: 0, wc: new Map(), capS: '', capA: 0, last: 0 };
   const RH_CAP = { wind: 'uyarı', strike: 'vuruş', rec: 'soluklanıyor  ·  vurursan +%50 hasar', fren: 'çan çaldı  ·  daire belirdi', fslam: 'daireye atılıyor', bo: 'dumana dönüşür', iv: 'görünmez  ·  vurulamaz', bi: 'belirir', rev: 'maske düşüyor', stuck: 'dil siperde yapıştı', dz: 'sersem  ·  vurursan +%50 hasar' };
@@ -9040,6 +9356,12 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         ctx.fillStyle = `rgba(${fg},0.12)`; ctx.beginPath(); ctx.ellipse(0, 2, ew - bob, 4.5 - bob * 0.2, 0, 0, TAU); ctx.fill();
         if (two) { drawDustIcon(-24, -36 + bob, 2.5); drawIngot(22, -36 - bob * 0.7, 2.1, 0.3); }   // toz + külçe yan yana
         else drawItemIcon(sc.item, 0, -38 + bob, 2.6);
+      }
+      else if (sc.kind === 'chest' || sc.kind === 'cvchest' || sc.kind === 'cxchest') {   // sandıklar: oyundaki kendi çizimleri
+        ctx.translate(cx, gy); ctx.scale(S * (sc.kind === 'chest' ? 2.4 : 1.9), S * (sc.kind === 'chest' ? 2.4 : 1.9));
+        if (sc.kind === 'chest') drawChest(0, 0, 'cbrh', false, light);
+        else if (sc.kind === 'cxchest') drawChest(0, 0, 'cbxrh', false, light);
+        else { drawChest(0, 0, 'cbvrh', false, light); }
       }
       else if (sc.kind === 'statue' || sc.kind === 'evil' || sc.kind === 'rubble') {   // heykeller: oyunun kendi çizimleri
         ctx.translate(cx, gy); ctx.scale(S, S);
@@ -9605,7 +9927,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     player.vx += (ix * spd - player.vx) * t;
     player.vy += (iy * spd - player.vy) * t;
     player.x += player.vx * sdt; player.y += player.vy * sdt;
-    if (CV.in) { if (CV.st === 'idle') collideCave(); } else if (CV.st === 'idle') { collideStatues(); collideChests(); collideTrees(); collideRocks(); collideCamps(); collideCaves(); }
+    if (CV.in) { if (CV.st === 'idle') { collideCave(); collideChests(); } } else if (CV.st === 'idle') { collideStatues(); collideChests(); collideTrees(); collideRocks(); collideCamps(); collideCaves(); }
     cvTick(sdt);
     if (Math.hypot(player.vx, player.vy) > 12) player.angle = Math.atan2(player.vy, player.vx);
 
@@ -9615,7 +9937,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     updateBow(sdt); updatePrism(sdt); updateHeal(sdt); if (!CV.in) updateCamp(sdt);
     if (fz) for (const e of E) { e.flash = Math.max(0, e.flash - dt); e.hf = Math.max(0, (e.hf || 0) - dt * 6); e.sf = Math.max(0, (e.sf || 0) - dt * 4); }   // donmuşken de vuruş parlaması sönsün
     if (!CV.in) updateEnemies(fz ? 0 : sdt);   // donmuşken yalnızca ölmekte olanlar oynar
-    if (!CV.in) { campBarrier(); caveBarrier(); updateBolts(fz ? 0 : sdt); updateEvil(fz ? 0 : sdt); updateChests(sdt); updateTrees(sdt); updateRocks(sdt); }
+    if (!CV.in) { campBarrier(); caveBarrier(); updateBolts(fz ? 0 : sdt); updateEvil(fz ? 0 : sdt); updateChests(sdt); updateTrees(sdt); updateRocks(sdt); } else updateChests(sdt);
     { const ft0 = FX.t; updateFx(dt, sdt); if (fz) FX.t = ft0; }
     let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
     try { AU.setMode(F.death >= 0.6 ? 'death' : 'game'); AU.setListener(player.x, player.y); AU.setTime(GCLK.f, DNT.on || CV.in); AU.update(dt, CAMP.in ? 0 : clamp(alert, 0, 1)); } catch (_) {} try { cvSnd(dt); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
@@ -9637,7 +9959,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const campV = CV.in ? [] : campsIn(cam.x - 400, cam.y - 400, cam.x + W / ZOOM + 400, cam.y + H / ZOOM + 400); drawCampGround(campV, fg);
     const sfg = light ? '105,105,105' : '150,150,150';
     const sObjs = cvz(statuesIn)(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, ev]) => ({ y, f: ev ? () => drawEvil(x, y, id, light) : () => drawStatue(x, y, SS, sfg, light) }));
-    const cObjs = cvz(chestsIn)(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, lk]) => ({ y, f: () => drawChest(x, y, id, lk, light) })).concat((CV.in ? [] : LOOT).map(l => ({ y: l.y, f: () => drawLoot(l) })));
+    const cObjs = chestsIn(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, lk]) => ({ y, f: () => drawChest(x, y, id, lk, light) })).concat(LOOT.filter(l => !!l.cv === CV.in).map(l => ({ y: l.y, f: () => drawLoot(l) })));
     const eObjs = (CV.in ? [] : E).map(e => ({ y: e.y, f: () => drawEnemy(e, fg) })).concat((CV.in ? [] : EP).map(p => ({ y: p.y, f: () => drawBolt(p, fg) }))), kObjs = campV.flatMap(c => campObjs(c, fg, light)), tObjs = cvz(treesIn)(cam.x - 150, cam.y - 20, cam.x + W / ZOOM + 150, cam.y + H / ZOOM + 170).map(([x, y, id]) => ({ y, f: () => drawTree(x, y, id, light) })), rObjs = cvz(rocksIn)(cam.x - 120, cam.y - 20, cam.x + W / ZOOM + 120, cam.y + H / ZOOM + 120).map(([x, y, id]) => ({ y, f: () => drawRock(x, y, id, light) })), allO = (CV.in ? cvObjs(fg) : cvDoors(fg, bgCol, light)).concat(sObjs, eObjs, cObjs, kObjs, tObjs, rObjs).sort((a, b) => a.y - b.y);
     allO.filter(o => o.y < player.y).forEach(o => o.f());
     drawBowAim(fg);
@@ -9648,7 +9970,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     drawSparks(fg); drawHealFx();
     allO.filter(o => o.y >= player.y).forEach(o => o.f());
     drawArrows(fg); drawPrismFx(fg); drawCampShield(campV);
-    drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawRockFx(light); drawChestPieces(light); drawChestFx(light); drawRings(); drawDmgNums(fg); drawFT(fg);
+    drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawRockFx(light); drawChestPieces(light); drawChestFx(light); drawCurseFx(light); drawRings(); drawDmgNums(fg); drawFT(fg);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     try { if (CV.in) drawCaveAtmo(dt); else drawAtmo(dt, DK, campV); } catch (_) {}
@@ -9679,7 +10001,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.stroke();
       ctx.restore();
     }
-    drawHud(fg); drawBowHud(fg); drawTimer(fg, dt); drawHealHud(fg, dt); drawDevHp(fg, dt); drawCampHud(fg, dt);
+    drawHud(fg); drawBowHud(fg); drawTimer(fg, dt); drawHealHud(fg, dt); drawDevHp(fg, dt); drawCampHud(fg, dt); drawCurseHud(fg, dt);
     drawAtk(fg, dt); drawSwapBtn(fg, dt); drawHotbar(fg, dt); drawBowBtn(fg, dt); drawHealBtns(fg, dt); drawPrismBtns(fg, dt); drawPauseBtn(fg, dt); drawBagBtn(fg, dt); drawRadial(fg, dt);
     if (PAUSE.a > 0) drawPause(dt, true);
     if (DEATH.on) drawDeath(dt, fg);
