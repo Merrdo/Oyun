@@ -1505,7 +1505,8 @@
       ctx.fillStyle = `rgba(${fg},0.92)`; ctx.fillText(txt, cx, hy + 0.5); ctx.restore();
     }
   }
-  const DEV = { on: false, tspd: 1, anycraft: false, hpbtn: true, peace: false, gold: false, keys: false, arrows: false, tears: false, god: false, freeze: false, spawn: {}, mimic: 12, luck: 0, pick: false };
+  const anyCraft = () => DEV.anycraft || !!SK.own.iscilik;   // 'İşçilik' perki (ya da geliştirici testi): duraklatma menüsünden her yerde üretim
+  const DEV = { on: false, tspd: 1, anycraft: false, hpbtn: true, campArrow: false, campArrow2: false, peace: false, gold: false, keys: false, arrows: false, tears: false, god: false, freeze: false, spawn: {}, mimic: 12, luck: 0, pick: false };
   const luckP = p => DEV.on && DEV.luck > 0 ? Math.min(1, p) + (1 - Math.min(1, p)) * DEV.luck / 100 : p;   // geliştirici şansı (0–100): her olasılığı p → p + (1−p)·şans yapar; %100'de şansa bağlı her şey kesin gerçekleşir   // spawn: türe göre doğal doğuş kapatma (false = doğmaz) · geliştirici modu: ana ekranın sağ üstünden girilir · hepsi açık başlar · düğmeleri duraklatma menüsünde
   const E = []; E.spawnT = 1.5;
   const F = { kd: -1, stag: 0, sgx: 0, sgy: 0, kp: 0, lx: 0, ly: 0, slow: 0, bstun: false, gt: 0, pt: -1, dir: 1, aim: 0, buf: false, down: false, hold: 0, guarding: false, gw: 0, dur: 100, broken: 0, bw: 0, regenT: 0, sw: 0, off: 0,
@@ -1749,6 +1750,7 @@
   const SKILLS = [
     { id: 'sifa', name: 'Şifalı Eller', cost: 2, desc: 'Sağlık ekipmanları kalıcı olarak %25 daha güçlü iyileştirir: bandaj %10 yerine %12,5, medkit %50 yerine %62,5 can yeniler. Şifa Hilali de aynı oranda güçlenir.', buff: { healMul: 1.25 }, cls: 'hero', req: [], ico: 'heal' },
     { id: 'tarif', name: 'Tarif Bilgisi', cost: 2, desc: 'Oyundaki tüm tarifleri, daha önce açmış olsan da olmasan da Craft ve Tüm Tarifler sayfalarında görebilirsin. Malzemesi yetmeyen tarifler soluk görünür. Şifalı Eller açıldıktan sonra alınabilir.', buff: {}, cls: 'hero', req: ['sifa'], ico: 'book' },
+    { id: 'iscilik', name: 'İşçilik', cost: 3, desc: 'Üretim artık craft tezgâhına bağlı kalmaz: malzemen varsa her yerde, kampın dışında bile üretim yapabilirsin. Duraklatma menüsünde CRAFT düğmesi belirir. Eritme hâlâ kampta yapılır. Tarif Bilgisi açıldıktan sonra alınabilir.', buff: {}, cls: 'hero', req: ['tarif'], ico: 'craft' },
     { id: 'hisim', name: 'Kor Hışım', cost: 2, desc: 'Verdiğin hasar %20 artar (kılıç, ok, bomba, ışın). Yan etki olarak dayanıklılık %6 daha hızlı yenilenir, siper ve prizma ışını %5 daha az yorar.', buff: { dmgDealt: 1.2, stamRegen: 1.06, stamCost: 0.95 }, cls: 'hero', req: [], ico: 'dmg' }
   ];   // yeni beceri eklemek için buraya bir kayıt + ağaçtaki düğüm konumu yeterli · cls: 'hero' (Halaskar) | 'sword' (Kılıç) | 'bow' (Yay) · req: önce açık olması gereken becerilerin id'leri (Güçlendirmeler sayfasında bağlantı çizgisi olarak görünür; sınıflar arası da olabilir)
   const CURSE = { on: false, kills: 0, need: 10, t: 0, fl: 0, vg: 0, pulse: 0, done: 0, ask: null, av: 0, bv: 0, nr: null, p: [], info: null, iv: 0, hp: 0, hid: null, hk: false }, CURSE_M = { dmgTaken: 2, healMul: 0.5, dmgDealt: 2 / 3 };   // lanet: alınan hasar ×2 · iyileşme ×0,5 · verilen hasar ×⅔ (15 → 10)
@@ -1923,7 +1925,8 @@
       e.t += dt; e.flash = Math.max(0, e.flash - dt); if (e.wk > 0) e.wk = Math.max(0, e.wk - dt); if (e.tol > 0) e.tol = Math.max(0, e.tol - dt); if (F.death >= 0) continue;
       e.armor = e.kind === 'sentinel' || e.st === 'fren' || e.st === 'fslam' ? 1 : (e.st === 'wind' || e.st === 'strike') && isSlam(e) ? 1 : 0;   // ağır ezmede süper zırh: sendelemez
       e.ghost = e.st === 'bo' || e.st === 'iv' || e.st === 'bi' || e.st === 'die' || e.st === 'mel';
-      if (!e.ghost && e.al < 1) e.al = Math.min(1, e.al + dt * 4);
+      if (e.hid && !(CAMP.in && CAMP.c)) { e.hid = false; smoke(e.x, e.y - 14, 6, 40, 10); }   // oyuncu kampı terk edince saklanan büyücü bulunduğu yerde dumanla belirir
+      if (!e.ghost && !e.hid && e.al < 1) e.al = Math.min(1, e.al + dt * 4);
       if (e.kind === 'bellman') { e.hz = Math.max(0, (e.hz || 0) - dt * 3.2); if (e.st === 'die') { bellDying(e); continue; } }
       if (e.kind === 'mum' && e.st === 'die') { mumDying(e, dt); continue; }   // güvenlik: dalış durumu dışında hiçbir düşman görünmez kalamaz
       if (e.em < 1) {   // doğuyor: dumanın içinden belirir, o sırada zararsızdır
@@ -2991,10 +2994,13 @@
      Haritada seyrek, parça (chunk) bazlı deterministik kamplar. İlk kamp başlangıca yakın. Kampın çevresinde sandık / heykel çıkmaz.
      İçeride: düşman giremez (elips sınır), kovalayanlar dağılır ve bekler (yok olmaz, yeni doğmaz), mermiler halkada söner, silahlar kınında kalır,
      dayanıklılık hızlı dolar (can YENİLENMEZ). Craft yalnızca tezgahın yanında açılır; oyun o sırada durur. Dışarı çıkınca kovalama kaldığı yerden sürer. */
-  const CAMP_R = 230, CAMP_KY = 0.72, CAMPC = 1500, GOLDRGB = '240,194,74', MB = '92,168,255', MC = '132,228,255', MV = '124,104,255';   // mavi büyü: orta mavi · camgöbeği · mor-mavi
+  const CAMP_R = 340, CAMP_KY = 0.72, CAMPC = 1500, GOLDRGB = '240,194,74', MB = '92,168,255', MC = '132,228,255', MV = '124,104,255';   // mavi büyü: orta mavi · camgöbeği · mor-mavi
   const ELIX_CHANCE = 0.4;   // eritme kabı olan güvenli kampların yüzde kaçında kabın içinde şifa iksiri bulunur (kampa göre sabit, toplanınca biter)
   const RUIN_RATE = 0.25;   // kampların yüzde kaçı harabe
-  const CAMP = { rate: 0.36, tf: new Map(), in: false, c: null, list: [], lt: 0, t: 0, sh: 0, bv: 0, ban: 0, seen: new Map(), ct: 1, near: false, nk: 'craft', arrow: 0, shield: new Map(), stones: new Map(), ruins: [], looted: new Set() };
+  const CAMP = { rate: 0.36, tf: new Map(), in: false, c: null, list: [], lt: 0, t: 0, sh: 0, bv: 0, ban: 0, seen: new Map(), ct: 1, near: false, nk: 'craft', arrow: 0, ab: null, shield: new Map(), stones: new Map(), ruins: [], looted: new Set() };
+  const CAMP_UP = { tier: 0 };   // KAMP GELİŞTİRMELERİ · 'Kamp yönü': kademe 0 kapalı · 1 = daha önce gördüğün kamplara ok · 2 = keşfedilmemiş yakın kamplara da ok (bayrak bunu yapamaz) · geliştirme alınınca CAMP_UP.tier ayarlanır (kayda işlenmesi de oradan) · şimdilik kapalı
+  const campArrowTier = () => DEV.campArrow2 ? 2 : (DEV.campArrow ? Math.max(1, CAMP_UP.tier) : CAMP_UP.tier);
+  const FLAG_NOCAMP = 800;   // kamp merkezine bu mesafeden yakına bayrak dikilmez: bayrakla kampı dolaylı işaretlemek geliştirmenin yerini tutmasın
   const baseCamps = [];   // sabit ilk kamp kaldırıldı: kamplar da tohuma göre rastgele yerleşir
   const CAMP_GAP = 2400;   // iki kamp arası en az mesafe: bu yarıçaptaki alanda yalnızca tek kamp olur (art arda kamp dizilmez)
   function campCand(ci, cj) {   // bir hücrenin aday kampı (yoksa null); tek kamp kuralı bu adaylar arasında uygulanır
@@ -3401,7 +3407,11 @@
   }
   const campN = (c, x, y) => { const dx = Math.abs(x - c.x), dy = Math.abs((y - c.y) / CAMP_KY); return Math.max(dy, dx * 0.866 + dy * 0.5) / 0.866; };   // altıgen mesafesi (yarıçap birimi: CAMP_R): sınır, içeride mi, mermi, bariyer hep bununla ölçülür
   // yerleşim (düzenli, ızgara gibi): ortada ateş + iki simetrik kütük · arka sıra: uyku köşesi (çadır) ↔ çalışma köşesi (şifa tezgahı), ortada sancak · orta sıra: yatak, çanta ↔ eritme ocağı, kasalar · ön sıra: iki fener; fl ile aynalanır
-  const campParts = c => ({ fire: [c.x, c.y], banner: [c.x, c.y - 84], tent: [c.x - c.fl * 120, c.y - 34], table: [c.x + c.fl * 100, c.y - 34], roll: [c.x - c.fl * 130, c.y + 14], pack: [c.x - c.fl * 82, c.y + 12], pot: [c.x + c.fl * 118, c.y + 14], crates: [c.x + c.fl * 172, c.y + 14], lamp: [c.x - c.fl * 118, c.y + 64], lamp2: [c.x + c.fl * 118, c.y + 64], log1: [c.x - 50, c.y + 50], log2: [c.x + 50, c.y + 52] });
+  /* KAMP DÜZENİ (CAMP_R = 340 · altıgen): ortada ateş, çevresinde iki kütük · arkada sancak ağacı (Dev Çınar) · iki yanda aynalı birer işlev sütunu:
+       dinlenme sütunu  (batı): çadır (arka) · yatak (orta) · sırt çantası (ön)
+       üretim sütunu    (doğu): craft tezgâhı (arka) · kasalar (orta) · eritme ocağı (ön)  → tezgâh ile ocak ~190 birim arayla, kasalar ikisinin arasında
+       iki fener ön girişte. Her sütunda nesneler arası ~100+ birim boşluk; hepsi mühür çizgisinin 70+ birim içinde. c.fl yalnızca aynalar. */
+  const campParts = c => ({ fire: [c.x, c.y], banner: [c.x, c.y - 150], tent: [c.x - c.fl * 190, c.y - 100], table: [c.x + c.fl * 190, c.y - 100], roll: [c.x - c.fl * 235, c.y - 5], crates: [c.x + c.fl * 240, c.y - 5], pack: [c.x - c.fl * 190, c.y + 95], pot: [c.x + c.fl * 190, c.y + 95], lamp: [c.x - c.fl * 105, c.y + 140], lamp2: [c.x + c.fl * 105, c.y + 140], log1: [c.x - 88, c.y + 44], log2: [c.x + 88, c.y + 46] });
   const CP_SC = [1, 0.94, 1.06, 0.97, 1.04, 0.92], CP_MID = 26;   // taş boyu (hafif farklı) · taşın orta yüksekliği: ışık çizgisi taşların tam ortasından geçer
   const campVerts = c => Array.from({ length: 6 }, (_, i) => { const a = i * PI / 3; return [c.x + Math.cos(a) * CAMP_R, c.y + Math.sin(a) * CAMP_R * CAMP_KY, i]; });   // altıgenin köşeleri = ışık çizgisinin ve bariyerin tam yeri
   const campPillars = c => campVerts(c).map(v => [v[0], v[1] + CP_MID, v[2]]);   // dikili taşlar: tabanları çizginin CP_MID kadar güneyinde, böylece çizgi gövdenin ortasından geçer
@@ -3426,14 +3436,14 @@
   }
   function collideCamps() {
     for (const c of CAMP.list) {
-      if (Math.abs(c.x - player.x) > 340 || Math.abs(c.y - player.y) > 340) continue; const P = campParts(c);
+      if (Math.abs(c.x - player.x) > 460 || Math.abs(c.y - player.y) > 460) continue; const P = campParts(c);
       for (const [pt, rx, ry] of [[P.fire, 18, 7], [P.table, 40, 8], [P.tent, 38, 9], [P.crates, 17, 6], [P.lamp, 5, 3], [P.banner, 28, 8]]) {   // banner = Dev Çınar'ın gövdesi
         const nx = (player.x - pt[0]) / rx, ny = (player.y - (pt[1] + 3)) / ry, d = Math.hypot(nx, ny);
         if (d < 1) { const q = d || 0.001; player.x = pt[0] + nx / q * rx; player.y = pt[1] + 3 + (d ? ny / q : 1) * ry; }
       }
     }
       for (const c of CAMP.list) {   // dikili taşlar: çizilen taban genişliğiyle birebir kutu (kenarlarından geçilmez)
-      if (Math.abs(c.x - player.x) > 340 || Math.abs(c.y - player.y) > 340) continue;
+      if (Math.abs(c.x - player.x) > 460 || Math.abs(c.y - player.y) > 460) continue;
       for (const q of campPillars(c)) {
         const hw = 20 * CP_SC[q[2]] + 6, hh = 6, dx = player.x - q[0], dy = player.y - (q[1] - 1);
         if (Math.abs(dx) < hw && Math.abs(dy) < hh) { if (hw - Math.abs(dx) < hh - Math.abs(dy)) player.x = q[0] + (dx < 0 ? -hw : hw); else player.y = q[1] - 1 + (dy < 0 ? -hh : hh); }
@@ -3442,9 +3452,10 @@
   }
   function campScatter(e, dt) {   // oyuncu kamptayken: saldırıyı bırak, kampın 460-700 birim uzağına çekil ve bekle (yok olma, yeni doğma yok)
     const c = CAMP.c;
-    if (e.st !== 'chase') { e.st = 'chase'; e.atk = ''; e.t = 0; e.cd = rnd(1, 2); e.ghost = false; e.armor = 0; e.fast = false; }
-    e.al = Math.min(1, e.al + dt * 4);   // görünmez dalıştayken yakalanan düşman yeniden belirir
-    const dx = e.x - c.x, dy = e.y - c.y, d = Math.hypot(dx, dy) || 1, tg = e.scR || (e.scR = rnd(460, 700)), sp = (e.rage ? 122 : 94) * E_SPD * 0.8;
+    if (e.st !== 'chase') { if (e.st === 'bo' || e.st === 'iv') e.hid = true; e.st = 'chase'; e.atk = ''; e.t = 0; e.cd = rnd(1, 2); e.ghost = false; e.armor = 0; e.fast = false; }   // görünmezken (ya da erirken) yakalanan büyücü görünmez kalır
+    const dx = e.x - c.x, dy = e.y - c.y, d = Math.hypot(dx, dy) || 1, tg = e.scR || (e.scR = rnd(600, 850)), sp = (e.rage ? 122 : 94) * E_SPD * 0.8 * (e.hid ? 2 : 1);
+    if (e.hid) { e.al = Math.max(0, e.al - dt * 4); if (d >= tg) { e.hid = false; smoke(e.x, e.y - 14, 6, 40, 10); } }   // görünmez geri çekilir; kamptan uzaklaşıp dağılma noktasına varınca dumanla belirir
+    else e.al = Math.min(1, e.al + dt * 4);
     if (d < tg) { const ux = dx / d, uy = dy / d; e.x += ux * sp * dt; e.y += uy * sp * dt; e.face += wrap(Math.atan2(uy, ux) - e.face) * dmp(8, dt); e.ph += dt * TAU; }
     else { e.face += wrap(Math.atan2(c.y - e.y, c.x - e.x) - e.face) * dmp(2, dt); e.ph += dt * 0.6; }
     for (const o of E) if (o !== e && o.em >= 1) { const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy); if (od > 0 && od < 42) { e.x += ox / od * 40 * dt; e.y += oy / od * 40 * dt; } }
@@ -3463,7 +3474,7 @@
     if ((CAMP.lt -= dt) <= 0) { CAMP.lt = 0.3; const all = campsIn(player.x - 2300, player.y - 2300, player.x + 2300, player.y + 2300); CAMP.list = all.filter(c => !c.ruin); CAMP.ruins = all.filter(c => c.ruin); }   // güvenli kamplar ve harabeler ayrı: harabede mühür/güvenlik yok
     let cur = null;
     for (const c of CAMP.list) { const n = campN(c, player.x, player.y); if (n < 900) CAMP.seen.set(c.id, c); const lim = CAMP.in && CAMP.c && CAMP.c.id === c.id ? CAMP_R + 8 : CAMP_R - 10; if (n < lim) cur = c; }
-    if (cur && !CAMP.in && F.death < 0) { CAMP.in = true; CAMP.c = cur; CAMP.last = cur; saveCamp(true); CAMP.ban = 3; E.spawnT = Math.max(E.spawnT, rnd(5, 8)); for (const e of E) e.scR = rnd(460, 700); }
+    if (cur && !CAMP.in && F.death < 0) { CAMP.in = true; CAMP.c = cur; CAMP.last = cur; saveCamp(true); CAMP.ban = 3; E.spawnT = Math.max(E.spawnT, rnd(5, 8)); for (const e of E) e.scR = rnd(600, 850); }
     else if (!cur && CAMP.in) { CAMP.in = false; CAMP.c = null; saveCamp(); }   // kamptan çıkarken de kaydedilir: kamptaki craft / eritme sonuçları kaybolmaz
     CAMP.sh += ((CAMP.in ? 1 : 0) - CAMP.sh) * dmp(5, dt);
     if (CAMP.in) {   // silahlar kınında: basılı tutuşları bırak
@@ -3474,7 +3485,7 @@
       const dS = Math.hypot(player.x - P.banner[0], (player.y - (P.banner[1] + 8)) * 1.3), dm = Math.min(dT, dP, dS);   // Dev Çınar: bayrağın yerinde
       CAMP.near = dm < 72; if (CAMP.near) CAMP.nk = dm === dS ? 'skill' : dP < dT ? (potElix(CAMP.c) ? 'elix' : 'smelt') : 'craft';
     } else CAMP.near = false;
-    for (const c of CAMP.ruins) if (!CAMP.looted.has(c.id) && Math.hypot(c.x - player.x, (c.y - player.y) / CAMP_KY) < 300) { CAMP.looted.add(c.id); ruinLoot(c); }   // harabeye yaklaşınca dağılmış eşyalar belirir
+    for (const c of CAMP.ruins) if (!CAMP.looted.has(c.id) && Math.hypot(c.x - player.x, (c.y - player.y) / CAMP_KY) < 420) { CAMP.looted.add(c.id); ruinLoot(c); }   // harabeye yaklaşınca dağılmış eşyalar belirir
     if (CAMP.ruins.length && CAMP.ct > 0.4) for (const c of CAMP.ruins) if (c.burn && Math.hypot(c.x - player.x, c.y - player.y) < 600 && Math.random() < dt * 2.2) { try { AU.sfx('crackle', c.x, c.y); } catch (_) {} }   // yanan harabede çıtırtı
     if (CAMP.list.length && (CAMP.ct -= dt) <= 0) { CAMP.ct = rnd(0.35, 1.2); for (const c of CAMP.list) if (Math.hypot(c.x - player.x, c.y - player.y) < 650) { try { AU.sfx('crackle', c.x, c.y); } catch (_) {} } }
   }
@@ -4012,17 +4023,30 @@
       CAMP.ban -= dt; const a = Math.min(1, CAMP.ban / 0.8) * Math.min(1, (3 - CAMP.ban) / 0.5), by = HUD_Y + 56 + 28 * HUD_S, q = HUD_S;
       ctx.save(); ctx.globalAlpha = Math.max(0, a); dvText('KAMP', W / 2, by, 15 * q, 500, GOLDRGB, 1, 6 * q, 'center'); dvText('mühürlü alan', W / 2, by + 20 * q, 11.5 * q, 400, fg, 0.55, 1, 'center'); ctx.restore();
     }
-    const need = INV.herb >= RECIPE.herb && INV.resin >= RECIPE.resin && INV.medk < HEAL_CAP.medk;
-    CAMP.arrow += ((need && !CAMP.in && CAMP.seen.size ? 1 : 0) - CAMP.arrow) * (1 - Math.exp(-6 * dt));
-    if (CAMP.arrow > 0.02) {
-      let b = null, bd = 1e12; for (const c of CAMP.seen.values()) { const d = Math.hypot(c.x - player.x, c.y - player.y); if (d < bd) { bd = d; b = c; } }
-      if (b) {
-        const sx = (b.x - cam.x) * ZOOM, sy = (b.y - cam.y) * ZOOM;
-        if (!(sx > -40 && sx < W + 40 && sy > -40 && sy < H + 40)) {
-          const dx = sx - W / 2, dy = sy - H / 2, k = Math.min((W / 2 - 34) / Math.abs(dx || 1e-3), (H / 2 - 120) / Math.abs(dy || 1e-3)), ax = W / 2 + dx * k, ay = H / 2 + dy * k, ang = Math.atan2(dy, dx);
-          ctx.save(); ctx.globalAlpha = CAMP.arrow * (0.55 + 0.35 * Math.sin(CAMP.t * 3)); ctx.translate(ax, ay); ctx.rotate(ang);
-          ctx.fillStyle = `rgb(${GOLDRGB})`; ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-6, -7); ctx.lineTo(-2.5, 0); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.restore();
+    {   // KAMP YÖN OKU: yalnızca kamp geliştirmesiyle açılır · karakterin üzerinde, bayrak oklarından daha dışta, ember renginde çift şevron + 'Kamp · mesafe'
+      let b = null, bd = 1e12;
+      const tier = campArrowTier();
+      if (tier > 0 && !CV.in && F.death < 0 && !CAMP.in && !MENU.on) {   // kademe 1: gördüğün kamplar · kademe 2: yakındaki keşfedilmemiş kamplar da
+        for (const c of CAMP.seen.values()) { const d = Math.hypot(c.x - player.x, c.y - player.y); if (d < bd) { bd = d; b = c; } }
+        if (tier >= 2) for (const c of CAMP.list) { const d = Math.hypot(c.x - player.x, c.y - player.y); if (d < bd) { bd = d; b = c; } }
+      }
+      if (b) CAMP.ab = b;
+      const edge = b ? Math.max(0, bd - CAMP_R) : 0, tgt = b ? clamp((edge - 380) / 140, 0, 1) : 0;
+      CAMP.arrow += (tgt - CAMP.arrow) * (1 - Math.exp(-6 * dt));
+      if (CAMP.arrow > 0.02 && CAMP.ab) {
+        const c = CAMP.ab, light = fg === '0,0,0', bgc = light ? '242,242,242' : '10,10,10', EMB = '255,138,58';
+        const px = (player.x - cam.x) * ZOOM, py = (player.y - 20 - cam.y) * ZOOM, R = 78 * ZOOM, ang = Math.atan2(c.y - (player.y - 20), c.x - player.x), ca = Math.cos(ang), sa = Math.sin(ang);
+        const pu = 0.78 + 0.22 * Math.sin(CAMP.t * 3.2), a = CAMP.arrow;
+        ctx.save(); ctx.translate(px + ca * R, py + sa * R); ctx.rotate(ang); ctx.globalAlpha = a * pu; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        for (const [ox, w] of [[-5, 0.55], [3, 1]]) {   // iki şevron: arkadaki soluk, öndeki parlak
+          ctx.beginPath(); ctx.moveTo(ox - 6, -8); ctx.lineTo(ox + 3, 0); ctx.lineTo(ox - 6, 8);
+          ctx.lineWidth = 5.2; ctx.strokeStyle = `rgba(${bgc},${0.55 * w})`; ctx.stroke();
+          ctx.lineWidth = 2.6; ctx.strokeStyle = `rgba(${EMB},${w})`; ctx.stroke();
         }
+        ctx.restore();
+        ctx.save(); ctx.globalAlpha = a * 0.9; ctx.font = `600 10.5px ${UIF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+        const txt = (CAMP.seen.has(c.id) ? 'KAMP' : 'YENİ KAMP') + '  ·  ' + flagFmt(edge), tx = clamp(px + ca * (R + 30), 56, W - 56), ty = clamp(py + sa * (R + 22), HUD_Y + 90, H - 30);
+        ctx.lineWidth = 3; ctx.strokeStyle = `rgba(${bgc},0.7)`; ctx.strokeText(txt, tx, ty); ctx.fillStyle = `rgb(${EMB})`; ctx.fillText(txt, tx, ty); ctx.restore();
       }
     }
   }
@@ -4037,6 +4061,7 @@
     if (INV.flag <= 0) { ftext(player.x, player.y - 62, 'Bayrağın yok', '#c99a52'); return false; }
     if (CV.in) { ftext(player.x, player.y - 62, 'Mağarada bayrak dikilmez', '#c99a52'); return false; }
     if (FLG.list.length >= FLAG_MAX) { ftext(player.x, player.y - 62, 'Çok fazla bayrak dikili', '#c99a52'); return false; }
+    if (campNear(player.x, player.y, FLAG_NOCAMP, true)) { ftext(player.x, player.y - 62, 'Kamp mührüne çok yakın · bayrak dikilmez', '#c99a52'); return false; }
     if (FLG.list.some(f => flagDist(f) < 56)) { ftext(player.x, player.y - 62, 'Burada zaten bayrak var', '#c99a52'); return false; }
     INV.flag--; const n = ++FLG.n, f = { id: 'fl' + n, x: player.x, y: player.y + 6, name: 'Bayrak ' + n, b: performance.now() / 1000 };
     FLG.list.push(f); FLG.sel = f.id;
@@ -8314,7 +8339,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   function devStart() { DEVP.dn = null; if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; menuStart(); } else resumeGame(); }
   function devBack() {
     DEVP.dn = null;
-    if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; DEV.on = DEV.peace = DEV.gold = DEV.keys = DEV.arrows = DEV.tears = DEV.god = DEV.freeze = DEV.anycraft = DEV.pick = false; DEV.tspd = 1; DEV.windMode = 0; DEV.hpbtn = true; DEV.spawn = {}; }   // menüye dönünce geliştirici modu kapanır
+    if (PAUSE.fromMenu) { PAUSE.fromMenu = false; PAUSE.on = false; PAUSE.page = 'main'; PAUSE.drag = null; DEV.on = DEV.peace = DEV.gold = DEV.keys = DEV.arrows = DEV.tears = DEV.god = DEV.freeze = DEV.anycraft = DEV.pick = DEV.campArrow = DEV.campArrow2 = false; DEV.tspd = 1; DEV.windMode = 0; DEV.hpbtn = true; DEV.spawn = {}; }   // menüye dönünce geliştirici modu kapanır
     else PAUSE.page = 'main';
   }
   function devDown(e) {   // dokunuş yukarı kalkınca çalışır; sürüklenirse içerik kayar
@@ -8435,7 +8460,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         hair(y + h + 8, 0.08); y += h + 8; }
       y += 22; y = sec('maden', y); y = swRow('pick', 'Kazma (test)', 'Vuruşlar kaya madenlerini kazar', y);
       { const h = 100; ob(x0, y + 8, cw, 42, 'en yakın madene git', devGoMine, { solid: true, size: 14 }); ob(x0, y + 58, cw, 42, 'en yakın mağaraya git', devGoCave, { solid: true, size: 14 }); hair(y + h + 8, 0.08); y += h + 8; }
-      y += 22; y = sec('kamp', y); y = swRow('anycraft', 'Her yerde üret', 'Duraklatma menüsünde CRAFT düğmesi çıkar', y);
+      y += 22; y = sec('kamp', y); y = swRow('anycraft', 'Her yerde üret', 'Duraklatma menüsünde CRAFT düğmesi çıkar', y); y = swRow('campArrow', 'Kamp oku · kademe 1 (test)', 'Gördüğün kamplara yön oku', y); y = swRow('campArrow2', 'Kamp oku · kademe 2 (test)', 'Keşfedilmemiş yakın kamplara da yön oku', y);
       { const h = 132; dvText('Kamp sıklığı', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText('yeni bölgelere işler', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
         const cy = y + 44, n = 3, gp = 8, cwid = (cw - gp * (n - 1)) / n;
         [['seyrek', 0.15], ['normal', 0.3], ['sık', 0.5]].forEach(([nm, v], i) => ob(x0 + i * (cwid + gp), cy, cwid, 34, nm, () => { CAMP.rate = v; }, { on: CAMP.rate === v, size: 12.5 }));
@@ -8787,7 +8812,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       const ls = clamp(H / 390, 0.8, 1.3), M = Math.max(HUD_M, 16), colW = W / 2 - M, cxL = M + colW / 2, cxR = W / 2 + colW / 2;
       const top = 16 + 19 * 2 + 8;   // sağ üstteki simge düğmelerinin altı
       let bh = 46 * ls, oh = 38 * ls, g1 = 14 * ls, g2 = 8 * ls, g3 = 18 * ls;
-      const nExtra = (DEV.anycraft ? 1 : 0) + (DEV.on ? 1 : 0);
+      const nExtra = (anyCraft() ? 1 : 0) + (DEV.on ? 1 : 0);
       let total = bh + g1 + oh + g2 + oh + nExtra * (g2 + oh) + g3 + oh;
       const k = Math.min(1, (H - 10 - top) / total); if (k < 1) { bh *= k; oh *= k; g1 *= k; g2 *= k; g3 *= k; total *= k; }
       const y0 = Math.max(top, (H - total) / 2), midY = y0 + total / 2;
@@ -8808,7 +8833,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       menuPill(bx0, y, ow, oh, 'ENVANTER', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: ow, h: oh + 8, fn: () => invEnter('main') });
       menuPill(bx0 + ow + og, y, ow, oh, 'KIYAFET', 1, false, 0); PAUSE.btns.push({ x: bx0 + ow + og, y: y - 4, w: ow, h: oh + 8, fn: wdEnter });
       y += oh + g2; menuPill(bx0, y, bw, oh, 'GÜÇLENDİRMELER', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: powersEnter });
-      if (DEV.anycraft) { y += oh + g2; menuPill(bx0, y, bw, oh, 'CRAFT', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: craftEnter }); }
+      if (anyCraft()) { y += oh + g2; menuPill(bx0, y, bw, oh, 'CRAFT', 1, false, 0); PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: craftEnter }); }
       if (DEV.on) {
         y += oh + g2; menuPill(bx0, y, bw, oh, 'GELİŞTİRİCİ AYARLARI', 1, false, 0, null, 1, 'dev'); ctx.save(); rr(bx0, y, bw, oh, oh / 2); ctx.strokeStyle = 'rgba(240,194,74,0.6)'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
         PAUSE.btns.push({ x: bx0, y: y - 4, w: bw, h: oh + 8, fn: () => { PAUSE.page = 'dev'; } });
@@ -9214,6 +9239,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = col; ctx.lineWidth = 2.2;
     if (kind === 'heal') { ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(0, 14); ctx.moveTo(-14, 0); ctx.lineTo(14, 0); ctx.stroke(); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.stroke(); }
     else if (kind === 'book') { ctx.beginPath(); ctx.moveTo(0, -8); ctx.quadraticCurveTo(-8, -12, -14, -9); ctx.lineTo(-14, 10); ctx.quadraticCurveTo(-8, 7, 0, 11); ctx.quadraticCurveTo(8, 7, 14, 10); ctx.lineTo(14, -9); ctx.quadraticCurveTo(8, -12, 0, -8); ctx.lineTo(0, 11); ctx.stroke(); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-10, -4); ctx.lineTo(-4, -5); ctx.moveTo(-10, 0); ctx.lineTo(-4, -1); ctx.moveTo(4, -5); ctx.lineTo(10, -4); ctx.moveTo(4, -1); ctx.lineTo(10, 0); ctx.stroke(); }
+    else if (kind === 'craft') { ctx.beginPath(); ctx.moveTo(-11, 12); ctx.lineTo(4, -3); ctx.stroke(); ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(-1, -13); ctx.lineTo(13, -3); ctx.lineTo(9, 3); ctx.lineTo(-5, -7); ctx.closePath(); ctx.stroke(); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-14, 14); ctx.lineTo(-6, 14); ctx.stroke(); }   // çekiç + tezgâh çizgisi
     else if (kind === 'dmg') { ctx.beginPath(); ctx.moveTo(-9, 12); ctx.lineTo(12, -9); ctx.moveTo(6, -12); ctx.lineTo(12, -6); ctx.moveTo(-3, 3); ctx.lineTo(-11, 11); ctx.moveTo(-13, 4); ctx.lineTo(-4, 13); ctx.stroke(); }
     else { ctx.beginPath(); ctx.moveTo(-11, -13); ctx.lineTo(11, -13); ctx.lineTo(11, 2); ctx.quadraticCurveTo(11, 12, 0, 17); ctx.quadraticCurveTo(-11, 12, -11, 2); ctx.closePath(); ctx.stroke(); }
     ctx.restore();
@@ -9636,11 +9662,11 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       lore: 'Odun ve kemikten yapılmış küçük bir işaret direği. Bulunduğun yere dikilir ve orayı unutmaz; uzaklaşınca karakterinin etrafında bayrağa doğru dönen bir ok ile mesafe yazısı belirir. Sandıktan çıkmaz; Craft sayfasında üretilir.',
       stats: [['Üretim', '2 odun + 1 kemik'], ['Taşıma', 'en çok ' + FLAG_CAP], ['Dünyada dikili', 'en çok ' + FLAG_MAX], ['Mesafe', '1 m = 24 birim'], ['Ok gizlenir', FLAG_NEAR + ' birimden yakında'], ['Kısayol', 'F dik  ·  G sıradaki']],
       atks: [
-        ['Dikme', 'Hotbar\'daki bayrak düğmesine ya da F tuşuna bas: bayrak bulunduğun yere dikilir ve seçili bayrak olur. Aynı noktaya ikinci bayrak dikilmez; mağaralarda bayrak dikilmez.', '—', 'F  ·  en çok ' + FLAG_MAX + ' dikili'],
+        ['Dikme', 'Hotbar\'daki bayrak düğmesine ya da F tuşuna bas: bayrak bulunduğun yere dikilir ve seçili bayrak olur. Aynı noktaya ikinci bayrak dikilmez; mağaralarda ve kamp mührüne yakın (yaklaşık ' + Math.round(FLAG_NOCAMP / FLAG_M) + ' m) yerlerde bayrak dikilmez.', '—', 'F  ·  en çok ' + FLAG_MAX + ' dikili'],
         ['Yön oku', 'Bayraktan uzaklaşınca karakterin çevresinde bayrağa dönen küçük bir ok ve metre cinsinden mesafe görünür. Yakına gelince ok kaybolur. Varsayılan olarak yalnızca seçili bayrağın oku gösterilir.', '—', 'seçili bayrak'],
         ['Bayrak değiştirme', 'G tuşu okun gösterdiği bayrağı sıradakine geçirir ve adıyla mesafesini yazar. Pusulayla hepsinin okunu aynı anda açabilirsin.', '—', 'G'],
         ['Üretim', 'Kamptaki craft tezgâhında 2 odun ve 1 kemikle üretilir. Çanta en çok ' + FLAG_CAP + ' bayrak taşır.', '—', 'craft  ·  2 odun + 1 kemik']],
-      tips: ['Kampı, mağara girişlerini ve bulduğun sandıkları işaretle; kaybolunca yönünü hemen bulursun.', 'Bayraklara ad vermek ve silmek için Pusula gerekir.', 'Kayıtta saklanır: dikili bayraklar kamptan sonra yerinde durur.'] });
+      tips: ['Mağara girişlerini, madenleri ve bulduğun sandıkları işaretle; kaybolunca yönünü hemen bulursun. Kampın yakınına bayrak dikilemez: kampı bayrakla değil, kamp geliştirmesiyle işaretlersin.', 'Bayraklara ad vermek ve silmek için Pusula gerekir.', 'Kayıtta saklanır: dikili bayraklar kamptan sonra yerinde durur.'] });
   RH_ITEMS.push({ kind: 'item', item: 'compass', name: 'Pusula', tab: 'Pusula', sub: 'EŞYA  ·  ALET', atkTitle: 'KULLANIM', noplay: true,
       lore: 'Pirinç kasalı, kırmızı uçlu iğneli küçük bir pusula. Dikili bayrakları adlarıyla, yönleriyle ve mesafeleriyle listeler. Sandıktan çıkmaz; Craft sayfasında üretilir. Bir kez üretilir ve çantada kalır.',
       stats: [['Üretim', '1 altın külçesi + 1 mor prizma'], ['Taşıma', 'tek  ·  bir kez üretilir'], ['Kısayol', 'O'], ['Açma', 'hotbar  ·  Çanta\'da AÇ']],
@@ -10272,7 +10298,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
   // gündüz (açık zemin): sıcak krem ışık, güneş hüzmeleri, bulut gölgeleri, polen, savrulan yapraklar, uçan kuşlar · şafak / akşam: altın saat
   // gece (koyu zemin): hafif karartı + az sayıda küçük net ateş böceği
   /* ---------- MEŞALE: elde tutulunca çevresindeki gece karartısını açar, ışığın erdiği yerde gölgeler azalır · alev sağa-sola sallanır ---------- */
-  const TORCH_CAP = 64, CAMP_LR = 270, RUIN_LR = 250, MUM_LR = 240, LT = [];   // LT: ışık kaynakları {x, y, R, a, k}
+  const TORCH_CAP = 64, CAMP_LR = 270, CAMP_FIRE_LR = 390, RUIN_LR = 250, MUM_LR = 240, LT = [];   // LT: ışık kaynakları {x, y, R, a, k}
   let TORCH_NF = false;   // true: meşale alevsiz çizilir
   const TORCH = { hold: 0, fly: null, S: 1.6, doom: 0, on: false, w: 0, vis: 0, lit: 0, wx: 0, wy: 0, str: 1, R: 215, ph: Math.random() * 6, st: 0, fk: 1 };   // st: rüzgârda çırpınma (0–1) · fk: ışık titremesi
   /* ---------- RÜZGÂR: açıkta yavaşça dalgalanan esinti + ara sıra gelen hamleler (sert hamle ≈ %30) · alevler rüzgâr yönüne yatar · sert hamlede elde tutulan meşale söner (bir meşale harcanır) · mağarada yalnızca hafif cereyan ---------- */
@@ -10500,7 +10526,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R * TORCH.fk, a: TORCH.lit, k: TORCH.lit * TORCH.str });
     for (const c of camps) {   // tüm ateşler meşale gibi çevresindeki karartıyı açar ve gölgeleri azaltır (meşaleden bir tık güçlü: R 215 → 250–270)
       const fk = 0.95 + 0.05 * Math.sin(t * 9 + c.x) * Math.sin(t * 5.3 + c.y);
-      if (!c.ruin) { LT.push({ x: c.x, y: c.y - 10, R: CAMP_LR * fk, a: 1, k: nW }); continue; }   // kamp ateşi
+      if (!c.ruin) { LT.push({ x: c.x, y: c.y - 10, R: CAMP_FIRE_LR * fk, a: 1, k: nW }); continue; }   // kamp ateşi
       if (!c.burn) continue;   // sönmüş harabe: ışık yok
       const P = campParts(c), bp = [P.tent, P.crates, P.table][c.bk], bk = 0.93 + 0.07 * Math.sin(t * 8 + c.sd * 50) * Math.sin(t * 4.7 + c.x);
       LT.push({ x: bp[0], y: bp[1] - 10, R: RUIN_LR * bk, a: 1, k: nW });   // yanan çadır / kasa / tezgah
@@ -10725,7 +10751,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     drawTele(fg); if (!CV.in) { try { drawShadows(DK); } catch (_) {} }
 
     if (!CV.in) drawGroundGun(fg, light);
-    const campV = CV.in ? [] : campsIn(cam.x - 400, cam.y - 400, cam.x + W / ZOOM + 400, cam.y + H / ZOOM + 400); drawCampGround(campV, fg);
+    const campV = CV.in ? [] : campsIn(cam.x - 560, cam.y - 560, cam.x + W / ZOOM + 560, cam.y + H / ZOOM + 560); drawCampGround(campV, fg);
     const sfg = light ? '105,105,105' : '150,150,150';
     const sObjs = cvz(statuesIn)(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, ev]) => ({ y, f: ev ? () => drawEvil(x, y, id, light) : () => drawStatue(x, y, SS, sfg, light) }));
     const cObjs = chestsIn(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, lk]) => ({ y, f: () => drawChest(x, y, id, lk, light) })).concat(LOOT.filter(l => !!l.cv === CV.in).map(l => ({ y: l.y, f: () => drawLoot(l) })));
