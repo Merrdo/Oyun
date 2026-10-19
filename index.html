@@ -3584,7 +3584,7 @@
   function drawCampShield(L) {   // mavi büyü kubbesi: taşa/kampa vurulduğu an belirir; her vuruşta (pw) daha yoğun, daha parlak ve daha çok yazılı olur, sonra söner
     for (const c of L) {
       const sh = CAMP.shield.get(c.id); if (!sh) continue;
-      const f = sh.f, pw = sh.pw, t = CAMP.t, e = f * f * (3 - 2 * f), k = e * (0.5 + 0.5 * pw), V = campVerts(c), DH = 150 + 16 * pw, R = CAMP_R;
+      const f = sh.f, pw = sh.pw, t = CAMP.t, e = f * f * (3 - 2 * f), k = e * (0.5 + 0.5 * pw), V = campVerts(c), SC = CAMP_R / 230, DH = (150 + 16 * pw) * SC * 1.2, R = CAMP_R;   // SC: eski 230'luk kampa göre ölçek · kubbe hem genişledi hem ~%80 yükseldi (Dev Çınar ve çatılar içinde kalsın)
       ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       /* --- zemindeki büyü mührü: halkalar, altıgen yıldız ve dönen yazılar --- */
       ctx.save(); ctx.translate(c.x, c.y); ctx.scale(1, CAMP_KY);
@@ -3592,10 +3592,10 @@
       for (const [rr, w] of [[R * 0.84, 1.6], [R * 0.74, 1], [R * 0.42, 1.2]]) { ctx.strokeStyle = `rgba(${MC},${fa * 0.8})`; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(0, 0, rr, 0, TAU); ctx.stroke(); }
       ctx.save(); ctx.rotate(t * 0.12); ctx.strokeStyle = `rgba(${MB},${fa * 0.75})`; ctx.lineWidth = 1.1;
       for (const o of [0, PI / 6]) { ctx.beginPath(); for (let j = 0; j < 3; j++) { const a = o + j * TAU / 3 - PI / 2; j ? ctx.lineTo(Math.cos(a) * R * 0.74, Math.sin(a) * R * 0.74) : ctx.moveTo(Math.cos(a) * R * 0.74, Math.sin(a) * R * 0.74); } ctx.closePath(); ctx.stroke(); }
-      for (let j = 0; j < 14; j++) { const a = j * TAU / 14, th = hashN(j, 2, 90); drawRune(j * 3 + 1, Math.cos(a) * R * 0.79, Math.sin(a) * R * 0.79, 15, a + PI / 2, MC, clamp((0.25 + pw * 0.95 - th) * 3, 0, 1) * fa * (0.75 + 0.25 * Math.sin(t * 4 + j))); }
+      for (let j = 0; j < 20; j++) { const a = j * TAU / 20, th = hashN(j, 2, 90); drawRune(j * 3 + 1, Math.cos(a) * R * 0.79, Math.sin(a) * R * 0.79, 15 * SC, a + PI / 2, MC, clamp((0.25 + pw * 0.95 - th) * 3, 0, 1) * fa * (0.75 + 0.25 * Math.sin(t * 4 + j))); }
       ctx.restore();
       ctx.save(); ctx.rotate(-t * 0.2);
-      for (let j = 0; j < 7; j++) { const a = j * TAU / 7; drawRune(j * 5 + 2, Math.cos(a) * R * 0.58, Math.sin(a) * R * 0.58, 13, a + PI / 2, MV, clamp((pw * 1.2 - hashN(j, 4, 91) * 0.7) * 3, 0, 1) * fa); }
+      for (let j = 0; j < 10; j++) { const a = j * TAU / 10; drawRune(j * 5 + 2, Math.cos(a) * R * 0.58, Math.sin(a) * R * 0.58, 13 * SC, a + PI / 2, MV, clamp((pw * 1.2 - hashN(j, 4, 91) * 0.7) * 3, 0, 1) * fa); }
       ctx.restore();
       ctx.restore();
       /* --- kubbe: gövde + renk geçişleri --- */
@@ -3607,28 +3607,28 @@
       const vg = ctx.createLinearGradient(0, c.y - DH, 0, c.y + R * CAMP_KY * 0.9); vg.addColorStop(0, `rgba(${MV},${0.24 * k})`); vg.addColorStop(0.55, `rgba(${MB},${0.08 * k})`); vg.addColorStop(1, `rgba(${MC},${0.2 * k})`);
       ctx.fillStyle = vg; ctx.fill();
       ctx.save(); ctx.clip();   // kubbenin içine kırpılanlar: parıltı süpürmesi, enlem halkaları, yazılar, vuruş ışığı
-      const sx = c.x - R + ((t * 0.45) % 1.5) * R * 1.6 - R * 0.3, sg = ctx.createLinearGradient(sx - 70, 0, sx + 70, 0);
-      sg.addColorStop(0, `rgba(${MC},0)`); sg.addColorStop(0.5, `rgba(${MC},${0.2 * k})`); sg.addColorStop(1, `rgba(${MC},0)`); ctx.fillStyle = sg; ctx.fillRect(sx - 70, c.y - DH - 4, 140, DH + R * CAMP_KY);
+      const sx = c.x - R + ((t * 0.45) % 1.5) * R * 1.6 - R * 0.3, sg = ctx.createLinearGradient(sx - 70 * SC, 0, sx + 70 * SC, 0);
+      sg.addColorStop(0, `rgba(${MC},0)`); sg.addColorStop(0.5, `rgba(${MC},${0.2 * k})`); sg.addColorStop(1, `rgba(${MC},0)`); ctx.fillStyle = sg; ctx.fillRect(sx - 70 * SC, c.y - DH - 4, 140 * SC, DH + R * CAMP_KY);
       ctx.strokeStyle = `rgba(${MB},${0.22 * k})`; ctx.lineWidth = 1; for (const q of [0.34, 0.68]) { ctx.beginPath(); ctx.ellipse(c.x, c.y, R * q, DH, 0, PI, TAU); ctx.stroke(); }
       for (let j = 1; j < 5; j++) { const hy = c.y - DH * (j / 5) * 0.96; ctx.beginPath(); ctx.moveTo(c.x - R * Math.sqrt(1 - (j / 5) ** 2), hy); ctx.lineTo(c.x + R * Math.sqrt(1 - (j / 5) ** 2), hy); ctx.stroke(); }
       let ix = 0;   // kubbenin yüzeyindeki yazı satırları (kubbe güçlendikçe daha çoğu belirir)
-      for (const [vv, n] of [[0.22, 9], [0.46, 7], [0.68, 5], [0.86, 3]]) for (let j = 0; j < n; j++, ix++) {
+      for (const [vv, n] of [[0.22, 13], [0.46, 10], [0.68, 7], [0.86, 4]]) for (let j = 0; j < n; j++, ix++) {
         const u = n === 1 ? 0 : (j / (n - 1)) * 2 - 1, wd = Math.sqrt(Math.max(0, 1 - vv * vv)), gx = c.x + u * R * wd * 0.86, gy = c.y - vv * DH * 0.92 + 6;
-        const th = hashN(ix, 1, 92), ga = clamp((0.2 + pw * 1.0 - th) * 3.2, 0, 1) * (0.7 + 0.3 * Math.sin(t * 3.3 + ix * 1.7)), near = clamp(1 - Math.hypot(gx - sh.hx, gy - sh.hy) / 190, 0, 1);
-        drawRune(ix * 2 + 7, gx, gy, 19 - vv * 5, u * 0.18, near > 0.4 ? MC : (ix % 3 ? MB : MV), Math.min(1, (ga * 0.75 + near * 0.55) * e * (0.6 + 0.4 * pw)));
+        const th = hashN(ix, 1, 92), ga = clamp((0.2 + pw * 1.0 - th) * 3.2, 0, 1) * (0.7 + 0.3 * Math.sin(t * 3.3 + ix * 1.7)), near = clamp(1 - Math.hypot(gx - sh.hx, gy - sh.hy) / (190 * SC), 0, 1);
+        drawRune(ix * 2 + 7, gx, gy, (19 - vv * 5) * SC, u * 0.18, near > 0.4 ? MC : (ix % 3 ? MB : MV), Math.min(1, (ga * 0.75 + near * 0.55) * e * (0.6 + 0.4 * pw)));
       }
-      for (let j = 0; j < 22; j++) { const a = PI + (j + 0.5) * PI / 22, th = hashN(j, 3, 93); drawRune(j * 7 + 3, c.x + Math.cos(a) * R * 0.93, c.y + Math.sin(a) * DH * 0.93, 13, a + PI / 2, MC, clamp((0.3 + pw - th) * 3, 0, 1) * 0.8 * e); }   // kubbenin kenarında dönen yazı kuşağı
+      for (let j = 0; j < 32; j++) { const a = PI + (j + 0.5) * PI / 32, th = hashN(j, 3, 93); drawRune(j * 7 + 3, c.x + Math.cos(a) * R * 0.93, c.y + Math.sin(a) * DH * 0.93, 13 * SC, a + PI / 2, MC, clamp((0.3 + pw - th) * 3, 0, 1) * 0.8 * e); }   // kubbenin kenarında dönen yazı kuşağı
       for (const r of sh.rip) {   // her vuruş noktasından yayılan halkalar
-        const u = clamp(r.t / 1.1, 0, 1); if (u >= 1) continue; const rg = 12 + 120 * u, al = (1 - u) * e * 0.9;
-        const ig = ctx.createRadialGradient(r.x, r.y, 1, r.x, r.y, 54); ig.addColorStop(0, `rgba(255,255,255,${0.55 * al * (1 - u)})`); ig.addColorStop(0.35, `rgba(${MC},${0.5 * al * (1 - u)})`); ig.addColorStop(1, `rgba(${MB},0)`);
-        ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(r.x, r.y, 54, 0, TAU); ctx.fill();
+        const u = clamp(r.t / 1.1, 0, 1); if (u >= 1) continue; const rg = (12 + 120 * u) * SC, al = (1 - u) * e * 0.9;
+        const ig = ctx.createRadialGradient(r.x, r.y, 1, r.x, r.y, 54 * SC); ig.addColorStop(0, `rgba(255,255,255,${0.55 * al * (1 - u)})`); ig.addColorStop(0.35, `rgba(${MC},${0.5 * al * (1 - u)})`); ig.addColorStop(1, `rgba(${MB},0)`);
+        ctx.fillStyle = ig; ctx.beginPath(); ctx.arc(r.x, r.y, 54 * SC, 0, TAU); ctx.fill();
         ctx.strokeStyle = `rgba(${MC},${al})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(r.x, r.y, rg, rg * 0.7, 0, 0, TAU); ctx.stroke();
         ctx.strokeStyle = `rgba(${MV},${al * 0.7})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(r.x, r.y, rg * 0.62, rg * 0.43, 0, 0, TAU); ctx.stroke();
       }
       ctx.restore();
       /* --- kubbe kenarı: renk geçişli çizgi + parıltı --- */
       path(); const eg = ctx.createLinearGradient(c.x - R, 0, c.x + R, 0); eg.addColorStop(0, `rgba(${MC},${0.95 * e})`); eg.addColorStop(0.5, `rgba(${MB},${0.95 * e})`); eg.addColorStop(1, `rgba(${MV},${0.95 * e})`);
-      ctx.shadowColor = `rgba(${MB},${0.9 * e})`; ctx.shadowBlur = 6 + 14 * pw; ctx.strokeStyle = eg; ctx.lineWidth = 1.6 + 1.2 * pw; ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.shadowColor = `rgba(${MB},${0.9 * e})`; ctx.shadowBlur = 6 + 14 * pw; ctx.strokeStyle = eg; ctx.lineWidth = (1.6 + 1.2 * pw) * 1.25; ctx.stroke(); ctx.shadowBlur = 0;
       pth(V); const hg = ctx.createLinearGradient(c.x - R, 0, c.x + R, 0); hg.addColorStop(0, `rgba(${MV},${0.9 * e})`); hg.addColorStop(0.5, `rgba(${MC},${0.9 * e})`); hg.addColorStop(1, `rgba(${MV},${0.9 * e})`);
       ctx.strokeStyle = hg; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
@@ -8564,6 +8564,24 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       y += 18; { const gw = (cw - 8) / 2;
         ob(x0, y, gw, 44, 'hepsini doldur', () => { for (const k of ['band', 'medk', 'elix', 'herb', 'resin']) INV[k] = HEAL_CAP[k]; INV.ever = true; for (const k in HEAL.pop) HEAL.pop[k] = 1; try { AU.sfx('pickup'); } catch (_) {} devToast('Şifa eşyaları dolduruldu'); }, { solid: true, size: 14 });
         ob(x0 + gw + 8, y, gw, 44, 'boşalt', () => { for (const k of ['band', 'medk', 'elix', 'herb', 'resin']) INV[k] = 0; devToast('Şifa eşyaları boşaltıldı'); }, { size: 14 }); y += 44; }
+      const resRow = (k, nm, cap) => {   // geliştirici: çantaya doğrudan ekle / çıkar · cap yoksa üst sınır 999
+        const h = 66, n = INV[k], lim = cap || 999;
+        invIcon(k, x0 + 26, y + h / 2 + 1, fg, BG);
+        dvText(nm, x0 + 58, y + 27, 15, 600, fg, 0.97, 0, 'left'); dvText('çantada  ' + n + (cap ? ' / ' + cap : ''), x0 + 58, y + 47, 11.5, 400, fg, 0.45, 0, 'left');
+        const by = y + (h - 36) / 2;
+        ob(x0 + cw - 132, by, 38, 36, '−', () => { INV[k] = Math.max(0, INV[k] - 1); }, { dim: n <= 0, size: 17 });
+        dvText(String(n), x0 + cw - 66, by + 19, 16, 600, fg, 1, 0, 'center');
+        ob(x0 + cw - 38, by, 38, 36, '+', () => { if (INV[k] < lim) { INV[k]++; INV.ever = true; try { AU.sfx('pickup'); } catch (_) {} } }, { dim: n >= lim, size: 17 });
+        hair(y + h, 0.08); y += h;
+      };
+      y += 30; y = sec('işaretleme', y);   // bayrak (en çok FLAG_CAP) · pusula (tek)
+      resRow('flag', 'Bayrak', FLAG_CAP); resRow('compass', 'Pusula', 1);
+      y += 30; y = sec('malzemeler', y);   // craft ve doğa malzemeleri
+      const MATS = [['wood', 'Odun', WOOD_CAP], ['bone', 'Kemik', 0], ['coal', 'Kömür', ORE_CAP], ['stone', 'Taş', ORE_CAP], ['moss', 'Yosun', MOSS_CAP], ['prism', 'Mor Prizma', 0], ['ingot', 'Altın Külçesi', 0]];
+      for (const [k, nm, cap] of MATS) resRow(k, nm, cap);
+      y += 18; { const gw = (cw - 8) / 2;
+        ob(x0, y, gw, 44, 'malzemeleri doldur', () => { for (const [k, , cap] of MATS) INV[k] = cap || 20; INV.flag = FLAG_CAP; INV.compass = 1; INV.ever = true; try { AU.sfx('pickup'); } catch (_) {} devToast('Malzemeler, bayraklar ve pusula eklendi'); }, { solid: true, size: 13 });
+        ob(x0 + gw + 8, y, gw, 44, 'boşalt', () => { for (const [k] of MATS) INV[k] = 0; INV.flag = 0; INV.compass = 0; devToast('Malzemeler, bayraklar ve pusula boşaltıldı'); }, { size: 14 }); y += 44; }
     }
     ctx.restore();
     DEVP.max = Math.max(0, y + 24 - cbot);
