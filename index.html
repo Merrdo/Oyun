@@ -367,7 +367,6 @@
         [[880, 0.45, 0.5], [1320, 0.3, 0.45], [1980, 0.22, 0.4], [2960, 0.12, 0.3]].forEach(([f, v, dd], i) => tone(d, 'sine', f * k, f * k * 0.995, t + 0.015 + i * 0.025, dd + p * 0.5, v * (0.5 + 0.2 * p)));
       },
       dust(d, t, a) { [2400, 3100, 4000].forEach((f, i) => tone(d, 'sine', f * (1 + (a || 0) * 0.12), f, t + i * 0.025, 0.13, 0.06)); nz(d, t, 0.03, 0.12, 'highpass', 5200, 5200, 0.7); },   // altın tozu: ince parıltı
-      rockDrag(d, t) { nz(d, t, 0.95, 0.55, 'lowpass', 260, 120, 0.9, 0.06); nz(d, t + 0.05, 0.8, 0.28, 'bandpass', 520, 190, 1.6); tone(d, 'sine', 62, 34, t, 0.5, 0.8); tone(d, 'triangle', 90, 45, t + 0.18, 0.4, 0.34); tone(d, 'sine', 48, 30, t + 0.62, 0.35, 0.5); },   // MERDİVEN DALAVERECİSİ: ağır kaya sürtünmesi + alçak gümleme
       smeltStart(d, t) { nz(d, t, 0.8, 0.5, 'bandpass', 500, 1900, 1.0); tone(d, 'sawtooth', 90, 150, t, 0.7, 0.14, { lp: 500 }); [1500, 2300].forEach((f, i) => tone(d, 'sine', f, f, t + 0.1 + i * 0.07, 0.4, 0.07)); },
       ingot(d, t) { [880, 1320, 1760, 2640].forEach((f, i) => tone(d, 'sine', f, f * 0.998, t + i * 0.03, 0.9, 0.17)); nz(d, t, 0.05, 0.4, 'highpass', 3000, 3000, 0.7); tone(d, 'sine', 200, 90, t, 0.2, 0.5); },
       guardBreak(d, t) {
@@ -1507,7 +1506,7 @@
     }
   }
   const anyCraft = () => DEV.anycraft || !!SK.own.iscilik;   // 'İşçilik' perki (ya da geliştirici testi): duraklatma menüsünden her yerde üretim
-  const DEV = { on: false, tspd: 1, anycraft: false, hpbtn: true, campArrow: false, campArrow2: false, peace: false, gold: false, keys: false, arrows: false, tears: false, god: false, freeze: false, spawn: {}, mimic: 12, luck: 0, pick: false, dal: false };
+  const DEV = { on: false, tspd: 1, anycraft: false, hpbtn: true, campArrow: false, campArrow2: false, peace: false, gold: false, keys: false, arrows: false, tears: false, god: false, freeze: false, spawn: {}, mimic: 12, luck: 0, pick: false };
   const luckP = p => DEV.on && DEV.luck > 0 ? Math.min(1, p) + (1 - Math.min(1, p)) * DEV.luck / 100 : p;   // geliştirici şansı (0–100): her olasılığı p → p + (1−p)·şans yapar; %100'de şansa bağlı her şey kesin gerçekleşir   // spawn: türe göre doğal doğuş kapatma (false = doğmaz) · geliştirici modu: ana ekranın sağ üstünden girilir · hepsi açık başlar · düğmeleri duraklatma menüsünde
   const E = []; E.spawnT = 1.5;
   const F = { kd: -1, stag: 0, sgx: 0, sgy: 0, kp: 0, lx: 0, ly: 0, slow: 0, bstun: false, gt: 0, pt: -1, dir: 1, aim: 0, buf: false, down: false, hold: 0, guarding: false, gw: 0, dur: 100, broken: 0, bw: 0, regenT: 0, sw: 0, off: 0,
@@ -3035,7 +3034,7 @@
   /* ---------- MAĞARA SİSTEMİ: haritada tohuma bağlı rastgele mağara girişleri · girişten geçince merdivenle aşağı inilir, mağara atmosferine kesintisiz geçilir (yükleme yok) · merdivenden çıkılarak geri dönülür ----------
      Mağara ayrı bir "katman": oyuncu CVO noktasındaki yerel uzaya taşınır, dünya çizimi / güncellemesi o sürece durur (canavarlar girişte bekler). Geçiş = yürüyüş + iris kararması, bekleme yok. */
   const CVC = 2100, CVW = 26, CVO = { x: 30000, y: 30000 }, CV_RX = 235, CV_RY = 205, CV_CY = -320, CV_BR = [];   // CVC: giriş ızgara hücresi · CVW: kapı yarı genişliği · CV_BR: (eski ateş çanakları kaldırıldı; ışık kaynakları artık duvar meşaleleri)
-  const CV = { in: false, st: 'idle', t: 0, c: null, sw: false, dk: 0, fa: 0, lane: null, wx: NaN, wy: NaN, dp: 0, si: 0, bob: 0, by: 0, col: '16,9,4', cd: 0, px: 0, py: 0, drip: [], lt: false, mv: null, lad: null };   // st: idle | down | up
+  const CV = { in: false, st: 'idle', t: 0, c: null, sw: false, dk: 0, fa: 0, lane: null, wx: NaN, wy: NaN, dp: 0, si: 0, bob: 0, by: 0, col: '16,9,4', cd: 0, px: 0, py: 0, drip: [] };   // st: idle | down | up
   function cvCand(ci, cj) {
     const m = cvCand.m || (cvCand.m = new Map()), key = SEED + ':' + ci + ',' + cj; if (m.has(key)) return m.get(key);
     let r = null;
@@ -3052,7 +3051,6 @@
   }
   const cvR = c => { const a = c.sd * 40; return th => 1 + 0.09 * Math.sin(3 * th + a) + 0.05 * Math.sin(7 * th + a * 1.7); };   // salonun düzensiz kenarı
   function cvWalk(c, lx, ly) {   // yürünebilir mi: merdiven koridoru serbest · mağara ızgarasında zemin hücresi + duvar hücrelerine CV_R boşluk (yuvarlak köşeli çarpışma)
-    if (CV.lad && CV.c === c && Math.abs(lx) < 44 && ly > DAL.plugTop + CV_R) return false;   // dalavereci: eski merdiven ağzı kayayla kapalı
     if (Math.abs(lx) < 30 && ly <= 22 && ly >= -150) return true;
     const g = cvGeo(c), N = CVN, S = CVS, px = lx - CVGX, py = ly - CVGY, gx = Math.floor(px / S), gy = Math.floor(py / S);
     if (gx < 0 || gy < 0 || gx >= N || gy >= N || !g.G[gy * N + gx]) return false;
@@ -3062,57 +3060,7 @@
     }
     return true;
   }
-  function cvReset() { CV.lt = false; CV.mv = null; CV.lad = null; CV.lane = null; CV.in = false; CV.st = 'idle'; CV.dk = 0; CV.fa = 0; CV.dp = 0; CV.by = 0; CV.c = null; CV.cd = 0; }
-  /* ---------- MERDİVEN DALAVERECİSİ · güncelleme 1: yer değiştiren merdiven ----------
-     Dalaverecili mağarada (tohumlu şans) giriş merdiveni oyuncunun görüşünden çıktığı ilk karede taşınır: kaya sürüklenme sesi + hafif sallantı, eski çıkış kayayla kapanır,
-     merdiven mağaranın uzak bir duvar yüzüne (kuzey / güney / doğu / batı) geçer. Mağara başına bir kez; mağaradan çıkınca / yeniden girince sıfırlanır. */
-  const DAL = { chance: 0.35, viewPad: 60, minMove: 700, rumble: 0.9, plugTop: -170 };
-  const cvDal = c => DEV.dal || hashN(c.sd * 100, 7, 91) < DAL.chance;
-  const cvStairSeen = pad => { const vx0 = cam.x - pad, vy0 = cam.y - pad, vx1 = cam.x + W / ZOOM + pad, vy1 = cam.y + H / ZOOM + pad; return CVO.x + 44 > vx0 && CVO.x - 44 < vx1 && CVO.y + 80 > vy0 && CVO.y - 170 < vy1; };   // eski merdiven bölgesi (koridor + pay) ekranda mı
-  function cvLadPick(c) {   // duvara bitişik, önü açık zemin hücrelerinden uzak bir merdiven yeri seç (aynı mağara + aynı oyun = aynı yer)
-    const g = cvGeo(c), N = CVN, S = CVS, G = g.G, at = (x, y) => x >= 0 && y >= 0 && x < N && y < N ? G[y * N + x] : 0; let chs = []; try { chs = cvChests(c); } catch (_) {}
-    const out = [], D = [[0, -1, 'N'], [1, 0, 'E'], [0, 1, 'S'], [-1, 0, 'W']];
-    for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) {
-      if (!at(x, y)) continue;
-      for (const [dx, dy, f] of D) {
-        if (at(x + dx, y + dy) || !at(x - dx, y - dy) || !at(x - 2 * dx, y - 2 * dy) || !at(x + dy, y + dx) || !at(x - dy, y - dx)) continue;   // önü ve yanları açık olmalı
-        const cx = CVGX + (x + 0.5) * S, cy = CVGY + (y + 0.5) * S, lx = cx + dx * S / 2, ly = cy + dy * S / 2, d = Math.hypot(lx, ly + 150);
-        if (d < DAL.minMove || chs.some(h => Math.hypot(h.lx - lx, h.ly - ly) < 80) || g.tor.some(T => Math.hypot(T.x - lx, T.ly - ly) < 60)) continue;
-        out.push({ x: lx, y: ly, f, cx, cy, d });
-      }
-    }
-    if (!out.length) return null; out.sort((a, b) => b.d - a.d);
-    return out[Math.floor(hashN(c.sd * 100, 11, 92) * Math.ceil(out.length * 0.5)) % out.length];   // uzak yarıdan biri: bulması zor
-  }
-  function cvRelocate() {
-    const m = CV.mv; m.done = true; const L = cvLadPick(CV.c); if (!L) return;
-    CV.lad = L; m.rum = DAL.rumble; try { AU.sfx('rockDrag', CVO.x, CVO.y - 100); } catch (_) {}
-  }
-  function cvDalTick(dt) {   // her karede (mağarada): görüş testi + sallantı
-    const m = CV.mv; if (!m || !CV.in) return; m.age += dt;
-    if (!m.done && m.age > 0.8 && CV.st === 'idle' && !cvStairSeen(DAL.viewPad)) cvRelocate();
-    if (m.rum > 0) { m.rum -= dt; hitFx(0, 2.6 * Math.min(1, m.rum / DAL.rumble * 1.6)); if (Math.random() < dt * 9) { try { cdust(player.x + rnd(-150, 150), player.y + rnd(-60, 50), 1, 0.8); } catch (_) {} } }
-  }
-  function cvDrawPlug(c) {   // eski merdiven ağzı: koyu kaya yığını (cvWalk aynı dikdörtgeni kapatır)
-    const x0 = -44, x1 = 44, y0 = DAL.plugTop, R = (i, k) => hashN(c.sd * 100, i, 93 + k);
-    ctx.fillStyle = '#0b0603'; ctx.fillRect(x0, y0, x1 - x0, 252); ctx.lineJoin = ctx.lineCap = 'round';
-    for (let row = 0; row < 3; row++) for (let i = 0; i < 6; i++) {
-      const bx = x0 + 2 + i * 15.5 + (row % 2) * 7, by = y0 + 8 + row * 17, rx = 9 + R(i + row * 7, 0) * 6, ry = 8 + R(i + row * 7, 1) * 5; ctx.fillStyle = (i + row) % 2 ? '#4d3724' : '#3c2b1b'; ctx.strokeStyle = '#160d06'; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.ellipse(bx, by, rx, ry, R(i + row * 7, 2) * 3, 0, TAU); ctx.fill(); ctx.stroke(); ctx.strokeStyle = 'rgba(212,172,126,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx, by, rx * 0.65, PI * 1.1, PI * 1.7); ctx.stroke();
-    }
-    const gr = ctx.createLinearGradient(0, y0 + 40, 0, y0 + 120); gr.addColorStop(0, 'rgba(11,6,3,0)'); gr.addColorStop(1, 'rgba(11,6,3,1)'); ctx.fillStyle = gr; ctx.fillRect(x0, y0 + 40, x1 - x0, 80);
-  }
-  function cvDrawLad(t) {   // yeni merdiven: duvara dayalı, üstten gün ışığı sızan kemerli ağız
-    const L = CV.lad, f = L.f, k = 0.85 + 0.15 * Math.sin(t * 2.3), ux = f === 'E' ? -1 : f === 'W' ? 1 : 0, uy = f === 'S' ? -1 : f === 'N' ? 1 : 0;
-    ctx.save(); ctx.translate(L.x, L.y);
-    const gx = ux * 22, gy = uy * 22 - 18, gl = ctx.createRadialGradient(gx, gy, 4, gx, gy, 125); gl.addColorStop(0, `rgba(255,236,200,${0.3 * k})`); gl.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(gx, gy, 125, 0, TAU); ctx.fill();   // gün ışığı yeri aydınlatır
-    const cxr = f === 'E' ? 9 : f === 'W' ? -9 : 0, top = f === 'S' ? 0 : -60, h = f === 'S' ? 46 : 62, up = f !== 'S';
-    ctx.fillStyle = '#050302'; ctx.strokeStyle = 'rgba(212,172,126,0.75)'; ctx.lineWidth = 2; cvRRp(ctx, cxr - 16, top, 32, h, up ? [13, 13, 2, 2] : [2, 2, 13, 13]); ctx.fill(); ctx.stroke();
-    const lg = ctx.createLinearGradient(0, up ? top : top + h, 0, up ? top + h * 0.7 : top + h * 0.3); lg.addColorStop(0, `rgba(255,236,200,${0.62 * k})`); lg.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = lg; cvRRp(ctx, cxr - 14, top + 2, 28, h - 4, up ? [11, 11, 1, 1] : [1, 1, 11, 11]); ctx.fill();
-    ctx.strokeStyle = '#8a6a47'; ctx.lineWidth = 3.2; ctx.beginPath(); ctx.moveTo(cxr - 8, top + 8); ctx.lineTo(cxr - 8, top + h); ctx.moveTo(cxr + 8, top + 8); ctx.lineTo(cxr + 8, top + h); ctx.stroke();
-    ctx.strokeStyle = '#b48a55'; ctx.lineWidth = 2.2; for (let y = top + 14; y < top + h - 2; y += 9) { ctx.beginPath(); ctx.moveTo(cxr - 8, y); ctx.lineTo(cxr + 8, y); ctx.stroke(); }
-    ctx.restore();
-  }
+  function cvReset() { CV.lane = null; CV.in = false; CV.st = 'idle'; CV.dk = 0; CV.fa = 0; CV.dp = 0; CV.by = 0; CV.c = null; CV.cd = 0; }
   const cvz = f => CV.in ? () => [] : f;   // mağaradayken dünya nesneleri üretilmez / çizilmez
   function cvSnapCam() { cam.x = player.x - W / ZOOM / 2; cam.y = player.y - H / ZOOM / 2; }
   const cvRock = c => c.rp || (c.rp = (j => [[-84, 2], [-88, -22], [-72, -52], [-48, -78 + j(1) * 8], [-20, -92], [22, -94 + j(2) * 6], [52, -80], [74, -56], [88, -24], [84, 2]])(i => hashN(c.sd * 100, i, 5)));   // giriş kayasının dış hattı: hem çizim hem çarpışma bunu kullanır
@@ -3172,15 +3120,13 @@
         if (dy > 0) continue;
         CV.c = k; pd = clamp(-dy / 9, 0, 1); try { cvGeo(k); } catch (_) {}
         if (dy <= -9 && CV.cd <= 0 && F.death < 0) {   // eşik: içeri (kapı ağzından girer girmez)
-          CV.wx = NaN; CV.in = true; player.x = CVO.x + clamp(dx, -CVW, CVW); player.y = CVO.y - 24; CV.px = player.x; CV.py = player.y; CV.lad = null; CV.lt = cvDal(k); CV.mv = CV.lt ? { done: false, age: 0, rum: 0 } : null; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
+          CV.wx = NaN; CV.in = true; player.x = CVO.x + clamp(dx, -CVW, CVW); player.y = CVO.y - 24; CV.px = player.x; CV.py = player.y; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
         } break;
       }
     } else if (CV.c) {
-      cvDalTick(dt);
-      const ly = player.y - CVO.y, L = CV.lad, ld = L ? Math.hypot(player.x - CVO.x - L.x, player.y - CVO.y - L.y) : 1e9;
-      if (L) pd = clamp((46 - ld) / 30, 0, 1); else if (ly > -14) pd = clamp((ly + 14) / 14, 0, 1);   // dalavereci: yeni merdivene yaklaştıkça iris kapanır
-      if ((L ? ld < 17 : ly >= 0) && CV.cd <= 0 && F.death < 0) {   // eşik: dışarı
-        CV.lt = false; CV.mv = null; CV.lad = null; CV.wx = NaN; CV.dp = 0; CV.in = false; player.x = CV.c.x + clamp(player.x - CVO.x, -18, 18); player.y = CV.c.y + 6; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
+      const ly = player.y - CVO.y; if (ly > -14) pd = clamp((ly + 14) / 14, 0, 1);
+      if (ly >= 0 && CV.cd <= 0 && F.death < 0) {   // eşik: dışarı
+        CV.wx = NaN; CV.dp = 0; CV.in = false; player.x = CV.c.x + clamp(player.x - CVO.x, -18, 18); player.y = CV.c.y + 6; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
       }
     }
     { const ly = player.y - CVO.y, dpT = CV.in ? clamp(-ly / 125, 0, 1) : 0; CV.dp += (dpT - CV.dp) * Math.min(1, dt * 6);   // derinlik: merdivenin üstü 0 · altı 1
@@ -3409,8 +3355,7 @@
     ctx.save(); ctx.translate(CVO.x, CVO.y); ctx.lineJoin = ctx.lineCap = 'round'; ctx.imageSmoothingEnabled = true;
     { const vx0 = Math.max(CVGX, cam.x - CVO.x - 6), vy0 = Math.max(CVGY, cam.y - CVO.y - 6), vx1 = Math.min(CVGX + g.w, cam.x - CVO.x + W / ZOOM + 6), vy1 = Math.min(CVGY + g.h, cam.y - CVO.y + H / ZOOM + 6);
       if (vx1 > vx0 && vy1 > vy0) ctx.drawImage(g.img, vx0 - CVGX, vy0 - CVGY, vx1 - vx0, vy1 - vy0, vx0, vy0, vx1 - vx0, vy1 - vy0); }
-    if (CV.lad) { cvDrawPlug(c); cvDrawLad(t); }
-    else { const gl = ctx.createLinearGradient(0, 72, 0, -60); gl.addColorStop(0, 'rgba(255,236,200,0.26)'); gl.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = gl; ctx.fillRect(-32, -60, 64, 132); }   // merdivenden sızan gün ışığı
+    { const gl = ctx.createLinearGradient(0, 72, 0, -60); gl.addColorStop(0, 'rgba(255,236,200,0.26)'); gl.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = gl; ctx.fillRect(-32, -60, 64, 132); }   // merdivenden sızan gün ışığı
     ctx.globalCompositeOperation = 'lighter';
     for (const T of g.tor) { if (Math.abs(T.x - px) > 700 || Math.abs(T.ly - py) > 600) continue; const fk = 0.9 + 0.1 * Math.sin(t * 9 + T.ph * 3), gr = ctx.createRadialGradient(T.x, T.ly, 3, T.x, T.ly, 165); gr.addColorStop(0, `rgba(255,150,60,${0.2 * fk})`); gr.addColorStop(1, 'rgba(255,150,60,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(T.x, T.ly, 165, 0, TAU); ctx.fill(); }   // meşalelerin sıcak ışığı
     ctx.globalCompositeOperation = 'source-over';
@@ -3431,7 +3376,7 @@
     if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R * TORCH.fk, a: TORCH.lit, k: TORCH.lit * TORCH.str });
     { const cg = CV.c ? cvGeo(CV.c) : null; if (cg) for (const T of cg.tor) { if (Math.abs(T.x - (player.x - CVO.x)) > 900 || Math.abs(T.ly - (player.y - CVO.y)) > 700) continue; const fk = 0.95 + 0.05 * Math.sin(t * 9 + T.ph * 3) * Math.sin(t * 5.3 + T.ph) - 0.07 * WIND.s * (0.5 + 0.5 * Math.sin(t * 14 + T.ph * 5)); LT.push({ x: CVO.x + T.x, y: CVO.y + T.ly, R: CAMP_LR * 0.8 * fk, a: 1, k: 1 }); } }
     if (CV.c) for (const ch of cvChests(CV.c)) { const cs = chState(ch.id, false), k = cs.curse && cs.cop >= 0.8 ? 0.15 + 0.85 * (1 - sstep(4, 10, cs.cop - 0.8)) : cs.dead ? Math.max(0, 1 - cs.dd / 3) : cs.dying >= 0 ? 1 : 0.35 + 0.12 * cs.hits; if (cs.gone) continue; LT.push({ x: CVO.x + ch.lx, y: CVO.y + ch.ly - 24, R: 120 + 90 * k + 10 * Math.sin(t * 2.2 + cs.t), a: 1, k: 0.45 + 0.5 * k }); }   // ödül sandığı kendi altın ışığını yayar: vurdukça, kırılırken parlar
-    if (CV.lad) { const L = CV.lad; LT.push({ x: CVO.x + L.x + (L.f === 'E' ? -26 : L.f === 'W' ? 26 : 0), y: CVO.y + L.y + (L.f === 'S' ? -26 : L.f === 'N' ? 26 : 0) - 18, R: 190, a: 0.9, k: 0.85 }); } else LT.push({ x: CVO.x, y: CVO.y + 10, R: 220, a: 0.9, k: 0.9 });
+    LT.push({ x: CVO.x, y: CVO.y + 10, R: 220, a: 0.9, k: 0.9 });
     ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     const sw = Math.ceil(W / 4), sh = Math.ceil(H / 4); if (!ATM.dk) { ATM.dk = document.createElement('canvas'); ATM.dkx = ATM.dk.getContext('2d'); } if (ATM.dk.width !== sw || ATM.dk.height !== sh) { ATM.dk.width = sw; ATM.dk.height = sh; }
     const d = ATM.dkx; d.globalCompositeOperation = 'source-over'; d.clearRect(0, 0, sw, sh); d.fillStyle = `rgba(20,11,5,${0.52 + 0.4 * CV.dp})`; d.fillRect(0, 0, sw, sh); d.globalCompositeOperation = 'destination-out';
@@ -8515,7 +8460,6 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         hair(y + h + 8, 0.08); y += h + 8; }
       y += 22; y = sec('maden', y); y = swRow('pick', 'Kazma (test)', 'Vuruşlar kaya madenlerini kazar', y);
       { const h = 100; ob(x0, y + 8, cw, 42, 'en yakın madene git', devGoMine, { solid: true, size: 14 }); ob(x0, y + 58, cw, 42, 'en yakın mağaraya git', devGoCave, { solid: true, size: 14 }); hair(y + h + 8, 0.08); y += h + 8; }
-      y = swRow('dal', 'Merdiven dalaverecisi (test)', 'Girdiğin her mağarada dalavereci olur', y);
       y += 22; y = sec('kamp', y); y = swRow('anycraft', 'Her yerde üret', 'Duraklatma menüsünde CRAFT düğmesi çıkar', y); y = swRow('campArrow', 'Kamp oku · kademe 1 (test)', 'Gördüğün kamplara yön oku', y); y = swRow('campArrow2', 'Kamp oku · kademe 2 (test)', 'Keşfedilmemiş yakın kamplara da yön oku', y);
       { const h = 132; dvText('Kamp sıklığı', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText('yeni bölgelere işler', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
         const cy = y + 44, n = 3, gp = 8, cwid = (cw - gp * (n - 1)) / n;
