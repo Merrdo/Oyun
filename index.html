@@ -367,6 +367,7 @@
         [[880, 0.45, 0.5], [1320, 0.3, 0.45], [1980, 0.22, 0.4], [2960, 0.12, 0.3]].forEach(([f, v, dd], i) => tone(d, 'sine', f * k, f * k * 0.995, t + 0.015 + i * 0.025, dd + p * 0.5, v * (0.5 + 0.2 * p)));
       },
       dust(d, t, a) { [2400, 3100, 4000].forEach((f, i) => tone(d, 'sine', f * (1 + (a || 0) * 0.12), f, t + i * 0.025, 0.13, 0.06)); nz(d, t, 0.03, 0.12, 'highpass', 5200, 5200, 0.7); },   // altın tozu: ince parıltı
+      rockDrag(d, t) { nz(d, t, 0.95, 0.55, 'lowpass', 260, 120, 0.9, 0.06); nz(d, t + 0.05, 0.8, 0.28, 'bandpass', 520, 190, 1.6); tone(d, 'sine', 62, 34, t, 0.5, 0.8); tone(d, 'triangle', 90, 45, t + 0.18, 0.4, 0.34); tone(d, 'sine', 48, 30, t + 0.62, 0.35, 0.5); },   // MERDİVEN DALAVERECİSİ: ağır kaya sürtünmesi + alçak gümleme
       smeltStart(d, t) { nz(d, t, 0.8, 0.5, 'bandpass', 500, 1900, 1.0); tone(d, 'sawtooth', 90, 150, t, 0.7, 0.14, { lp: 500 }); [1500, 2300].forEach((f, i) => tone(d, 'sine', f, f, t + 0.1 + i * 0.07, 0.4, 0.07)); },
       ingot(d, t) { [880, 1320, 1760, 2640].forEach((f, i) => tone(d, 'sine', f, f * 0.998, t + i * 0.03, 0.9, 0.17)); nz(d, t, 0.05, 0.4, 'highpass', 3000, 3000, 0.7); tone(d, 'sine', 200, 90, t, 0.2, 0.5); },
       guardBreak(d, t) {
@@ -382,13 +383,6 @@
       curseOn(d, t) { tone(d, 'sine', 95, 30, t, 1.2, 0.9); tone(d, 'triangle', 233, 220, t, 0.9, 0.16); tone(d, 'triangle', 247, 233, t + 0.02, 0.9, 0.16); nz(d, t, 0.9, 0.6, 'lowpass', 1800, 120, 0.9); },
       lidCreak(d, t) { tone(d, 'sawtooth', 130, 230, t, 0.38, 0.09, { lp: 900 }); tone(d, 'sawtooth', 240, 120, t + 0.32, 0.4, 0.07, { lp: 700 }); nz(d, t, 0.7, 0.1, 'bandpass', 700, 1400, 0.6); },
       curseEnd(d, t) { [392, 523, 659, 784].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.07, 0.8, 0.12)); nz(d, t, 0.5, 0.22, 'highpass', 3000, 6000, 0.7); },
-      trapRune(d, t) { tone(d, 'sine', 70, 28, t, 1.4, 0.9, { att: 0.02 }); tone(d, 'sawtooth', 110, 55, t, 1.1, 0.18, { lp: 500 }); [392, 415, 466].forEach((f, i) => tone(d, 'triangle', f, f * 0.97, t + i * 0.05, 1.0, 0.1, { lp: 1400 })); nz(d, t, 0.8, 0.35, 'lowpass', 1600, 120, 0.8); },
-      trapRumble(d, t) { nz(d, t, 1.8, 0.5, 'lowpass', 260, 70, 0.9, 0.25); tone(d, 'sine', 48, 34, t, 1.8, 0.7, { att: 0.2 }); for (let i = 0; i < 9; i++) nz(d, t + 0.1 + i * 0.17 + Math.random() * 0.08, 0.09, 0.25, 'bandpass', 300 + Math.random() * 900, 200, 2.2); },
-      stoneCrash(d, t) { tone(d, 'sine', 95, 28, t, 0.7, 1.0, { att: 0.004 }); nz(d, t, 0.6, 0.9, 'lowpass', 1800, 120, 0.8); for (let i = 0; i < 6; i++) nz(d, t + 0.02 + i * 0.05 + Math.random() * 0.04, 0.07, 0.4, 'bandpass', 400 + Math.random() * 1600, 300, 2.4); tone(d, 'triangle', 55, 30, t + 0.05, 0.5, 0.4, { lp: 300 }); },
-      stoneBreak(d, t) { tone(d, 'sine', 120, 45, t, 0.35, 0.7); nz(d, t, 0.4, 0.7, 'lowpass', 2400, 200, 0.9); for (let i = 0; i < 4; i++) nz(d, t + 0.03 + i * 0.06, 0.06, 0.35, 'bandpass', 600 + Math.random() * 1800, 350, 2.5); },
-      trapWin(d, t) { [329.6, 392, 493.9, 659.3].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.09, 1.2, 0.14, { att: 0.02 })); nz(d, t, 0.6, 0.2, 'highpass', 3000, 7000, 0.7); },
-      rewardDescend(d, t) { tone(d, 'sine', 220, 440, t, 3.2, 0.1, { att: 1.2 }); tone(d, 'triangle', 330, 660, t, 3.2, 0.05, { att: 1.4, lp: 2400 }); for (let i = 0; i < 14; i++) { const f = 1046.5 * Math.pow(1.122, (i * 3) % 9); tone(d, 'sine', f, f, t + 0.2 + i * 0.21, 0.9, 0.04 + 0.002 * i, { att: 0.03 }); } nz(d, t, 3, 0.05, 'highpass', 4000, 9000, 0.7, 1.5); },
-      rewardGet(d, t) { [523.3, 659.3, 784, 1046.5, 1318.5].forEach((f, i) => tone(d, 'sine', f, f, t + i * 0.06, 1.4, 0.13)); nz(d, t, 0.5, 0.25, 'highpass', 3000, 7000, 0.7); tone(d, 'sine', 110, 60, t, 0.4, 0.5); },
       axeRaise(d, t, w) { w = w || 0.27; nz(d, t, w + 0.05, 0.22, 'bandpass', 260, 800, 1.2, 0.12); tone(d, 'sine', 120, 210, t, w + 0.03, 0.1); nz(d, t + w, 0.14, 0.4, 'bandpass', 2600, 500, 1.1, 0.03); },
       axeYank(d, t) { tone(d, 'sawtooth', 210, 110, t, 0.2, 0.09, { lp: 700, vib: [30, 10] }); nz(d, t, 0.14, 0.4, 'bandpass', 900, 320, 1.6); tone(d, 'sine', 150, 80, t + 0.12, 0.08, 0.3); },
       axeSwish(d, t) { nz(d, t, 0.16, 0.35, 'bandpass', 1800, 700, 1.0, 0.02); tone(d, 'sine', 160, 90, t, 0.12, 0.25); },   // kaldırırken hışırtı, inerken keskin ıslık
@@ -546,7 +540,7 @@
       },
       eRage(d, t) { tone(d, 'sawtooth', 90, 40, t, 0.9, 0.55, { lp: 600, att: 0.05, vib: [16, 10] }); tone(d, 'sawtooth', 180, 70, t, 0.8, 0.25, { lp: 1200, vib: [12, 14] }); nz(d, t, 0.9, 0.4, 'bandpass', 500, 250, 1.5, 0.1); }
     };
-    const REV = { stoneCrash: 0.5, stoneBreak: 0.4, trapRumble: 0.5, trapRune: 0.5, rewardDescend: 0.6, rewardGet: 0.5, trapWin: 0.5, sunRise: 0.6, moonRise: 0.75, celestSet: 0.5, windTick: 0.1, dawnChime: 0.8, duskBell: 0.8, mumSlam: 0.3, mumFlame: 0.3, mumDie: 0.3, bellToll: 0.55, eBellSlam: 0.4, eBellDie: 0.45, eBellHurt: 0.35, eBellIdle: 0.5, eBellSweep: 0.25, bowShot: 0.3, bowGet: 0.35, evilHit: 0.45, evilShatter: 0.6, eIdle: 0.3, eSpawn: 0.4, eRage: 0.4, eDie: 0.3, playerDeath: 0.4, pickup: 0.35 }, GAP = { windTick: 0.04, mumStep: 0.15, mumSwish: 0.08, mumHurt: 0.05, bellToll: 0.3, eBellStep: 0.2, eBellIdle: 1.5, eBellHurt: 0.05, bowEmpty: 0.2, arrowGet: 0.05, arrowHit: 0.04, coin: 0.06, chainClank: 0.08, swing: 0.08, hit: 0.05, eIdle: 0.15, block: 0.05, boltHit: 0.05, stoneHit: 0.03 }, last = {};
+    const REV = { sunRise: 0.6, moonRise: 0.75, celestSet: 0.5, windTick: 0.1, dawnChime: 0.8, duskBell: 0.8, mumSlam: 0.3, mumFlame: 0.3, mumDie: 0.3, bellToll: 0.55, eBellSlam: 0.4, eBellDie: 0.45, eBellHurt: 0.35, eBellIdle: 0.5, eBellSweep: 0.25, bowShot: 0.3, bowGet: 0.35, evilHit: 0.45, evilShatter: 0.6, eIdle: 0.3, eSpawn: 0.4, eRage: 0.4, eDie: 0.3, playerDeath: 0.4, pickup: 0.35 }, GAP = { windTick: 0.04, mumStep: 0.15, mumSwish: 0.08, mumHurt: 0.05, bellToll: 0.3, eBellStep: 0.2, eBellIdle: 1.5, eBellHurt: 0.05, bowEmpty: 0.2, arrowGet: 0.05, arrowHit: 0.04, coin: 0.06, chainClank: 0.08, swing: 0.08, hit: 0.05, eIdle: 0.15, block: 0.05, boltHit: 0.05, stoneHit: 0.03 }, last = {};
     function sfx(name, x, y, a) {
       if (!ac || ac.state !== 'running' || muted) return; const f = SFX[name]; if (!f) return; if ((name[0] === 'e' || name.startsWith('mum')) && ac.currentTime < quietUntil) return;   // oyuna giriş: canavar sesleri müzik oturana kadar susar
       const t = ac.currentTime; if (t - (last[name] || -9) < (GAP[name] || 0.03)) return; last[name] = t;
@@ -1513,7 +1507,7 @@
     }
   }
   const anyCraft = () => DEV.anycraft || !!SK.own.iscilik;   // 'İşçilik' perki (ya da geliştirici testi): duraklatma menüsünden her yerde üretim
-  const DEV = { on: false, tspd: 1, anycraft: false, hpbtn: true, campArrow: false, campArrow2: false, peace: false, gold: false, keys: false, arrows: false, tears: false, god: false, freeze: false, spawn: {}, mimic: 12, luck: 0, pick: false };
+  const DEV = { on: false, tspd: 1, anycraft: false, hpbtn: true, campArrow: false, campArrow2: false, peace: false, gold: false, keys: false, arrows: false, tears: false, god: false, freeze: false, spawn: {}, mimic: 12, luck: 0, pick: false, dal: false };
   const luckP = p => DEV.on && DEV.luck > 0 ? Math.min(1, p) + (1 - Math.min(1, p)) * DEV.luck / 100 : p;   // geliştirici şansı (0–100): her olasılığı p → p + (1−p)·şans yapar; %100'de şansa bağlı her şey kesin gerçekleşir   // spawn: türe göre doğal doğuş kapatma (false = doğmaz) · geliştirici modu: ana ekranın sağ üstünden girilir · hepsi açık başlar · düğmeleri duraklatma menüsünde
   const E = []; E.spawnT = 1.5;
   const F = { kd: -1, stag: 0, sgx: 0, sgy: 0, kp: 0, lx: 0, ly: 0, slow: 0, bstun: false, gt: 0, pt: -1, dir: 1, aim: 0, buf: false, down: false, hold: 0, guarding: false, gw: 0, dur: 100, broken: 0, bw: 0, regenT: 0, sw: 0, off: 0,
@@ -1590,7 +1584,7 @@
     F.aim = n ? Math.atan2(n.y - player.y, n.x - player.x) : v ? Math.atan2(v.y - player.y, v.x - player.x) : hero.face;
     F.dir = -F.dir; F.pt = 0; F.buf = false; F.hold = 0; F.hit = []; F.stp = 0; F.ix = 0; F.iy = 0; F.tgt = null; if (AX.on) { pickAxeVariant(!!(v && v.tree), !!(v && v.rock)); ST = AXV[AX.v].ST; AU.sfx(AX.k === 'pick' ? 'pickRaise' : 'axeRaise', undefined, undefined, AXV[AX.v].wh); F.dur = Math.max(0, F.dur - (AX.k === 'pick' ? 7 : 9)); } else AU.sfx('swing');   // balta: her darbe dayanıklılık harcar
   }
-  function pressAtk() { if (!G.has || G.eq < 1 || F.death >= 0 || F.kd >= 0 || CAMP.in || TRAP.lock || BEAM.fire || BEAM.ch > 0) return; if (BOW.st !== 'idle' || BOW.out > 0.02) bowCancel(); G.stow = false; G.idleT = G.runT = 0; G.sh = Math.min(G.sh, 0.3); F.down = true; F.hold = 0; if (F.pt < 0) startSwing(); else if (F.pt > ST * 0.5) F.buf = true; }
+  function pressAtk() { if (!G.has || G.eq < 1 || F.death >= 0 || F.kd >= 0 || CAMP.in || BEAM.fire || BEAM.ch > 0) return; if (BOW.st !== 'idle' || BOW.out > 0.02) bowCancel(); G.stow = false; G.idleT = G.runT = 0; G.sh = Math.min(G.sh, 0.3); F.down = true; F.hold = 0; if (F.pt < 0) startSwing(); else if (F.pt > ST * 0.5) F.buf = true; }
   function relAtk() { F.down = false; F.buf = false; F.hold = 0; F.guarding = false; }
   const burst = (x, y, n, sp) => { for (let i = 0; i < n; i++) { const a = rnd(0, TAU); hero.puffs.push({ x, y, vx: Math.cos(a) * sp * rnd(0.4, 1), vy: Math.sin(a) * sp * rnd(0.4, 1) - 8, t: 0, life: rnd(0.3, 0.55), r: rnd(1.6, 3) }); } };
   /* ---------- Hasar sayıları: küçük punto, yukarı süzülüp solar ---------- */
@@ -1631,7 +1625,7 @@
   }
   function swingHit() {
     const pcx = player.x, pcy = player.y - 22, hits = [];
-    for (const e of cvEL()) {   // mağarada yalnızca tuzak savaşı sürerken düşmanlara vurulur
+    for (const e of CV.in ? [] : E) {   // mağarada dünya düşmanlarına vurulmaz
       if (F.hit.includes(e) || e.em < 1 || e.ghost) continue;   // yeni doğan (belirmekte olan) yaratığa vurulmaz
       const dx = e.x - pcx, dy = e.y - 20 - pcy;
       if (Math.hypot(dx, dy) > 74 || Math.abs(wrap(Math.atan2(dy, dx) - F.aim)) > 1.6) continue;
@@ -1640,7 +1634,7 @@
     hits.forEach(e => hitEnemy(e, 20 * wpnDmg(), Math.atan2(e.y - player.y, e.x - player.x)));
     if (AX.on && hits.length) hitFx(0.1, 6);
     swingChests(pcx, pcy); swingTrees(pcx, pcy); swingRocks(pcx, pcy); swingCampStones(pcx, pcy); swingCaves(pcx, pcy);
-    if (cvWorld()) for (let i = EP.length - 1; i >= 0; i--) { const bl = EP[i], bx = bl.x - pcx, by = bl.y - 22 - pcy; if (Math.hypot(bx, by) < 86 && Math.abs(wrap(Math.atan2(by, bx) - F.aim)) < 1.7) { sparks(bl.x, bl.y - 22, 8, 200, F.aim, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(i, 1); } }   // kılıç kara küreleri keser
+    if (!CV.in) for (let i = EP.length - 1; i >= 0; i--) { const bl = EP[i], bx = bl.x - pcx, by = bl.y - 22 - pcy; if (Math.hypot(bx, by) < 86 && Math.abs(wrap(Math.atan2(by, bx) - F.aim)) < 1.7) { sparks(bl.x, bl.y - 22, 8, 200, F.aim, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(i, 1); } }   // kılıç kara küreleri keser
     for (const [sx, sy, id, ev] of statuesIn(pcx - 170, pcy - 120, pcx + 170, pcy + 170)) {   // kötücül heykel
       if (!ev) continue;
       const s = evState(id); if (s.dead || s.dying >= 0 || F.hit.includes(s)) continue;
@@ -1767,12 +1761,12 @@
   function skLoad(sv) { skReset(); (sv.sk || []).forEach(id => { if (SKILLS.some(q => q.id === id)) SK.own[id] = true; }); SK.pts = isFinite(sv.tp) ? Math.max(0, sv.tp | 0) + (sv.sk || []).filter(id => id === 'soluk').length : Math.max(0, LVL.lv - 1 - skSpent()); }   // eski kayıtlarda tp yoksa: seviye - 1 puan hakkı
 
   function dropXp(x, y, total) {   // ~2'şer değerli XP kristalleri saçılır
-    for (let left = total; left > 0; left -= 2) LOOT.push({ cv: CV.in ? 1 : 0, k: 'xp', n: Math.min(2, left), x: x + rnd(-8, 8), y: y + 4, z: 18, vx: rnd(-110, 110), vy: rnd(-60, 60), vz: rnd(220, 360), t: 0, ph: rnd(0, 6), b: 0, rest: false });
+    for (let left = total; left > 0; left -= 2) LOOT.push({ k: 'xp', n: Math.min(2, left), x: x + rnd(-8, 8), y: y + 4, z: 18, vx: rnd(-110, 110), vy: rnd(-60, 60), vz: rnd(220, 360), t: 0, ph: rnd(0, 6), b: 0, rest: false });
   }
   function ghostDrops(e) {   // çırak büyücü: XP + nadiren (%12) altın tozu
     dropXp(e.x, e.y, XP_GHOST);
-    if (Math.random() < luckP(0.12)) LOOT.push({ cv: CV.in ? 1 : 0, k: 'coin', x: e.x, y: e.y + 4, z: 18, vx: rnd(-90, 90), vy: rnd(-50, 50), vz: rnd(260, 380), t: 0, ph: rnd(0, 6), b: 0, rest: false });
-    const sp = (k, n) => LOOT.push({ cv: CV.in ? 1 : 0, k, n: n || 1, x: e.x, y: e.y + 4, z: 18, vx: rnd(-90, 90), vy: rnd(-50, 50), vz: rnd(260, 380), t: 0, ph: rnd(0, 6), b: 0, rest: false });
+    if (Math.random() < luckP(0.12)) LOOT.push({ k: 'coin', x: e.x, y: e.y + 4, z: 18, vx: rnd(-90, 90), vy: rnd(-50, 50), vz: rnd(260, 380), t: 0, ph: rnd(0, 6), b: 0, rest: false });
+    const sp = (k, n) => LOOT.push({ k, n: n || 1, x: e.x, y: e.y + 4, z: 18, vx: rnd(-90, 90), vy: rnd(-50, 50), vz: rnd(260, 380), t: 0, ph: rnd(0, 6), b: 0, rest: false });
     if (Math.random() < luckP(0.07)) sp('band');    // bandaj %7
     if (Math.random() < luckP(0.03)) sp('medk');    // sağlık çantası %3
     if (Math.random() < luckP(0.025)) sp('tear');   // göz yaşı puanı %2,5
@@ -1901,7 +1895,7 @@
   }
   function fireBolt(e) {
     const a0 = Math.atan2(player.y - e.y, player.x - e.x), n = e.rage ? 3 : 1, spd = e.rage ? 230 : 190;
-    for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.3; EP.push({ x: e.x + Math.cos(a) * 18, y: e.y + Math.sin(a) * 10, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, t: 0, tr: 0, cv: e.trap ? 1 : 0 }); }
+    for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.3; EP.push({ x: e.x + Math.cos(a) * 18, y: e.y + Math.sin(a) * 10, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, t: 0, tr: 0 }); }
     AU.sfx('eBolt', e.x, e.y);
   }
   function updateEnemies(dt) {
@@ -1911,15 +1905,15 @@
     for (const q of E) if (q.keep && Math.hypot(q.x - player.x, q.y - player.y) < 1400) q.keep = false;   // kayıttan dönüşte korunan canavar oyuncuya yaklaşınca normal kurallara döner
     for (let i = E.length - 1; i >= 0; i--) if (!E[i].keep && E[i].src && Math.hypot(E[i].x - player.x, E[i].y - player.y) > 1500) E.splice(i, 1);
     for (let i = E.length - 1; i >= 0; i--) { const q = E[i]; if (q.rm || (!q.keep && q.kind === 'sentinel' && q.st !== 'die' && Math.hypot(q.x - player.x, q.y - player.y) > 1100) || (!q.keep && q.kind === 'bellman' && Math.hypot(q.x - player.x, q.y - player.y) > 1400)) E.splice(i, 1); }
-    if (!CV.in) { sentSpawn(dt, on); bellSpawn(dt, on); } bellUpdate(dt);
+    sentSpawn(dt, on); bellSpawn(dt, on); bellUpdate(dt);
     let nat = 0; for (const e of E) if (!e.src && e.kind === 'ghost') nat++;
     const T = TM.t, Tc = Math.min(T, WV.bossAt);   // büyüme 5. dakikada doyar (boss gelene kadar)
     const ghCap = Math.min(WV.ghMax, Math.max(NAT_CAP, WV.ghBase + Math.floor(Tc * WV.ghPerSec)));   // her saniye artan çırak sayısı
-    if (on && !CV.in && !CAMP.in && DEV.spawn.ghost !== false && nat < ghCap && E.length < WV.entCap && (E.spawnT -= dt) <= 0) {
+    if (on && !CAMP.in && DEV.spawn.ghost !== false && nat < ghCap && E.length < WV.entCap && (E.spawnT -= dt) <= 0) {
       const a = rnd(0, TAU), r = rnd(430, 520), sx = player.x + Math.cos(a) * r, sy = player.y + Math.sin(a) * r;
       if (!campNear(sx, sy, CAMP_R + 60, true)) { E.push(newEnemy(sx, sy, undefined, -0.3)); E.spawnT = Math.max(WV.ghIntMin, WV.ghInt0 - Tc * WV.ghIntDrop) * rnd(0.8, 1.2); }   // kampın içine doğmaz
     }
-    if (MUM_SPAWN && on && !CV.in && !CAMP.in && DEV.spawn.mum !== false && T >= WV.mumAt) {   // eriyen mum: 3:50'den sonra, zamanla artan sayıda
+    if (MUM_SPAWN && on && !CAMP.in && DEV.spawn.mum !== false && T >= WV.mumAt) {   // eriyen mum: 3:50'den sonra, zamanla artan sayıda
       if (E.mumT === undefined || E.mumT < 0) E.mumT = 0;
       let nm = 0; for (const e of E) if (e.kind === 'mum' && e.st !== 'die') nm++;
       const mcap = Math.min(WV.mumCap, 1 + Math.floor((Tc - WV.mumAt) / WV.mumStep));
@@ -1967,7 +1961,6 @@
         else if (d < 105) { mx = -ux * 0.45 + tx * 0.8; my = -uy * 0.45 + ty * 0.8; }                // sıra bekleyen: geri çekil, etrafında dön
         else if (d < 200) { mx = tx * 0.9 + ux * 0.25; my = ty * 0.9 + uy * 0.25; }
         else { mx = ux; my = uy; }
-        if (CV.in && e.trap) { const sv = cvSteer(e, d, dt); if (sv) { mx = sv[0]; my = sv[1]; } }   // mağara labirenti: görüş kapalıysa en kısa yolu izler
         for (const o of E) if (o !== e && o.em >= 1) { const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy); if (od > 0 && od < 42) { mx += ox / od * 0.9; my += oy / od * 0.9; } }   // birbirine yığılmaz
         e.x += mx * sp * dt; e.y += my * sp * dt;
         if (ready && (e.thk -= dt) <= 0) {
@@ -2027,7 +2020,6 @@
   function updateBolts(dt) {
     for (let i = EP.length - 1; i >= 0; i--) {
       const p = EP[i]; p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.cv && CV.in && CV.c && !cvWalk(CV.c, p.x - CVO.x, p.y - CVO.y)) { smoke(p.x, p.y - 22, 3, 24, 6); EP.splice(i, 1); continue; }   // mağara duvarına çarpan küre söner
       if (campBolt(p)) { EP.splice(i, 1); continue; }   // kampa mermi giremez
       if (p.t > 3.4) { smoke(p.x, p.y - 22, 2, 20, 5); EP.splice(i, 1); continue; }
       if ((p.tr -= dt) <= 0) { p.tr = 0.045; if (SMK.length < 120) SMK.push({ x: p.x, y: p.y - 22, vx: rnd(-6, 6), vy: rnd(-8, 2), t: 0, life: 0.6, r: 4.5 }); }
@@ -3043,9 +3035,7 @@
   /* ---------- MAĞARA SİSTEMİ: haritada tohuma bağlı rastgele mağara girişleri · girişten geçince merdivenle aşağı inilir, mağara atmosferine kesintisiz geçilir (yükleme yok) · merdivenden çıkılarak geri dönülür ----------
      Mağara ayrı bir "katman": oyuncu CVO noktasındaki yerel uzaya taşınır, dünya çizimi / güncellemesi o sürece durur (canavarlar girişte bekler). Geçiş = yürüyüş + iris kararması, bekleme yok. */
   const CVC = 2100, CVW = 26, CVO = { x: 30000, y: 30000 }, CV_RX = 235, CV_RY = 205, CV_CY = -320, CV_BR = [];   // CVC: giriş ızgara hücresi · CVW: kapı yarı genişliği · CV_BR: (eski ateş çanakları kaldırıldı; ışık kaynakları artık duvar meşaleleri)
-  const CV = { in: false, st: 'idle', t: 0, c: null, sw: false, dk: 0, fa: 0, lane: null, wx: NaN, wy: NaN, dp: 0, si: 0, bob: 0, by: 0, col: '16,9,4', cd: 0, px: 0, py: 0, drip: [] };   // st: idle | down | up
-  const TRAP = { ph: '', t: 0, id: '', c: null, sp: null, live: false, lock: false, sealed: false, k: 0, fx: 0, fy: 0, pd: 0, rg: 0, dl: 0, flash: 0, vg: 0, msg: null, bl: [], pt: [], N: 0, left: 0, stash: null, estash: null, fld: null, fcx: -9, fcy: -9, orb: null, rw: null, q: null, qT: 0, gi: 0, landT: 0, s1: 0, bv: 0, pc: null };   // TUZAK ODASI durumu (ayrıntı: aşağıdaki «TUZAK ODASI» bölümü)
-  const TRAPUSED = new Set(), cvEL = () => CV.in && !TRAP.live ? [] : E, cvWorld = () => !CV.in || TRAP.live;   // TRAPUSED: tuzağı harcanan mağaralar (kalıcı) · cvEL / cvWorld: mağarada yalnızca tuzak savaşı sürerken düşmanlar / kara küreler geçerli
+  const CV = { in: false, st: 'idle', t: 0, c: null, sw: false, dk: 0, fa: 0, lane: null, wx: NaN, wy: NaN, dp: 0, si: 0, bob: 0, by: 0, col: '16,9,4', cd: 0, px: 0, py: 0, drip: [], lt: false, mv: null, lad: null };   // st: idle | down | up
   function cvCand(ci, cj) {
     const m = cvCand.m || (cvCand.m = new Map()), key = SEED + ':' + ci + ',' + cj; if (m.has(key)) return m.get(key);
     let r = null;
@@ -3062,7 +3052,7 @@
   }
   const cvR = c => { const a = c.sd * 40; return th => 1 + 0.09 * Math.sin(3 * th + a) + 0.05 * Math.sin(7 * th + a * 1.7); };   // salonun düzensiz kenarı
   function cvWalk(c, lx, ly) {   // yürünebilir mi: merdiven koridoru serbest · mağara ızgarasında zemin hücresi + duvar hücrelerine CV_R boşluk (yuvarlak köşeli çarpışma)
-    if (TRAP.sealed && c === TRAP.c && Math.abs(lx) < TRAP_SX && ly > TRAP_DY - 40 && ly < TRAP_DY + 14) return false;   // tuzak: çıkışı kapatan taş duvar
+    if (CV.lad && CV.c === c && Math.abs(lx) < 44 && ly > DAL.plugTop + CV_R) return false;   // dalavereci: eski merdiven ağzı kayayla kapalı
     if (Math.abs(lx) < 30 && ly <= 22 && ly >= -150) return true;
     const g = cvGeo(c), N = CVN, S = CVS, px = lx - CVGX, py = ly - CVGY, gx = Math.floor(px / S), gy = Math.floor(py / S);
     if (gx < 0 || gy < 0 || gx >= N || gy >= N || !g.G[gy * N + gx]) return false;
@@ -3072,7 +3062,57 @@
     }
     return true;
   }
-  function cvReset() { trapReset(); CV.lane = null; CV.in = false; CV.st = 'idle'; CV.dk = 0; CV.fa = 0; CV.dp = 0; CV.by = 0; CV.c = null; CV.cd = 0; }
+  function cvReset() { CV.lt = false; CV.mv = null; CV.lad = null; CV.lane = null; CV.in = false; CV.st = 'idle'; CV.dk = 0; CV.fa = 0; CV.dp = 0; CV.by = 0; CV.c = null; CV.cd = 0; }
+  /* ---------- MERDİVEN DALAVERECİSİ · güncelleme 1: yer değiştiren merdiven ----------
+     Dalaverecili mağarada (tohumlu şans) giriş merdiveni oyuncunun görüşünden çıktığı ilk karede taşınır: kaya sürüklenme sesi + hafif sallantı, eski çıkış kayayla kapanır,
+     merdiven mağaranın uzak bir duvar yüzüne (kuzey / güney / doğu / batı) geçer. Mağara başına bir kez; mağaradan çıkınca / yeniden girince sıfırlanır. */
+  const DAL = { chance: 0.35, viewPad: 60, minMove: 700, rumble: 0.9, plugTop: -170 };
+  const cvDal = c => DEV.dal || hashN(c.sd * 100, 7, 91) < DAL.chance;
+  const cvStairSeen = pad => { const vx0 = cam.x - pad, vy0 = cam.y - pad, vx1 = cam.x + W / ZOOM + pad, vy1 = cam.y + H / ZOOM + pad; return CVO.x + 44 > vx0 && CVO.x - 44 < vx1 && CVO.y + 80 > vy0 && CVO.y - 170 < vy1; };   // eski merdiven bölgesi (koridor + pay) ekranda mı
+  function cvLadPick(c) {   // duvara bitişik, önü açık zemin hücrelerinden uzak bir merdiven yeri seç (aynı mağara + aynı oyun = aynı yer)
+    const g = cvGeo(c), N = CVN, S = CVS, G = g.G, at = (x, y) => x >= 0 && y >= 0 && x < N && y < N ? G[y * N + x] : 0; let chs = []; try { chs = cvChests(c); } catch (_) {}
+    const out = [], D = [[0, -1, 'N'], [1, 0, 'E'], [0, 1, 'S'], [-1, 0, 'W']];
+    for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) {
+      if (!at(x, y)) continue;
+      for (const [dx, dy, f] of D) {
+        if (at(x + dx, y + dy) || !at(x - dx, y - dy) || !at(x - 2 * dx, y - 2 * dy) || !at(x + dy, y + dx) || !at(x - dy, y - dx)) continue;   // önü ve yanları açık olmalı
+        const cx = CVGX + (x + 0.5) * S, cy = CVGY + (y + 0.5) * S, lx = cx + dx * S / 2, ly = cy + dy * S / 2, d = Math.hypot(lx, ly + 150);
+        if (d < DAL.minMove || chs.some(h => Math.hypot(h.lx - lx, h.ly - ly) < 80) || g.tor.some(T => Math.hypot(T.x - lx, T.ly - ly) < 60)) continue;
+        out.push({ x: lx, y: ly, f, cx, cy, d });
+      }
+    }
+    if (!out.length) return null; out.sort((a, b) => b.d - a.d);
+    return out[Math.floor(hashN(c.sd * 100, 11, 92) * Math.ceil(out.length * 0.5)) % out.length];   // uzak yarıdan biri: bulması zor
+  }
+  function cvRelocate() {
+    const m = CV.mv; m.done = true; const L = cvLadPick(CV.c); if (!L) return;
+    CV.lad = L; m.rum = DAL.rumble; try { AU.sfx('rockDrag', CVO.x, CVO.y - 100); } catch (_) {}
+  }
+  function cvDalTick(dt) {   // her karede (mağarada): görüş testi + sallantı
+    const m = CV.mv; if (!m || !CV.in) return; m.age += dt;
+    if (!m.done && m.age > 0.8 && CV.st === 'idle' && !cvStairSeen(DAL.viewPad)) cvRelocate();
+    if (m.rum > 0) { m.rum -= dt; hitFx(0, 2.6 * Math.min(1, m.rum / DAL.rumble * 1.6)); if (Math.random() < dt * 9) { try { cdust(player.x + rnd(-150, 150), player.y + rnd(-60, 50), 1, 0.8); } catch (_) {} } }
+  }
+  function cvDrawPlug(c) {   // eski merdiven ağzı: koyu kaya yığını (cvWalk aynı dikdörtgeni kapatır)
+    const x0 = -44, x1 = 44, y0 = DAL.plugTop, R = (i, k) => hashN(c.sd * 100, i, 93 + k);
+    ctx.fillStyle = '#0b0603'; ctx.fillRect(x0, y0, x1 - x0, 252); ctx.lineJoin = ctx.lineCap = 'round';
+    for (let row = 0; row < 3; row++) for (let i = 0; i < 6; i++) {
+      const bx = x0 + 2 + i * 15.5 + (row % 2) * 7, by = y0 + 8 + row * 17, rx = 9 + R(i + row * 7, 0) * 6, ry = 8 + R(i + row * 7, 1) * 5; ctx.fillStyle = (i + row) % 2 ? '#4d3724' : '#3c2b1b'; ctx.strokeStyle = '#160d06'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.ellipse(bx, by, rx, ry, R(i + row * 7, 2) * 3, 0, TAU); ctx.fill(); ctx.stroke(); ctx.strokeStyle = 'rgba(212,172,126,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx, by, rx * 0.65, PI * 1.1, PI * 1.7); ctx.stroke();
+    }
+    const gr = ctx.createLinearGradient(0, y0 + 40, 0, y0 + 120); gr.addColorStop(0, 'rgba(11,6,3,0)'); gr.addColorStop(1, 'rgba(11,6,3,1)'); ctx.fillStyle = gr; ctx.fillRect(x0, y0 + 40, x1 - x0, 80);
+  }
+  function cvDrawLad(t) {   // yeni merdiven: duvara dayalı, üstten gün ışığı sızan kemerli ağız
+    const L = CV.lad, f = L.f, k = 0.85 + 0.15 * Math.sin(t * 2.3), ux = f === 'E' ? -1 : f === 'W' ? 1 : 0, uy = f === 'S' ? -1 : f === 'N' ? 1 : 0;
+    ctx.save(); ctx.translate(L.x, L.y);
+    const gx = ux * 22, gy = uy * 22 - 18, gl = ctx.createRadialGradient(gx, gy, 4, gx, gy, 125); gl.addColorStop(0, `rgba(255,236,200,${0.3 * k})`); gl.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(gx, gy, 125, 0, TAU); ctx.fill();   // gün ışığı yeri aydınlatır
+    const cxr = f === 'E' ? 9 : f === 'W' ? -9 : 0, top = f === 'S' ? 0 : -60, h = f === 'S' ? 46 : 62, up = f !== 'S';
+    ctx.fillStyle = '#050302'; ctx.strokeStyle = 'rgba(212,172,126,0.75)'; ctx.lineWidth = 2; cvRRp(ctx, cxr - 16, top, 32, h, up ? [13, 13, 2, 2] : [2, 2, 13, 13]); ctx.fill(); ctx.stroke();
+    const lg = ctx.createLinearGradient(0, up ? top : top + h, 0, up ? top + h * 0.7 : top + h * 0.3); lg.addColorStop(0, `rgba(255,236,200,${0.62 * k})`); lg.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = lg; cvRRp(ctx, cxr - 14, top + 2, 28, h - 4, up ? [11, 11, 1, 1] : [1, 1, 11, 11]); ctx.fill();
+    ctx.strokeStyle = '#8a6a47'; ctx.lineWidth = 3.2; ctx.beginPath(); ctx.moveTo(cxr - 8, top + 8); ctx.lineTo(cxr - 8, top + h); ctx.moveTo(cxr + 8, top + 8); ctx.lineTo(cxr + 8, top + h); ctx.stroke();
+    ctx.strokeStyle = '#b48a55'; ctx.lineWidth = 2.2; for (let y = top + 14; y < top + h - 2; y += 9) { ctx.beginPath(); ctx.moveTo(cxr - 8, y); ctx.lineTo(cxr + 8, y); ctx.stroke(); }
+    ctx.restore();
+  }
   const cvz = f => CV.in ? () => [] : f;   // mağaradayken dünya nesneleri üretilmez / çizilmez
   function cvSnapCam() { cam.x = player.x - W / ZOOM / 2; cam.y = player.y - H / ZOOM / 2; }
   const cvRock = c => c.rp || (c.rp = (j => [[-84, 2], [-88, -22], [-72, -52], [-48, -78 + j(1) * 8], [-20, -92], [22, -94 + j(2) * 6], [52, -80], [74, -56], [88, -24], [84, 2]])(i => hashN(c.sd * 100, i, 5)));   // giriş kayasının dış hattı: hem çizim hem çarpışma bunu kullanır
@@ -3132,13 +3172,15 @@
         if (dy > 0) continue;
         CV.c = k; pd = clamp(-dy / 9, 0, 1); try { cvGeo(k); } catch (_) {}
         if (dy <= -9 && CV.cd <= 0 && F.death < 0) {   // eşik: içeri (kapı ağzından girer girmez)
-          CV.wx = NaN; CV.in = true; player.x = CVO.x + clamp(dx, -CVW, CVW); player.y = CVO.y - 24; CV.px = player.x; CV.py = player.y; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
+          CV.wx = NaN; CV.in = true; player.x = CVO.x + clamp(dx, -CVW, CVW); player.y = CVO.y - 24; CV.px = player.x; CV.py = player.y; CV.lad = null; CV.lt = cvDal(k); CV.mv = CV.lt ? { done: false, age: 0, rum: 0 } : null; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
         } break;
       }
     } else if (CV.c) {
-      const ly = player.y - CVO.y; if (ly > -14) pd = clamp((ly + 14) / 14, 0, 1);
-      if (ly >= 0 && CV.cd <= 0 && F.death < 0) {   // eşik: dışarı
-        CV.wx = NaN; CV.dp = 0; CV.in = false; player.x = CV.c.x + clamp(player.x - CVO.x, -18, 18); player.y = CV.c.y + 6; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
+      cvDalTick(dt);
+      const ly = player.y - CVO.y, L = CV.lad, ld = L ? Math.hypot(player.x - CVO.x - L.x, player.y - CVO.y - L.y) : 1e9;
+      if (L) pd = clamp((46 - ld) / 30, 0, 1); else if (ly > -14) pd = clamp((ly + 14) / 14, 0, 1);   // dalavereci: yeni merdivene yaklaştıkça iris kapanır
+      if ((L ? ld < 17 : ly >= 0) && CV.cd <= 0 && F.death < 0) {   // eşik: dışarı
+        CV.lt = false; CV.mv = null; CV.lad = null; CV.wx = NaN; CV.dp = 0; CV.in = false; player.x = CV.c.x + clamp(player.x - CVO.x, -18, 18); player.y = CV.c.y + 6; CV.fa = 1; CV.cd = 0.3; cvSnapCam(); try { AU.sfx('sheath'); } catch (_) {} pd = 0;
       }
     }
     { const ly = player.y - CVO.y, dpT = CV.in ? clamp(-ly / 125, 0, 1) : 0; CV.dp += (dpT - CV.dp) * Math.min(1, dt * 6);   // derinlik: merdivenin üstü 0 · altı 1
@@ -3350,339 +3392,6 @@
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(l.x, l.y + 1, 7 * sh, 2.4 * sh, 0, 0, TAU); ctx.fill();
     ctx.save(); ctx.translate(l.x, gy - 5); ctx.rotate(l.rest ? 0 : l.t * 7); drawBoneIcon(0, 0, 0.9); ctx.restore();
   }
-  /* ---------- TUZAK ODASI (mağara): sahte hazine yığını · dokununca çıkış taşlarla mühürlenir, mağaranın dört yanında canavarlar doğar · hepsi kesilince taşlar çöker, ödül tavandan süzülüp envantere girer ----------
-     Hak mağara başınadır ve KALICIDIR: hazineye dokunulduğu an kayda yazılır (kamp kaydından ayrı: hlk_trap). Savaşta ölürsen, oyunu kapatırsan ya da kayıttan devam edersen o mağarada tuzak bir daha kurulmaz.
-     Akış: '' → dis (yığın erir, zemin mührü yanar, tavandan taş yağar) → pan1 (kamera çıkışa kayar) → drop (taşlar düşer, çıkış kapanır) → pan2 (kamera döner) → fight (tek dalga) →
-           w1 (zafer) → w2 (kamera çıkışa kayar) → w3 (taşlar çatlar, çöker) → w4 (kamera döner) → orb (ödül süzülür) → give (envantere girer) → ''
-     Mağarada dünya düşmanları çalışmaz: savaş başlarken dünya düşmanları (E, EP) kenara alınır, savaş bitince / mağara sıfırlanınca geri verilir. */
-  const TRAP_P = 0.55, TRAP_KEY = 'hlk_trap', TRAP_DY = -150, TRAP_SX = 56;   // mağara başına tuzak şansı · mühür taşlarının yeri (yerel y) · taş duvarın yarı genişliği
-  function trapLoad() {   // kayıttan: bu dünyada (SEED) hangi mağaralarda tuzak harcandı
-    TRAPUSED.clear();
-    try { const j = JSON.parse(localStorage.getItem(TRAP_KEY) || 'null'); const row = j && Array.isArray(j.l) ? j.l.find(r => r && r[0] === SEED) : null; if (row && Array.isArray(row[1])) row[1].forEach(id => TRAPUSED.add(String(id))); } catch (_) {}
-  }
-  function trapMark(id) {   // hazineye dokunulduğu AN yazılır (ölüm / çıkış / yeniden yükleme hakkı geri vermez)
-    TRAPUSED.add(id);
-    try { const j = JSON.parse(localStorage.getItem(TRAP_KEY) || 'null'), l = j && Array.isArray(j.l) ? j.l.filter(r => r && r[0] !== SEED) : []; l.push([SEED, [...TRAPUSED]]); while (l.length > 8) l.shift(); localStorage.setItem(TRAP_KEY, JSON.stringify({ l })); } catch (_) {}
-  }
-  function cvTrapSpot(c) {   // bu mağarada tuzak var mı, nerede: büyük bir odanın açık zemininde (5×5 hücre boş), sandık / meşale / havuzdan uzakta
-    const g = cvGeo(c); if (g.trp !== undefined) return g.trp; g.trp = null;
-    if (hashN(c.sd, 91, 3) >= TRAP_P) return g.trp;
-    const N = CVN, S = CVS, G = g.G, at = (x, y) => x >= 0 && y >= 0 && x < N && y < N && G[y * N + x] === 1;
-    const rooms = g.rooms.filter(r => r.kind !== 'start').sort((a, b) => b.rw * b.rh - a.rw * a.rh).slice(0, 6); if (!rooms.length) return g.trp;
-    let chs = []; try { chs = cvChests(c); } catch (_) {}
-    const r0 = Math.floor(hashN(c.sd, 92, 5) * rooms.length);
-    for (let q = 0; q < rooms.length && !g.trp; q++) {
-      const R = rooms[(r0 + q) % rooms.length]; let best = null, bd = 1e9;
-      for (let gy = Math.floor(R.cy - R.rh * 1.2); gy <= Math.ceil(R.cy + R.rh * 1.2); gy++) for (let gx = Math.floor(R.cx - R.rw * 1.2); gx <= Math.ceil(R.cx + R.rw * 1.2); gx++) {
-        let ok = gy < 44; for (let dy = -2; ok && dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (!at(gx + dx, gy + dy)) { ok = false; break; }
-        if (!ok) continue; const lx = CVGX + (gx + 0.5) * S, ly = CVGY + (gy + 0.5) * S;
-        if (chs.some(h => Math.hypot(h.lx - lx, h.ly - ly) < 170) || g.tor.some(T => Math.hypot(T.x - lx, T.ly - ly) < 70) || g.pools.some(P => Math.hypot(P.cx - lx, (P.cy - ly) * 1.2) < Math.max(P.rx, P.ry) * 1.25 + 70)) continue;
-        const d = Math.hypot(gx - R.cx, gy - R.cy) + hashN(gx, gy, c.sd * 40) * 0.8; if (d < bd) { bd = d; best = { lx, ly }; }
-      }
-      if (best) g.trp = { lx: best.lx, ly: best.ly };
-    }
-    return g.trp;
-  }
-  const trapShown = c => { const sp = c && cvTrapSpot(c); return !!sp && (!TRAPUSED.has(c.id) || (!!TRAP.ph && TRAP.id === c.id && TRAP.pd < 1)); };   // yığın görünüyor mu (tetiklendikten sonra erirken de)
-  /* --- parçacıklar (dünya koordinatı) --- */
-  const tpf = p => { if (TRAP.pt.length < 280) TRAP.pt.push(Object.assign({ t: 0, vx: 0, vy: 0, z: 0, vz: 0, life: 1, s: 1, r: 0, vr: 0, b: 0, rest: false }, p)); };
-  const trapDust = (x, y, n, sc) => { for (let i = 0; i < n; i++) tpf({ k: 'dust', x: x + rnd(-20, 20) * sc, y: y + rnd(-4, 4), z: rnd(2, 16), vx: rnd(-70, 70) * sc, vy: rnd(-16, 8), vz: rnd(14, 46), life: rnd(0.8, 1.5), s: rnd(9, 17) * sc }); };
-  const trapChips = (x, y, n, sp, up) => { for (let i = 0; i < n; i++) tpf({ k: 'rock', x: x + rnd(-14, 14), y: y + rnd(-4, 4), z: rnd(4, 26), vx: rnd(-1, 1) * sp, vy: rnd(-0.5, 0.5) * sp * 0.5, vz: rnd(0.35, 1) * up, life: rnd(1.8, 2.8), s: rnd(2, 5.6), r: rnd(0, TAU), vr: rnd(-10, 10), c: Math.random() < 0.5 ? 0 : 1 }); };
-  function trapFxUpdate(dt) {
-    const P = TRAP.pt;
-    for (let i = P.length - 1; i >= 0; i--) {
-      const p = P[i]; if ((p.t += dt) >= p.life) { P.splice(i, 1); continue; }
-      if (p.k === 'rock') {
-        if (p.rest) continue;
-        p.vz -= 1100 * dt; p.z += p.vz * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
-        if (p.z <= 0) { p.z = 0; if (p.vz < -170 && p.b < 2) { if (p.b === 0 && p.s > 3.4 && P.length < 250) tpf({ k: 'dust', x: p.x, y: p.y, z: 2, vx: rnd(-20, 20), vy: rnd(-8, 2), vz: rnd(8, 24), life: 0.8, s: rnd(6, 10) }); p.vz *= -0.34; p.vx *= 0.6; p.vy *= 0.6; p.vr *= 0.5; p.b++; } else { p.rest = true; p.vx = p.vy = p.vr = 0; } }
-      } else if (p.k === 'dust') { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; const k = Math.max(0, 1 - 2.2 * dt); p.vx *= k; p.vy *= k; p.vz *= k; }
-      else if (p.k === 'spark') { p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= 240 * dt; p.vx *= 1 - 1.2 * dt; if (p.z < 0) { p.z = 0; p.vz *= -0.3; } }
-      else if (p.k === 'mote') { p.x += (p.vx + Math.sin(p.t * 6 + p.s * 9) * 14) * dt; p.z += p.vz * dt; p.vz *= 1 - 0.5 * dt; }
-    }
-  }
-  function drawTrapFx() {
-    const T = TRAP; if (!T.pt.length && !T.orb) return;
-    ctx.save(); ctx.lineJoin = ctx.lineCap = 'round';
-    for (const p of T.pt) {
-      const u = p.t / p.life, gy = p.y - p.z;
-      if (p.k === 'rock') {
-        const a = p.t > p.life - 0.7 ? (p.life - p.t) / 0.7 : 1;
-        if (p.z > 3) { ctx.globalAlpha = 0.3 * a; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, p.s * (0.8 + p.z * 0.002), p.s * 0.3, 0, 0, TAU); ctx.fill(); }
-        ctx.globalAlpha = a; ctx.save(); ctx.translate(p.x, gy); ctx.rotate(p.r); ctx.fillStyle = p.c ? '#4d3724' : '#6b4e34'; ctx.strokeStyle = '#160d06'; ctx.lineWidth = 0.8; const s = p.s;
-        ctx.beginPath(); ctx.moveTo(-s, -s * 0.6); ctx.lineTo(s * 0.4, -s * 0.9); ctx.lineTo(s, -s * 0.1); ctx.lineTo(s * 0.5, s * 0.8); ctx.lineTo(-s * 0.8, s * 0.6); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-      } else if (p.k === 'dust') {
-        ctx.globalAlpha = 0.34 * (1 - u) * Math.min(1, u * 8); ctx.fillStyle = '#8a7258'; ctx.beginPath(); ctx.arc(p.x, gy, p.s * (0.7 + u * 1.5), 0, TAU); ctx.fill();
-      } else if (p.k === 'spark') {
-        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - u; ctx.fillStyle = p.c || '#ffd873'; ctx.beginPath(); ctx.arc(p.x, gy, p.s, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
-      } else if (p.k === 'mote') {
-        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.sin(Math.min(1, u) * PI); const g = ctx.createRadialGradient(p.x, gy, 0, p.x, gy, p.s * 3); g.addColorStop(0, 'rgba(255,236,170,0.95)'); g.addColorStop(1, 'rgba(255,200,90,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, gy, p.s * 3, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
-      } else if (p.k === 'ring') {
-        ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = p.c || 'rgba(255,214,120,1)'; ctx.globalAlpha = (1 - u) * 0.8; ctx.lineWidth = 2.4 * (1 - u) + 0.6; const r = p.s * Math.sqrt(u); ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r * 0.42, 0, 0, TAU); ctx.stroke(); ctx.globalCompositeOperation = 'source-over';
-      }
-    }
-    ctx.globalAlpha = 1;
-    const O = T.orb;
-    if (O) {   // ödül: tavandan süzülen ışık sütunu + altın küre
-      const ox = O.x + Math.sin(O.t * 2.4) * 5 * (1 - O.t / O.dur), oy = O.y - O.z, a = Math.min(1, O.t / 0.8), tw = 0.5 + 0.5 * Math.sin(O.t * 9);
-      ctx.globalCompositeOperation = 'lighter';
-      const col = ctx.createLinearGradient(0, oy - 520, 0, O.y + 4); col.addColorStop(0, 'rgba(255,224,140,0)'); col.addColorStop(0.55, `rgba(255,214,120,${0.16 * a})`); col.addColorStop(1, `rgba(255,214,120,${0.3 * a})`);
-      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(ox - 9, oy - 520); ctx.lineTo(ox + 9, oy - 520); ctx.lineTo(ox + 30, O.y + 4); ctx.lineTo(ox - 30, O.y + 4); ctx.closePath(); ctx.fill();   // sütun
-      ctx.strokeStyle = `rgba(255,224,140,${0.55 * a})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(O.x, O.y + 2, 26 + 5 * tw, 11 + 2 * tw, 0, 0, TAU); ctx.stroke();   // zemindeki halka
-      const hg = ctx.createRadialGradient(ox, oy, 0, ox, oy, 46); hg.addColorStop(0, `rgba(255,240,190,${0.7 * a})`); hg.addColorStop(0.4, `rgba(255,200,90,${0.3 * a})`); hg.addColorStop(1, 'rgba(255,190,80,0)'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(ox, oy, 46, 0, TAU); ctx.fill();
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = a;
-      ctx.save(); ctx.translate(ox, oy); ctx.rotate(O.t * 1.6); ctx.fillStyle = '#ffd35a'; ctx.strokeStyle = '#8a5a08'; ctx.lineWidth = 1.2;   // dönen dört uçlu yıldız + çekirdek
-      ctx.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? 4.6 : 13; ctx.lineTo(Math.cos(i * PI / 4) * r, Math.sin(i * PI / 4) * r); } ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-      ctx.fillStyle = '#fff6cf'; ctx.beginPath(); ctx.arc(ox, oy, 5.2, 0, TAU); ctx.fill(); ctx.strokeStyle = '#d99a1c'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-    ctx.restore();
-  }
-  /* --- hazine yığını ve zemin mührü --- */
-  function trapPileCoins() {   // yığının paraları: sabit dağılım (her karede aynı)
-    if (TRAP.pc) return TRAP.pc; const a = [], H = (i, k) => hashN(i, k, 77);
-    for (let i = 0; i < 54; i++) { const px = (H(i, 1) - 0.5) * 80, prof = 30 * Math.pow(Math.max(0, 1 - (px / 42) ** 2), 0.85); a.push({ x: px, y: -H(i, 2) * prof, r: H(i, 3) * 3, c: Math.floor(H(i, 4) * 3), s: 3.4 + H(i, 5) * 1.7 }); }
-    a.sort((p, q) => p.y - q.y); return TRAP.pc = a;
-  }
-  function drawTrapPile(sp) {
-    const T = TRAP, t = ATM.t || 0, pd = T.pd, x = CVO.x + sp.lx, y = CVO.y + sp.ly + 8, al = 1 - pd, jx = pd > 0 ? Math.sin(t * 90) * 2.6 * (1 - pd * 0.5) : 0;
-    ctx.save(); ctx.translate(x + jx, y); ctx.lineJoin = ctx.lineCap = 'round';
-    ctx.globalAlpha = al * 0.9; ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.beginPath(); ctx.ellipse(0, 3, 50, 11, 0, 0, TAU); ctx.fill();
-    ctx.globalAlpha = al; ctx.scale(1.08, 1.08 * (1 - 0.3 * pd));
-    ctx.beginPath(); ctx.moveTo(-44, 2); ctx.bezierCurveTo(-40, -14, -22, -30, 0, -33); ctx.bezierCurveTo(22, -30, 40, -14, 44, 2); ctx.bezierCurveTo(30, 9, -30, 9, -44, 2); ctx.closePath();
-    const g = ctx.createLinearGradient(0, -34, 0, 8); g.addColorStop(0, '#ffe9a0'); g.addColorStop(0.45, '#f0b73a'); g.addColorStop(1, '#a8690c'); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#6b4308'; ctx.lineWidth = 1.4; ctx.stroke();
-    const cols = ['#f0b73a', '#ffe08a', '#c98717'], coins = trapPileCoins();
-    for (const c of coins) { ctx.save(); ctx.translate(c.x, c.y - 2); ctx.rotate(c.r - 1.5); ctx.fillStyle = cols[c.c]; ctx.strokeStyle = '#6b4308'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.ellipse(0, 0, c.s, c.s * 0.5, 0, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,248,214,0.7)'; ctx.fillRect(-c.s * 0.5, -0.9, c.s * 0.6, 0.9); ctx.restore(); }
-    for (const [gx, gy, col] of [[-27, -9, '#e0405a'], [25, -8, '#5ec8ff'], [3, -27, '#59d98e'], [-7, -15, '#c58bff'], [33, -3, '#e0405a'], [-36, -2, '#5ec8ff']]) { ctx.fillStyle = col; ctx.strokeStyle = '#2a1608'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(gx, gy - 4.4); ctx.lineTo(gx + 3.4, gy); ctx.lineTo(gx, gy + 3.8); ctx.lineTo(gx - 3.4, gy); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(gx - 1.6, gy - 2.4, 1.3, 1.8); }
-    drawIngot(-14, -23, 0.72, 0.35); drawIngot(15, -17, 0.64, 0);
-    for (let i = 0; i < 7; i++) { const c = coins[(i * 7) % coins.length], tw = Math.max(0, Math.sin(t * 2.6 + i * 1.9)); if (tw < 0.2) continue; ctx.strokeStyle = `rgba(255,252,225,${0.9 * tw})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(c.x - 4 * tw, c.y - 3); ctx.lineTo(c.x + 4 * tw, c.y - 3); ctx.moveTo(c.x, c.y - 3 - 4 * tw); ctx.lineTo(c.x, c.y - 3 + 4 * tw); ctx.stroke(); }
-    ctx.globalCompositeOperation = 'lighter'; const ag = ctx.createRadialGradient(0, -16, 4, 0, -16, 80); ag.addColorStop(0, `rgba(255,214,110,${(0.2 + 0.07 * Math.sin(t * 3) + 0.55 * pd) * al + 0.35 * pd})`); ag.addColorStop(1, 'rgba(255,190,80,0)'); ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(0, -16, 80, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
-  function drawTrapGround(c) {   // zemin: eski bir mühür oyuğu — tuzaktan önce yalnızca silik bir iz; tetiklenince kor gibi yanar
-    const sp = cvTrapSpot(c); if (!sp) return; const T = TRAP, act = T.id === c.id && T.rg > 0.01, vis = !TRAPUSED.has(c.id) || act; if (!vis) return;
-    const t = ATM.t || 0, rg = act ? T.rg : 0, R = 80;
-    ctx.save(); ctx.translate(sp.lx, sp.ly + 6); ctx.scale(1, 0.46); ctx.lineJoin = ctx.lineCap = 'round';
-    const ring = r => { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); }, star = (r, rot) => { ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = rot + i * 2 * TAU / 5; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); }, ticks = (r0, r1, rot) => { ctx.beginPath(); for (let i = 0; i < 12; i++) { const a = rot + i * TAU / 12; ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); } ctx.stroke(); };
-    ctx.strokeStyle = 'rgba(14,7,3,0.5)'; ctx.lineWidth = 3.4; ring(R); ctx.stroke(); ring(R * 0.7); ctx.stroke(); star(R * 0.7, 0.3); ctx.stroke(); ticks(R + 2, R + 12, 0);
-    ctx.strokeStyle = 'rgba(212,172,126,0.15)'; ctx.lineWidth = 1.1; ring(R + 1.6); ctx.stroke(); ring(R * 0.7 + 1.6); ctx.stroke(); star(R * 0.7 + 1, 0.3); ctx.stroke(); ticks(R + 2, R + 12, 0.02);
-    if (rg > 0.01) {
-      ctx.globalCompositeOperation = 'lighter'; const gg = ctx.createRadialGradient(0, 0, 6, 0, 0, R + 30); gg.addColorStop(0, `rgba(255,120,50,${0.4 * rg})`); gg.addColorStop(1, 'rgba(255,90,40,0)'); ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, 0, R + 30, 0, TAU); ctx.fill();
-      ctx.strokeStyle = `rgba(255,${130 + 70 * Math.sin(t * 8) * 0.5},60,${0.9 * rg})`; ctx.lineWidth = 3.2; ring(R); ctx.stroke(); ring(R * 0.7); ctx.stroke(); star(R * 0.7, 0.3 + t * 0.6); ctx.stroke(); ticks(R + 2, R + 14, t * 0.4);
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    ctx.restore();
-  }
-  /* --- çıkışı kapatan taş duvar --- */
-  const trapSpec = [[-36, -16, 17], [-12, -17, 19], [13, -16, 18], [37, -14, 16], [-44, -1, 15], [-22, 1, 17], [0, 0, 20], [22, 1, 17], [44, -1, 15], [-31, 13, 13], [-10, 14, 14], [11, 13, 15], [32, 12, 12]];
-  function trapMakeWall() {
-    const idx = trapSpec.map((_, i) => i).sort(() => Math.random() - 0.5);
-    TRAP.bl = trapSpec.map(([x, y, r], i) => ({ x, y, r, z: 360 + rnd(0, 150), vz: 0, d: idx[i] * 0.11 + rnd(0, 0.06), st: 0, sq: 0, sd: rnd(0, 6), j: [0, 1, 2, 3, 4, 5, 6, 7, 8].map(() => rnd(0.88, 1.1)), tr: 0, cr: 0, alive: true, bn: 0, o: 0 }));
-    [...TRAP.bl].sort((a, b) => Math.abs(a.x) - Math.abs(b.x)).forEach((b, i) => { b.o = i; });   // çökme sırası: ortadan kenarlara
-  }
-  function trapImpact(b) {
-    const x = CVO.x + b.x, y = CVO.y + TRAP_DY + b.y; TRAP.sealed = true; b.sq = 1;
-    trapDust(x, y, 5, 1.2); trapChips(x, y, 6, 170, 280); hitFx(0, 9); try { AU.sfx('stoneCrash'); } catch (_) {}
-  }
-  function drawTrapWall() {
-    const T = TRAP, C = cvPal(false), ox = CVO.x, oy = CVO.y + TRAP_DY, L = T.bl.filter(b => b.alive && b.st > 0).sort((a, b) => a.y - b.y);
-    ctx.save(); ctx.lineJoin = ctx.lineCap = 'round';
-    for (const b of L) { const k = 1 - clamp(b.z / 480, 0, 1); ctx.fillStyle = `rgba(0,0,0,${0.1 + 0.36 * k})`; ctx.beginPath(); ctx.ellipse(ox + b.x, oy + b.y + 2, b.r * (0.5 + 0.6 * k), b.r * (0.18 + 0.22 * k), 0, 0, TAU); ctx.fill(); }
-    for (const b of L) {
-      const sh = b.tr > 0 ? Math.sin(T.t * 85 + b.sd * 5) * b.tr * 1.9 : 0, cx = ox + b.x + sh, r = b.r * (1 + 0.1 * b.sq), hy = b.r * 0.8 * (1 - 0.16 * b.sq), cy = oy + b.y - b.z - hy * 0.82, P = b.j.map((v, i) => { const a = i / 9 * TAU + b.sd; return [cx + Math.cos(a) * r * v, cy + Math.sin(a) * hy * v]; });
-      const path = () => { ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); };
-      path(); ctx.fillStyle = C.b2; ctx.fill();
-      ctx.save(); path(); ctx.clip(); ctx.fillStyle = C.b1; ctx.beginPath(); ctx.ellipse(cx - r * 0.22, cy - hy * 0.2, r * 0.8, hy * 0.82, -0.3, 0, TAU); ctx.fill(); ctx.fillStyle = C.hl; ctx.beginPath(); ctx.ellipse(cx - r * 0.38, cy - hy * 0.46, r * 0.4, hy * 0.28, -0.4, 0, TAU); ctx.fill();
-      ctx.fillStyle = 'rgba(10,5,2,0.28)'; ctx.beginPath(); ctx.ellipse(cx + r * 0.5, cy + hy * 0.5, r * 0.7, hy * 0.6, 0, 0, TAU); ctx.fill(); ctx.restore();
-      path(); ctx.strokeStyle = C.ln; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.strokeStyle = 'rgba(20,10,4,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - r * 0.1, cy - hy * 0.7); ctx.lineTo(cx + r * 0.1, cy - hy * 0.1); ctx.lineTo(cx - r * 0.2, cy + hy * 0.35); ctx.stroke();
-      if (b.cr > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(255,170,90,${0.85 * b.cr})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(cx - r * 0.1, cy - hy * 0.7); ctx.lineTo(cx + r * 0.1, cy - hy * 0.1); ctx.lineTo(cx - r * 0.2, cy + hy * 0.35); ctx.moveTo(cx + r * 0.35, cy - hy * 0.4); ctx.lineTo(cx + r * 0.15, cy + hy * 0.2); ctx.stroke(); ctx.globalCompositeOperation = 'source-over'; }
-    }
-    ctx.restore();
-  }
-  /* --- yol bulma: mağara bir labirent; canavarlar oyuncuyu görmüyorsa ızgarada oyuncuya giden en kısa yolu izler --- */
-  function trapField() {
-    const c = CV.c; if (!c) return; const g = cvGeo(c), N = CVN, S = CVS, G = g.G;
-    const px = Math.floor((player.x - CVO.x - CVGX) / S), py = Math.floor((player.y - CVO.y - CVGY) / S);
-    if (px === TRAP.fcx && py === TRAP.fcy && TRAP.fld) return;
-    TRAP.fcx = px; TRAP.fcy = py; const f = TRAP.fld && TRAP.fld.length === N * N ? TRAP.fld : (TRAP.fld = new Int16Array(N * N)); f.fill(-1);
-    if (px < 0 || py < 0 || px >= N || py >= N || !G[py * N + px]) return;
-    const q = [py * N + px]; f[q[0]] = 0;
-    for (let h = 0; h < q.length; h++) { const i = q[h], x = i % N, y = (i - x) / N, d = f[i] + 1; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue; const j = ny * N + nx; if (G[j] && f[j] < 0) { f[j] = d; q.push(j); } } }
-  }
-  function cvLOS(ax, ay, bx, by) {
-    const c = CV.c; if (!c) return false; const d = Math.hypot(bx - ax, by - ay); if (d > 620) return false;
-    const n = Math.ceil(d / 22); for (let i = 1; i < n; i++) { const u = i / n; if (!cvWalk(c, ax + (bx - ax) * u, ay + (by - ay) * u)) return false; } return true;
-  }
-  function cvSteer(e, d, dt) {   // null = doğrudan oyuncuya yürü (görüş açık) · yoksa bir sonraki hücrenin merkezine yönelir
-    if (!CV.in || !TRAP.fld || d < 80) return null;
-    e.lst = (e.lst || 0) - dt; if (e.lst <= 0) { e.lst = 0.18; e.los = cvLOS(e.x - CVO.x, e.y - CVO.y, player.x - CVO.x, player.y - CVO.y); }
-    if (e.los) return null;
-    const N = CVN, S = CVS, f = TRAP.fld, gx = Math.floor((e.x - CVO.x - CVGX) / S), gy = Math.floor((e.y - CVO.y - CVGY) / S);
-    if (gx < 0 || gy < 0 || gx >= N || gy >= N) return null; let bd = f[gy * N + gx]; if (bd < 0) return null;
-    let bx = -1, by = -1;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      const nx = gx + dx, ny = gy + dy; if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue; const v = f[ny * N + nx]; if (v < 0 || v >= bd) continue;
-      if (dx && dy && (f[gy * N + nx] < 0 || f[ny * N + gx] < 0)) continue;   // köşeyi kesmez
-      bd = v; bx = nx; by = ny;
-    }
-    if (bx < 0) return null;
-    const tx = CVO.x + CVGX + (bx + 0.5) * S, ty = CVO.y + CVGY + (by + 0.5) * S, l = Math.hypot(tx - e.x, ty - e.y) || 1; return [(tx - e.x) / l, (ty - e.y) / l];
-  }
-  function trapNear(c, lx, ly, R) { for (let r = 4; r <= R; r += 4) for (let k = 0; k < 12; k++) { const a = k / 12 * TAU, x = lx + Math.cos(a) * r, y = ly + Math.sin(a) * r; if (cvWalk(c, x, y)) return [x, y]; } return null; }
-  function trapClamp() {   // canavarlar mağara duvarından geçemez (görünmez dalış hariç: belireceği yerde en yakın zemine oturur)
-    const c = CV.c; if (!CV.in || !c) return;
-    for (const e of E) {
-      if (!e.trap) continue; const lx = e.x - CVO.x, ly = e.y - CVO.y;
-      if (e.st === 'iv') continue;
-      if (cvWalk(c, lx, ly)) { e.lx = lx; e.ly = ly; continue; }
-      if (e.st === 'bi' || e.lx === undefined) { const q = trapNear(c, lx, ly, 160); if (q) { e.x = CVO.x + q[0]; e.y = CVO.y + q[1]; e.lx = q[0]; e.ly = q[1]; continue; } }
-      if (cvWalk(c, lx, e.ly)) { e.y = CVO.y + e.ly; e.lx = lx; } else if (cvWalk(c, e.lx, ly)) { e.x = CVO.x + e.lx; e.ly = ly; } else { e.x = CVO.x + e.lx; e.y = CVO.y + e.ly; }
-    }
-  }
-  /* --- savaş --- */
-  function trapSpawn() {   // tek dalga: haritanın dört yanındaki, oyuncuya ulaşılabilir zemin hücrelerinde Çırak Büyücüler
-    const c = CV.c, g = cvGeo(c), N = CVN, S = CVS, G = g.G, T = TRAP; trapField();
-    const cells = []; for (let gy = 4; gy < 46; gy++) for (let gx = 4; gx < N - 4; gx++) {
-      if (!G[gy * N + gx] || !T.fld || T.fld[gy * N + gx] < 0) continue; const lx = CVGX + (gx + 0.5) * S, ly = CVGY + (gy + 0.5) * S, wx = CVO.x + lx, wy = CVO.y + ly;
-      if (Math.hypot(wx - player.x, wy - player.y) < 360 || !cvWalk(c, lx, ly)) continue; cells.push([wx, wy]);
-    }
-    for (let i = cells.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [cells[i], cells[j]] = [cells[j], cells[i]]; }
-    const n = 8 + Math.min(6, Math.floor((LVL.lv - 1) / 2)), pick = [];
-    for (const sep of [260, 190, 120, 0]) { for (const q of cells) { if (pick.length >= n) break; if (pick.every(p => Math.hypot(p[0] - q[0], p[1] - q[1]) >= sep)) pick.push(q); } if (pick.length >= n) break; }
-    T.stash = E.splice(0); T.estash = EP.splice(0);   // dünya düşmanları mağara dışında dondurulur
-    pick.forEach(([x, y], i) => { const e = newEnemy(x, y, undefined, -(0.2 + i * 0.24)); e.trap = true; e.lx = x - CVO.x; e.ly = y - CVO.y; E.push(e); });
-    T.N = pick.length; T.left = pick.length; T.live = true;
-  }
-  const trapRestore = () => { for (let i = E.length - 1; i >= 0; i--) if (E[i].trap) E.splice(i, 1); for (let i = EP.length - 1; i >= 0; i--) if (EP[i].cv) EP.splice(i, 1); if (TRAP.stash) { for (const e of TRAP.stash) E.push(e); TRAP.stash = null; } if (TRAP.estash) { for (const p of TRAP.estash) EP.push(p); TRAP.estash = null; } };
-  function trapReset() {   // mağara sıfırlanırken (ölüm, yeniden yükleme, yeni oyun) ya da tuzak biterken: düşmanlar geri verilir, durum temizlenir (kalıcı hak TRAPUSED'da kalır)
-    trapRestore(); const T = TRAP;
-    Object.assign(T, { ph: '', t: 0, id: '', c: null, sp: null, live: false, lock: false, sealed: false, k: 0, pd: 0, rg: 0, dl: 0, flash: 0, vg: 0, msg: null, bl: [], pt: [], N: 0, left: 0, fld: null, fcx: -9, fcy: -9, orb: null, rw: null, q: null, qT: 0, gi: 0, landT: 0, s1: 0, bv: 0 });
-  }
-  function trapReward() {   // uğraşa değer: altın · kemik · külçe · prizma · duruma uygun şifa eşyası · şansa bağlı göz yaşı / iksir
-    const low = F.hpMax > 0 ? clamp(1 - F.hp / F.hpMax, 0, 1) : 0, ri = (a, b) => a + (Math.random() * (b - a + 1) | 0), R = [];
-    R.push({ k: 'dust', n: ri(50, 80) }, { k: 'bone', n: ri(10, 16) }, { k: 'ingot', n: 2 + (Math.random() < luckP(0.4) ? 1 : 0) }, { k: 'prism', n: ri(3, 5) });
-    R.push(low > 0.45 ? { k: 'medk', n: 1 } : { k: 'band', n: 2 });
-    if (Math.random() < luckP(0.5)) R.push({ k: 'tear', n: 1 }); if (Math.random() < luckP(0.1)) R.push({ k: 'elix', n: 1 });
-    return R;
-  }
-  function trapGive(it) {
-    const T = TRAP, y = player.y - 58 - (T.gi++ % 4) * 15, x = player.x, k = it.k, n = it.n; INV.ever = true; try { sparks(x, player.y - 30, 6, 130, -PI / 2, 1.2); } catch (_) {}
-    if (k === 'dust') { INV.dust += n; STAT.got.dust += n; INV.gp = 1; ftext(x, y, '+' + n + ' Altın Tozu', GOLD); try { AU.sfx('ingotGet'); } catch (_) {} }
-    else if (k === 'bone') { INV.bone += n; ftext(x, y, '+' + n + ' Kemik', '#ece5d2'); try { AU.sfx('oreGet'); } catch (_) {} }
-    else if (k === 'ingot') { INV.ingot += n; STAT.got.ingot += n; INV.gp = 1; ftext(x, y, '+' + n + ' Altın Külçesi', GOLD); try { AU.sfx('ingotGet'); } catch (_) {} }
-    else if (k === 'prism') { INV.prism += n; STAT.got.prism += n; INV.gp = 1; ftext(x, y, '+' + n + ' Mor Prizma', PRISM_COL); try { AU.sfx('pickup'); } catch (_) {} }
-    else if (k === 'tear') { SK.pts += n; SK.pop = 1; ftext(x, y, '+' + n + ' Göz Yaşı Puanı', '#7fd4ff'); try { AU.sfx('tearGet'); } catch (_) {} }
-    else if (HEAL_CAP[k] !== undefined) {
-      const m = Math.max(0, Math.min(n, HEAL_CAP[k] - INV[k])); if (m > 0) { INV[k] += m; STAT.got[k] = (STAT.got[k] || 0) + m; HEAL.pop[k] = 1; ftext(x, y, '+' + m + ' ' + HEAL_NAME[k], HEAL_COL[k]); try { AU.sfx('pickup'); } catch (_) {} }
-      for (let i = m; i < n; i++) LOOT.push({ k, n: 1, cv: 1, x: x + rnd(-14, 14), y: player.y + 10, z: 30, vx: rnd(-60, 60), vy: rnd(10, 60), vz: rnd(300, 420), t: 0, ph: rnd(0, 6), b: 0, rest: false });   // çanta doluysa taşan yere düşer
-    }
-  }
-  function trapGrantAll() { const T = TRAP; for (const it of (T.q || T.rw || [])) trapGive(it); T.q = null; T.rw = null; }
-  const trapMsg = (s, sub, col, l) => { TRAP.msg = { s, sub, col, t: 0, l: l || 3 }; };
-  function trapWin() {
-    const T = TRAP; T.ph = 'w1'; T.t = 0; T.live = false; T.lock = true; T.flash = 0.55; EP.length = 0; player.vx = player.vy = 0;
-    T.rw = trapReward(); trapMsg('TUZAK AŞILDI', 'Çıkış açılıyor', '120,255,170', 3.4);
-    try { AU.sfx('trapWin'); } catch (_) {}
-    for (let i = 0; i < 26; i++) tpf({ k: 'mote', x: player.x + rnd(-26, 26), y: player.y, z: rnd(0, 50), vz: rnd(30, 90), life: rnd(1.0, 1.9), s: rnd(1.4, 2.8) });
-    tpf({ k: 'ring', x: player.x, y: player.y + 2, life: 0.9, s: 130 });
-  }
-  function trapStart(c, sp) {
-    const T = TRAP; trapReset(); Object.assign(T, { ph: 'dis', t: 0, id: c.id, c, sp, lock: true });
-    trapMark(c.id); player.vx = player.vy = 0; try { relAtk(); } catch (_) {}
-    T.flash = 0.7; trapMsg('TUZAK!', '', '255,120,80', 2.4); try { AU.sfx('trapRune'); } catch (_) {}
-  }
-  function updateTrap(dt) {
-    const T = TRAP; T.flash = Math.max(0, T.flash - dt * 1.4); T.dl = Math.max(0, T.dl - dt * 0.8); if (T.msg && (T.msg.t += dt) > T.msg.l) T.msg = null;
-    trapFxUpdate(dt);
-    if (!T.ph) { const c = CV.c; if (CV.in && c && F.death < 0 && trapShown(c)) { const sp = cvTrapSpot(c); if (sp && !TRAPUSED.has(c.id) && Math.hypot(player.x - (CVO.x + sp.lx), (player.y - (CVO.y + sp.ly)) * 1.3) < 40) trapStart(c, sp); } return; }
-    if (!CV.in || !CV.c || CV.c !== T.c) { if (T.ph === 'orb' || T.ph === 'give') trapGrantAll(); trapReset(); return; }   // (geliştirici ışınlanması vb.) mağaradan çıkıldı: ödül varsa anında verilir
-    if (F.death >= 0) return;
-    if (T.ph !== 'dis') T.rg = Math.max(0, T.rg - dt * 0.7);
-    T.t += dt; const t = T.t, dx = CVO.x, dy = CVO.y + TRAP_DY - 36;
-    if (T.ph === 'dis') {
-      T.pd = sstep(0.2, 1.3, t); T.rg = sstep(0, 0.6, t); hitFx(0, 1.5 + 4 * sstep(0, 1.2, t));
-      if (!T.s1 && t > 0.3) { T.s1 = 1; try { AU.sfx('trapRumble'); } catch (_) {} }
-      const px = CVO.x + T.sp.lx, py = CVO.y + T.sp.ly;
-      if (t < 1.5 && Math.random() < dt * 46) tpf({ k: 'spark', x: px + rnd(-34, 34), y: py + rnd(-6, 6), z: rnd(4, 26), vx: rnd(-40, 40), vz: rnd(60, 190), life: rnd(0.5, 1.0), s: rnd(1.2, 2.6) });
-      if (Math.random() < dt * (6 + 24 * sstep(0.3, 1.5, t))) tpf({ k: 'rock', x: player.x + rnd(-280, 280), y: player.y + rnd(-170, 170), z: rnd(220, 330), vz: 0, life: 2.4, s: rnd(2, 5.4), r: rnd(0, TAU), vr: rnd(-8, 8), c: Math.random() < 0.5 ? 0 : 1 });
-      if (t > 0.2 && t < 1.5 && Math.random() < dt * 14) trapDust(player.x + rnd(-240, 240), player.y + rnd(-130, 130), 1, 1.4);
-      if (t >= 1.7) { T.ph = 'pan1'; T.t = 0; T.fx = dx; T.fy = dy; }
-    } else if (T.ph === 'pan1') {
-      T.k = sstep(0, 1.15, t); hitFx(0, 2.4); if (Math.random() < dt * 12) tpf({ k: 'rock', x: dx + rnd(-60, 60), y: CVO.y + TRAP_DY + rnd(-20, 20), z: rnd(200, 300), vz: 0, life: 2.2, s: rnd(2, 4.6), r: rnd(0, TAU), vr: rnd(-8, 8), c: 1 });
-      if (t >= 1.3) { trapMakeWall(); T.ph = 'drop'; T.t = 0; T.k = 1; T.landT = 0; }
-    } else if (T.ph === 'drop') {
-      for (const b of T.bl) {
-        b.sq = Math.max(0, b.sq - dt * 6);
-        if (b.st === 0) { if (t >= b.d) b.st = 1; continue; }
-        if (b.st === 1) { b.vz += 1500 * dt; b.z -= b.vz * dt; if (b.z <= 0) { b.z = 0; if (!b.bn) { b.bn = 1; trapImpact(b); if (b.vz > 500) { b.vz *= -0.16; b.z = 0.01; } else b.st = 2; } else { b.st = 2; b.vz = 0; } } }
-      }
-      hitFx(0, 1.2);
-      if (T.bl.every(b => b.st === 2)) { if (!T.landT) T.landT = t; if (t - T.landT > 0.9) { T.ph = 'pan2'; T.t = 0; trapMsg('ÇIKIŞ MÜHÜRLENDİ', 'Tüm canavarları kes', '255,150,90', 3.6); } }
-    } else if (T.ph === 'pan2') {
-      T.k = 1 - sstep(0, 1.0, t); if (t >= 1.0) { T.k = 0; trapSpawn(); T.ph = 'fight'; T.t = 0; T.lock = false; try { AU.sfx('eRage', player.x, player.y); } catch (_) {} }
-    } else if (T.ph === 'fight') {
-      trapField(); T.left = 0; for (const e of E) if (e.trap) T.left++;
-      if (T.left === 0 && t > 0.8) trapWin();
-    } else if (T.ph === 'w1') {
-      if (t >= 1.1) { T.ph = 'w2'; T.t = 0; T.fx = dx; T.fy = dy; }
-    } else if (T.ph === 'w2') {
-      T.k = sstep(0, 1.1, t); if (t >= 1.3) { T.ph = 'w3'; T.t = 0; T.k = 1; try { AU.sfx('trapRumble'); } catch (_) {} }
-    } else if (T.ph === 'w3') {
-      hitFx(0, 2.6 + (t > 0.9 ? 2 : 0)); let alive = 0, last = 0;
-      for (const b of T.bl) {
-        if (!b.alive) continue; b.tr = sstep(0, 0.8, t); b.cr = sstep(0.25, 0.8, t); const ct = 0.9 + b.o * 0.1; last = Math.max(last, ct);
-        if (t >= ct) { b.alive = false; const x = CVO.x + b.x, y = CVO.y + TRAP_DY + b.y; trapDust(x, y, 5, 1.3); trapChips(x, y, 9, 210, 320); T.dl = 1; try { AU.sfx('stoneBreak'); } catch (_) {} } else alive++;
-      }
-      if (alive <= 5) T.sealed = false;
-      if (alive === 0 && t > 0.9 + trapSpec.length * 0.1 + 0.7) { T.ph = 'w4'; T.t = 0; T.sealed = false; T.bl = []; }
-    } else if (T.ph === 'w4') {
-      T.k = 1 - sstep(0, 1.0, t); if (t >= 1.0) { T.k = 0; T.lock = false; trapRestore(); T.ph = 'orb'; T.t = 0; T.orb = { t: 0, dur: 3.8, x: player.x, y: player.y, z: 340 }; trapMsg('ÖDÜL', 'Tavandan süzülüyor', '255,214,110', 3.2); try { AU.sfx('rewardDescend'); } catch (_) {} }
-    } else if (T.ph === 'orb') {
-      const O = T.orb; O.t += dt; const u = clamp(O.t / O.dur, 0, 1), e = 1 - Math.pow(1 - u, 2.2);
-      O.x += (player.x - O.x) * dmp(5, dt); O.y += (player.y - O.y) * dmp(5, dt); O.z = lerp(340, 42, e);
-      if (Math.random() < dt * 40) tpf({ k: 'mote', x: O.x + rnd(-16, 16), y: O.y, z: O.z + rnd(-6, 6), vz: rnd(-20, 10), life: rnd(0.6, 1.3), s: rnd(1.2, 2.4) });
-      if (O.t >= O.dur) {   // varış: küre dağılır, ödüller sırayla envantere girer
-        for (let i = 0; i < 24; i++) tpf({ k: 'spark', x: O.x, y: O.y, z: O.z, vx: rnd(-120, 120), vz: rnd(20, 200), life: rnd(0.5, 1.1), s: rnd(1.4, 3) });
-        tpf({ k: 'ring', x: O.x, y: O.y + 2, life: 0.8, s: 110 }); T.flash = 0.35; hitFx(0, 4); try { AU.sfx('rewardGet'); } catch (_) {}
-        T.ph = 'give'; T.t = 0; T.q = (T.rw || []).slice(); T.qT = 0.15; T.orb = null;
-      }
-    } else if (T.ph === 'give') {
-      if (T.q && T.q.length) { if ((T.qT -= dt) <= 0) { trapGive(T.q.shift()); T.qT = 0.34; } }
-      else if (t > 1.4) { T.rw = null; trapReset(); }   // bitti: kalıcı hak zaten kayıtlı
-    }
-  }
-  /* --- ekran katmanı: kalan canavar sayacı, başlık, çakma ışığı, kenar kızıllığı --- */
-  function drawTrapHud(fg, dt) {
-    const T = TRAP, light = fg === '0,0,0', bgc = light ? '242,242,242' : '0,0,0', A = light ? '210,100,20' : '255,170,70', q = HUD_S;
-    T.vg += ((T.live ? 1 : 0) - T.vg) * dmp(3, dt); if (T.vg < 0.004) T.vg = 0; T.bv += ((T.live ? 1 : 0) - T.bv) * dmp(8, dt); if (T.bv < 0.01) T.bv = 0;
-    if (T.vg > 0.01) { const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.38, W / 2, H / 2, Math.max(W, H) * 0.78); g.addColorStop(0, 'rgba(255,90,40,0)'); g.addColorStop(1, `rgba(255,90,40,${0.16 * T.vg})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
-    if (T.flash > 0.01) { ctx.fillStyle = `rgba(255,${T.ph === 'dis' || T.ph === '' ? '170,110' : '240,190'},${Math.min(0.5, T.flash * 0.5)})`; ctx.fillRect(0, 0, W, H); }
-    if (T.bv > 0.01) {
-      const w = 150 * q, h = 28 * q, x = W / 2 - w / 2, y = HUD_Y - 22 * q + ((CURSE.on || CURSE.done > 0) ? 34 * q : 0), done = T.N - T.left, a = T.bv;
-      ctx.save(); ctx.globalAlpha = a; rr(x, y, w, h, h / 2); ctx.fillStyle = `rgba(${bgc},0.6)`; ctx.fill(); ctx.fillStyle = `rgba(${A},0.1)`; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(${A},0.7)`; ctx.stroke();
-      const sx = x + 16 * q, sy = y + h / 2; ctx.strokeStyle = `rgba(${A},0.95)`; ctx.lineWidth = 1.4 * q; ctx.beginPath(); ctx.arc(sx, sy, 5.4 * q, 0, TAU); ctx.moveTo(sx, sy - 8 * q); ctx.lineTo(sx, sy - 5.4 * q); ctx.moveTo(sx, sy + 8 * q); ctx.lineTo(sx, sy + 5.4 * q); ctx.moveTo(sx - 8 * q, sy); ctx.lineTo(sx - 5.4 * q, sy); ctx.moveTo(sx + 8 * q, sy); ctx.lineTo(sx + 5.4 * q, sy); ctx.stroke();
-      dvText('TUZAK', x + 29 * q, sy + 0.5, 10.5 * q, 600, A, 1, 2 * q, 'left'); dvText('kalan ' + T.left, x + w - 12 * q, sy + 0.5, 11.5 * q, 700, fg, 0.95, 0.4, 'right');
-      const bw = w - 40 * q; ctx.fillStyle = `rgba(${fg},0.12)`; ctx.fillRect(x + 20 * q, y + h - 4.5 * q, bw, 2 * q); ctx.fillStyle = `rgba(${A},0.9)`; ctx.fillRect(x + 20 * q, y + h - 4.5 * q, bw * (T.N ? done / T.N : 0), 2 * q); ctx.restore();
-    }
-    if (T.msg) {
-      const m = T.msg, a = clamp(m.t / 0.3, 0, 1) * clamp((m.l - m.t) / 0.7, 0, 1), s = clamp(H / 390, 0.75, 1.2); ctx.save(); ctx.globalAlpha = a;
-      dvText(m.s, W / 2, H * 0.21, 24 * s, 300, m.col, 1, 7 * s, 'center'); if (m.sub) dvText(m.sub, W / 2, H * 0.21 + 26 * s, 12.5 * s, 400, fg, 0.7, 2 * s, 'center'); ctx.restore();
-    }
-  }
-  function trapObjs() {   // mağara içi y-sıralı nesneler: hazine yığını · taş duvar
-    const c = CV.c, o = []; if (!c) return o;
-    if (trapShown(c)) { const sp = cvTrapSpot(c); o.push({ y: CVO.y + sp.ly + 8, f: () => drawTrapPile(sp) }); }
-    if (TRAP.bl.length && TRAP.c === c) o.push({ y: CVO.y + TRAP_DY + 14, f: drawTrapWall });
-    return o;
-  }
-  function trapLights() {   // mağara karanlığına açılan ışıklar: yığının altın ışığı, mühür, çıkış, canavarlar, ödül
-    const c = CV.c; if (!c) return; const t = ATM.t || 0, T = TRAP;
-    if (trapShown(c)) { const sp = cvTrapSpot(c); LT.push({ x: CVO.x + sp.lx, y: CVO.y + sp.ly - 18, R: 150 + 12 * Math.sin(t * 3) + 160 * T.rg, a: 1, k: 0.7 }); }
-    if (T.k > 0.02 || T.sealed || T.dl > 0.02) LT.push({ x: CVO.x, y: CVO.y + TRAP_DY - 20, R: 240 + 110 * T.dl, a: 0.95, k: 0.8 });
-    if (T.live) { LT.push({ x: player.x, y: player.y - 24, R: 175, a: 0.8, k: 0.6 }); for (const e of E) if (e.trap && e.em >= 0) LT.push({ x: e.x, y: e.y - 20, R: 84, a: 0.85, k: 0.5 }); }   // savaşta oyuncunun çevresi de görünür
-    if (T.orb) LT.push({ x: T.orb.x, y: T.orb.y - T.orb.z, R: 230, a: 1, k: 1 });
-  }
   function cvObjs(fg) {   // mağara içi y-sıralı nesneler: duvar meşaleleri
     const c = CV.c; if (!c) return []; const g = cvGeo(c), t = ATM.t || 0;
     return g.tor.map(T => ({ y: CVO.y + T.y, f: () => {
@@ -3692,7 +3401,7 @@
       ctx.beginPath(); ctx.moveTo(-1.9, 0); ctx.lineTo(-2.2, -33); ctx.lineTo(2.2, -33); ctx.lineTo(1.9, 0); ctx.closePath(); ctx.fillStyle = '#6a4a2c'; ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#3a342f'; ctx.fillRect(-3.2, -17, 6.4, 3); ctx.strokeRect(-3.2, -17, 6.4, 3);
       ctx.beginPath(); ctx.moveTo(-3.4, -33); ctx.lineTo(-4.4, -38.5); ctx.lineTo(4.4, -38.5); ctx.lineTo(3.4, -33); ctx.closePath(); ctx.fillStyle = '#2b1d12'; ctx.fill(); ctx.stroke();   // bez sarılı baş
-      drawFlameBlob(0, -38, 6.5, 22, t, T.ph); ctx.restore(); } })).concat(trapObjs());
+      drawFlameBlob(0, -38, 6.5, 22, t, T.ph); ctx.restore(); } }));
   }
   function drawCaveBg(fg) {   // mağara zemini: önceden çizilmiş maden ağı (yalnızca görünen kesit) + meşale ışığı, maden parıltısı, merdiven ışığı
     const c = CV.c; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#0e0804'; ctx.fillRect(0, 0, W, H); if (!c) return; setBase();
@@ -3700,8 +3409,8 @@
     ctx.save(); ctx.translate(CVO.x, CVO.y); ctx.lineJoin = ctx.lineCap = 'round'; ctx.imageSmoothingEnabled = true;
     { const vx0 = Math.max(CVGX, cam.x - CVO.x - 6), vy0 = Math.max(CVGY, cam.y - CVO.y - 6), vx1 = Math.min(CVGX + g.w, cam.x - CVO.x + W / ZOOM + 6), vy1 = Math.min(CVGY + g.h, cam.y - CVO.y + H / ZOOM + 6);
       if (vx1 > vx0 && vy1 > vy0) ctx.drawImage(g.img, vx0 - CVGX, vy0 - CVGY, vx1 - vx0, vy1 - vy0, vx0, vy0, vx1 - vx0, vy1 - vy0); }
-    drawTrapGround(c);   // tuzak mührü (zeminde silik iz)
-    { const gl = ctx.createLinearGradient(0, 72, 0, -60); gl.addColorStop(0, 'rgba(255,236,200,0.26)'); gl.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = gl; ctx.fillRect(-32, -60, 64, 132); }   // merdivenden sızan gün ışığı
+    if (CV.lad) { cvDrawPlug(c); cvDrawLad(t); }
+    else { const gl = ctx.createLinearGradient(0, 72, 0, -60); gl.addColorStop(0, 'rgba(255,236,200,0.26)'); gl.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = gl; ctx.fillRect(-32, -60, 64, 132); }   // merdivenden sızan gün ışığı
     ctx.globalCompositeOperation = 'lighter';
     for (const T of g.tor) { if (Math.abs(T.x - px) > 700 || Math.abs(T.ly - py) > 600) continue; const fk = 0.9 + 0.1 * Math.sin(t * 9 + T.ph * 3), gr = ctx.createRadialGradient(T.x, T.ly, 3, T.x, T.ly, 165); gr.addColorStop(0, `rgba(255,150,60,${0.2 * fk})`); gr.addColorStop(1, 'rgba(255,150,60,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(T.x, T.ly, 165, 0, TAU); ctx.fill(); }   // meşalelerin sıcak ışığı
     ctx.globalCompositeOperation = 'source-over';
@@ -3722,8 +3431,7 @@
     if (TORCH.lit > 0.01) LT.push({ x: TORCH.wx, y: TORCH.wy, R: TORCH.R * TORCH.fk, a: TORCH.lit, k: TORCH.lit * TORCH.str });
     { const cg = CV.c ? cvGeo(CV.c) : null; if (cg) for (const T of cg.tor) { if (Math.abs(T.x - (player.x - CVO.x)) > 900 || Math.abs(T.ly - (player.y - CVO.y)) > 700) continue; const fk = 0.95 + 0.05 * Math.sin(t * 9 + T.ph * 3) * Math.sin(t * 5.3 + T.ph) - 0.07 * WIND.s * (0.5 + 0.5 * Math.sin(t * 14 + T.ph * 5)); LT.push({ x: CVO.x + T.x, y: CVO.y + T.ly, R: CAMP_LR * 0.8 * fk, a: 1, k: 1 }); } }
     if (CV.c) for (const ch of cvChests(CV.c)) { const cs = chState(ch.id, false), k = cs.curse && cs.cop >= 0.8 ? 0.15 + 0.85 * (1 - sstep(4, 10, cs.cop - 0.8)) : cs.dead ? Math.max(0, 1 - cs.dd / 3) : cs.dying >= 0 ? 1 : 0.35 + 0.12 * cs.hits; if (cs.gone) continue; LT.push({ x: CVO.x + ch.lx, y: CVO.y + ch.ly - 24, R: 120 + 90 * k + 10 * Math.sin(t * 2.2 + cs.t), a: 1, k: 0.45 + 0.5 * k }); }   // ödül sandığı kendi altın ışığını yayar: vurdukça, kırılırken parlar
-    trapLights();
-    LT.push({ x: CVO.x, y: CVO.y + 10, R: 220, a: 0.9, k: 0.9 });
+    if (CV.lad) { const L = CV.lad; LT.push({ x: CVO.x + L.x + (L.f === 'E' ? -26 : L.f === 'W' ? 26 : 0), y: CVO.y + L.y + (L.f === 'S' ? -26 : L.f === 'N' ? 26 : 0) - 18, R: 190, a: 0.9, k: 0.85 }); } else LT.push({ x: CVO.x, y: CVO.y + 10, R: 220, a: 0.9, k: 0.9 });
     ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     const sw = Math.ceil(W / 4), sh = Math.ceil(H / 4); if (!ATM.dk) { ATM.dk = document.createElement('canvas'); ATM.dkx = ATM.dk.getContext('2d'); } if (ATM.dk.width !== sw || ATM.dk.height !== sh) { ATM.dk.width = sw; ATM.dk.height = sh; }
     const d = ATM.dkx; d.globalCompositeOperation = 'source-over'; d.clearRect(0, 0, sw, sh); d.fillStyle = `rgba(20,11,5,${0.52 + 0.4 * CV.dp})`; d.fillRect(0, 0, sw, sh); d.globalCompositeOperation = 'destination-out';
@@ -3880,8 +3588,7 @@
     } else {
       const cs = []; for (let i = Math.floor((ox - 7000) / CVC); i <= Math.floor((ox + 7000) / CVC); i++) for (let j = Math.floor((oy - 7000) / CVC); j <= Math.floor((oy + 7000) / CVC); j++) { const c = cvCand(i, j); if (c) cs.push(c); }
       cs.sort((a, b) => Math.hypot(a.x - ox, a.y - oy) - Math.hypot(b.x - ox, b.y - oy));
-      if (DEVC.k === 't') for (const c of cs.slice(0, 14)) { let sp = null; try { sp = cvTrapSpot(c); } catch (_) {} if (sp && !TRAPUSED.has(c.id)) out.push({ d: Math.hypot(c.x - ox, c.y - oy), lk: false, go: () => devTpCave(c, sp) }); }
-      else for (const c of cs.slice(0, 14)) { let chs = []; try { chs = cvChests(c); } catch (_) {}
+      for (const c of cs.slice(0, 14)) { let chs = []; try { chs = cvChests(c); } catch (_) {}
         for (const ch of chs) { if (ch.id.charAt(2) !== DEVC.k) continue; const st = chState(ch.id, false); if (st.dead || st.gone || st.dying >= 0 || st.cop >= 0) continue; out.push({ d: Math.hypot(c.x - ox, c.y - oy), lk: false, go: () => devTpCave(c, ch) }); } }
     }
     return out.sort((a, b) => a.d - b.d);
@@ -7393,7 +7100,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       const a = AR[i], x0 = a.x, y0 = a.y; a.t += dt; a.x += a.vx * dt; a.y += a.vy * dt;
       a.tr.unshift({ x: x0, y: y0 }); if (a.tr.length > 6) a.tr.pop();
       let stop = false, rec = 0.5;
-      for (const e of cvEL().slice()) {   // düşmanlar (delme: a.pen)
+      for (const e of CV.in ? [] : E.slice()) {   // düşmanlar (delme: a.pen)
         if (a.pen <= 0) break;
         if (e.em < 1 || e.ghost || a.hit.includes(e) || !inEll(x0, y0, a.x, a.y, e.x, e.y, 25, 17)) continue;
         a.hit.push(e); hitEnemy(e, a.dmg * gearM('arrow'), a.a, true);
@@ -7401,7 +7108,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         if (a.perf && a.hit.length === 1) ftext(e.x, e.y - 78, 'Tam isabet!', GOLD);
         if (--a.pen <= 0) { stop = true; rec = 0.3; }
       }
-      if (!stop && cvWorld()) for (let j = EP.length - 1; j >= 0; j--) {   // kara küreleri havada keser
+      if (!stop && !CV.in) for (let j = EP.length - 1; j >= 0; j--) {   // kara küreleri havada keser
         const bl = EP[j]; if (!inEll(x0, y0, a.x, a.y, bl.x, bl.y, 20, 18)) continue;
         sparks(bl.x, bl.y - 22, 8, 200, a.a, 0.9); smoke(bl.x, bl.y - 22, 2, 30, 5); AU.sfx('boltBreak', bl.x, bl.y); EP.splice(j, 1);
         if (--a.pen <= 0) { stop = true; rec = 0.7; } break;
@@ -8086,7 +7793,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const R = BOMB_R;
     PBX.push({ x: b.x, y: b.y, t: 0, life: 0.6, r: R }); CFX.push({ k: 'flash', x: b.x, y: b.y - 14, t: 0, life: 0.35 });
     sparks(b.x, b.y - 14, 16, 300, 0, TAU); smoke(b.x, b.y - 10, 6, 50, 12); hitFx(0.1, 7); try { AU.sfx('boltBreak', b.x, b.y); AU.sfx('guardBreak', b.x, b.y); } catch (_) {}
-    for (const e of cvEL().slice()) {
+    for (const e of CV.in ? [] : E.slice()) {
       if (e.em < 1 || e.st === 'die') continue;
       const dx = e.x - b.x, dy = e.y - b.y; if (Math.hypot(dx, dy / 0.8) > R) continue;
       const ang = Math.atan2(dy, dx); hitEnemy(e, BOMB_DMG, ang);
@@ -8095,7 +7802,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         else if (!e.armor) { e.stun = 0.8; e.kx = Math.cos(ang) * 380; e.ky = Math.sin(ang) * 300; e.st = 'chase'; e.atk = ''; }
       }
     }
-    if (cvWorld()) for (let i = EP.length - 1; i >= 0; i--) if (Math.hypot(EP[i].x - b.x, (EP[i].y - b.y) / 0.8) < R) { sparks(EP[i].x, EP[i].y - 22, 6, 160, 0, TAU); EP.splice(i, 1); }
+    if (!CV.in) for (let i = EP.length - 1; i >= 0; i--) if (Math.hypot(EP[i].x - b.x, (EP[i].y - b.y) / 0.8) < R) { sparks(EP[i].x, EP[i].y - 22, 6, 160, 0, TAU); EP.splice(i, 1); }
     for (const [sx, sy, id, ev] of statuesIn(b.x - R - 40, b.y - R - 60, b.x + R + 40, b.y + R + 100)) { if (!ev) continue; const s = evState(id); if (s.dead || s.dying >= 0 || Math.hypot(sx - b.x, (sy - b.y) / 0.8) > R + 28) continue; hitEvil(s, sx, sy, Math.atan2(sy - b.y, sx - b.x)); }
     for (const [cx, cy, id, lk] of chestsIn(b.x - R, b.y - R, b.x + R, b.y + R + 40)) { const s = chState(id, lk); if (s.dead || s.dying >= 0 || Math.hypot(cx - b.x, (cy - b.y) / 0.8) > R) continue; hitChest(s, cx, cy, Math.atan2(cy - b.y, cx - b.x)); }
     const pd = Math.hypot(player.x - b.x, (player.y - b.y) / 0.8);
@@ -8105,7 +7812,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const P = BEAM, A = P.aim, ca = Math.cos(A), sa = Math.sin(A), line = (x, y) => { const dx = x - player.x, dy = y - player.y; return [dx * ca + dy * sa, -dx * sa + dy * ca]; };
     P.n++;
     const offs = beamOffs(P.streak), inBeam = (x, y, w, l0) => offs.some(o => { const dx = x - player.x, dy = y - player.y, c = Math.cos(A + o), s = Math.sin(A + o), al = dx * c + dy * s, pp = -dx * s + dy * c; return al > l0 && al < beamLen(P.streak) + 12 && Math.abs(pp) < w; });
-    for (const e of cvEL().slice()) {   // deldiği herkes: darbe + erimeye başlar (ışın çekilse de bir süre erimeye devam eder); düşman başına tek darbe
+    for (const e of CV.in ? [] : E.slice()) {   // deldiği herkes: darbe + erimeye başlar (ışın çekilse de bir süre erimeye devam eder); düşman başına tek darbe
       if (e.em < 1 || e.ghost || e.st === 'die') continue;
       if (inBeam(e.x, e.y, beamW(P.streak), 8)) {
         e.melt = MELT_T; const big = P.streak >= BEAM_S3, ang = big ? Math.atan2(e.y - player.y, e.x - player.x) : A;
@@ -8113,7 +7820,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         if (P.streak >= BEAM_S5 && e.st !== 'die' && E.includes(e)) { e.kx += Math.cos(ang) * 260; e.ky += Math.sin(ang) * 260; }
       }
     }
-    if (cvWorld()) for (let i = EP.length - 1; i >= 0; i--) { if (inBeam(EP[i].x, EP[i].y, 14 + 10 * beamU(P.streak), 0)) { sparks(EP[i].x, EP[i].y - 22, 6, 160, A, 0.8); EP.splice(i, 1); } }
+    if (!CV.in) for (let i = EP.length - 1; i >= 0; i--) { if (inBeam(EP[i].x, EP[i].y, 14 + 10 * beamU(P.streak), 0)) { sparks(EP[i].x, EP[i].y - 22, 6, 160, A, 0.8); EP.splice(i, 1); } }
     if (P.n % 3 === 1) {   // heykel ve sandıklara her 0.9 sn'de bir
       const BL = beamLen(P.streak), x1 = player.x + ca * BL, y1 = player.y + sa * BL;
       for (const [sx, sy, id, ev] of statuesIn(Math.min(player.x, x1) - 40, Math.min(player.y, y1) - 60, Math.max(player.x, x1) + 40, Math.max(player.y, y1) + 100)) { if (!ev) continue; const s = evState(id); if (s.dead || s.dying >= 0) continue; const [al, pp] = line(sx, sy); if (al > 0 && al < BL + 20 && Math.abs(pp) < 34) hitEvil(s, sx, sy, A); }
@@ -8153,7 +7860,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     for (const e of E) if (e.melt > 0) {   // erime: mor damlalar süzülür, 0.3 sn'de bir hasar
       e.melt -= dt; if (Math.random() < dt * 16) sparks(e.x + rnd(-8, 8), e.y - rnd(8, 34), 1, 40, PI / 2, 0.6);
     }
-    P.mt -= dt; if (P.mt <= 0) { P.mt = 0.3; for (const e of cvEL().slice()) if (e.melt > 0 && e.st !== 'die' && !e.ghost) hitEnemy(e, MELT_DMG * beamMul(P.streak) * wpnDmg(), PI / 2, 'soft'); }
+    P.mt -= dt; if (P.mt <= 0) { P.mt = 0.3; for (const e of CV.in ? [] : E.slice()) if (e.melt > 0 && e.st !== 'die' && !e.ghost) hitEnemy(e, MELT_DMG * beamMul(P.streak) * wpnDmg(), PI / 2, 'soft'); }
   }
   function drawPrismFx(fg) {
     for (const b of BM) {   // bombalar
@@ -8540,7 +8247,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     BASE0.s.forEach((a, i) => baseStatues.push([a[0] * mx + j(i, 45), a[1] * my + j(i + 10, 45), ...a.slice(2)]));
     BASE0.c.forEach((a, i) => baseChests.push([a[0] * mx + j(i + 20, 30), a[1] * my + j(i + 30, 30), ...a.slice(2)]));
     BASE0.k.forEach((a, i) => baseCamps.push([a[0] * mx + j(i + 40, 60), a[1] * my + j(i + 50, 60), ...a.slice(2)]));
-    EV.clear(); CST.clear(); chestCache.clear(); TST.clear(); treeCache.clear(); RST.clear(); rockCache.clear(); rkGeo.clear(); RS.length = 0; LV.length = TP.length = 0; AX.on = false; CAMP.seen.clear(); CAMP.looted.clear(); CAMP.shield.clear(); CAMP.stones.clear(); CAMP.lt = 0; CAMP.list = []; CAMP.ruins = []; CAMP.last = null; trapLoad();
+    EV.clear(); CST.clear(); chestCache.clear(); TST.clear(); treeCache.clear(); RST.clear(); rockCache.clear(); rkGeo.clear(); RS.length = 0; LV.length = TP.length = 0; AX.on = false; CAMP.seen.clear(); CAMP.looted.clear(); CAMP.shield.clear(); CAMP.stones.clear(); CAMP.lt = 0; CAMP.list = []; CAMP.ruins = []; CAMP.last = null;
   }
   function newGame() { for (const k in RCS) delete RCS[k]; FLG.list.length = 0; FLG.sel = null; FLG.n = 0; FLG.mode = 'sel'; cvReset(); applySeed(1 + Math.floor(Math.random() * 900000)); TM.t = 0; PLAY.t = 0; GCLK.f = 8 / 24; lvReset(1, 0); skReset(); for (const k in OWN) delete OWN[k]; gearSanitize(); }   // yeni oyun: kıyafetler de sıfırlanır   // BAŞLA: her seferinde yeni tohum = tamamen yeni harita (eski kayıt, ilk kampa girilene dek durur)
   function loadGame(sv) {
@@ -8808,6 +8515,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
         hair(y + h + 8, 0.08); y += h + 8; }
       y += 22; y = sec('maden', y); y = swRow('pick', 'Kazma (test)', 'Vuruşlar kaya madenlerini kazar', y);
       { const h = 100; ob(x0, y + 8, cw, 42, 'en yakın madene git', devGoMine, { solid: true, size: 14 }); ob(x0, y + 58, cw, 42, 'en yakın mağaraya git', devGoCave, { solid: true, size: 14 }); hair(y + h + 8, 0.08); y += h + 8; }
+      y = swRow('dal', 'Merdiven dalaverecisi (test)', 'Girdiğin her mağarada dalavereci olur', y);
       y += 22; y = sec('kamp', y); y = swRow('anycraft', 'Her yerde üret', 'Duraklatma menüsünde CRAFT düğmesi çıkar', y); y = swRow('campArrow', 'Kamp oku · kademe 1 (test)', 'Gördüğün kamplara yön oku', y); y = swRow('campArrow2', 'Kamp oku · kademe 2 (test)', 'Keşfedilmemiş yakın kamplara da yön oku', y);
       { const h = 132; dvText('Kamp sıklığı', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText('yeni bölgelere işler', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
         const cy = y + 44, n = 3, gp = 8, cwid = (cw - gp * (n - 1)) / n;
@@ -8818,8 +8526,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       { const h = 190, [ox, oy] = devChestOrigin(); if (!DEVC.l || Math.hypot(ox - DEVC.ox, oy - DEVC.oy) > 300) DEVC.l = devChestScan();
         const L = DEVC.l, n = L.length; DEVC.i = n ? clamp(DEVC.i, 0, n - 1) : 0; const it = L[DEVC.i];
         dvText('Sandığa git', x0, y + 26, 14.5, 500, fg, 0.95, 0, 'left'); dvText(n + ' sandık bulundu', x0 + cw, y + 26, 12, 400, fg, 0.5, 0, 'right');
-        const ky = y + 44, gp = 8, cwid = (cw - gp * 3) / 4;
-        [['n', 'normal'], ['v', 'ödül'], ['x', 'lanet'], ['t', 'tuzak']].forEach(([k, nm], i) => ob(x0 + i * (cwid + gp), ky, cwid, 34, nm, () => { DEVC.k = k; DEVC.i = 0; DEVC.l = null; }, { on: DEVC.k === k, size: 11.5 }));
+        const ky = y + 44, gp = 8, cwid = (cw - gp * 2) / 3;
+        [['n', 'normal'], ['v', 'ödül · mağara'], ['x', 'lanetli · mağara']].forEach(([k, nm], i) => ob(x0 + i * (cwid + gp), ky, cwid, 34, nm, () => { DEVC.k = k; DEVC.i = 0; DEVC.l = null; }, { on: DEVC.k === k, size: 11.5 }));
         const sy = ky + 46;
         ob(x0, sy, 44, 38, '‹', () => { if (n) DEVC.i = (DEVC.i + n - 1) % n; }, { dim: n < 2, size: 18 }); ob(x0 + cw - 44, sy, 44, 38, '›', () => { if (n) DEVC.i = (DEVC.i + 1) % n; }, { dim: n < 2, size: 18 });
         dvText(it ? '#' + (DEVC.i + 1) + ' / ' + n : 'yok', x0 + cw / 2, sy + 14, 15, 500, fg, 1, 0, 'center'); dvText(it ? 'uzaklık ' + Math.round(it.d) + (it.lk ? '  ·  zincirli' : '') : 'yakında bu türden sandık yok', x0 + cw / 2, sy + 31, 11, 400, fg, 0.5, 0, 'center');
@@ -11074,7 +10782,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     if (keys['arrowright'] || keys['d']) ix += 1;
     if (keys['arrowup'] || keys['w']) iy -= 1;
     if (keys['arrowdown'] || keys['s']) iy += 1;
-    if (F.death >= 0 || (F.kd >= 0 && F.kd < 2.1) || CV.st !== 'idle' || TRAP.lock) ix = iy = 0;
+    if (F.death >= 0 || (F.kd >= 0 && F.kd < 2.1) || CV.st !== 'idle') ix = iy = 0;
     const m = Math.hypot(ix, iy);
     if (m > 1) { ix /= m; iy /= m; }
     if (keys['shift']) { const mm = Math.hypot(ix, iy); if (mm > 0.45) { ix *= 0.45 / mm; iy *= 0.45 / mm; } } // Shift = yürü (masaüstü testi)
@@ -11097,9 +10805,8 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     updateFight(sdt);
     updateBow(sdt); updatePrism(sdt); updateHeal(sdt); if (!CV.in) updateCamp(sdt);
     if (fz) for (const e of E) { e.flash = Math.max(0, e.flash - dt); e.hf = Math.max(0, (e.hf || 0) - dt * 6); e.sf = Math.max(0, (e.sf || 0) - dt * 4); }   // donmuşken de vuruş parlaması sönsün
-    if (cvWorld()) updateEnemies(fz ? 0 : sdt);   // donmuşken yalnızca ölmekte olanlar oynar
-    if (!CV.in) { campBarrier(); caveBarrier(); updateBolts(fz ? 0 : sdt); updateEvil(fz ? 0 : sdt); updateChests(sdt); updateTrees(sdt); updateRocks(sdt); } else { updateChests(sdt); if (TRAP.live) { trapClamp(); updateBolts(fz ? 0 : sdt); } }
-    try { updateTrap(sdt); } catch (err) { if (!TRAP.er) { TRAP.er = 1; console.error('tuzak', err); } }
+    if (!CV.in) updateEnemies(fz ? 0 : sdt);   // donmuşken yalnızca ölmekte olanlar oynar
+    if (!CV.in) { campBarrier(); caveBarrier(); updateBolts(fz ? 0 : sdt); updateEvil(fz ? 0 : sdt); updateChests(sdt); updateTrees(sdt); updateRocks(sdt); } else updateChests(sdt);
     { const ft0 = FX.t; updateFx(dt, sdt); if (fz) FX.t = ft0; }
     let alert = 0; for (const e of E) if (e.em >= 1 && Math.hypot(e.x - player.x, e.y - player.y) < 460) alert += e.st === 'wind' || e.st === 'strike' ? 0.3 : 0.18;
     try { AU.setMode(F.death >= 0.6 ? 'death' : 'game'); AU.setListener(player.x, player.y); AU.setTime(GCLK.f, DNT.on || CV.in); AU.update(dt, CAMP.in ? 0 : clamp(alert, 0, 1)); } catch (_) {} try { cvSnd(dt); } catch (_) {}   // müzik yoğunluğu çatışmayla yükselir; heykel sesleri / Doppler
@@ -11110,7 +10817,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const bgCol = light ? '#f2f2f2' : '#0a0a0a';
     const fg = light ? '0,0,0' : '255,255,255';
     ctx.fillStyle = bgCol; ctx.fillRect(0, 0, W, H);
-    const ck = dmp(10, dt); cam.x += (player.x + (TRAP.fx - player.x) * TRAP.k - W / ZOOM / 2 - cam.x) * ck; cam.y += (player.y + (TRAP.fy - player.y) * TRAP.k - H / ZOOM / 2 - cam.y) * ck;   // kamera yumuşak takip
+    const ck = dmp(10, dt); cam.x += (player.x - W / ZOOM / 2 - cam.x) * ck; cam.y += (player.y - H / ZOOM / 2 - cam.y) * ck;   // kamera yumuşak takip
     cam.x += FX.ox; cam.y += FX.oy + CV.by;   // kamera sarsıntısı
     if (CV.in) drawCaveBg(fg); else drawWorld(fg);
     setBase();
@@ -11122,7 +10829,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     const sfg = light ? '105,105,105' : '150,150,150';
     const sObjs = cvz(statuesIn)(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, ev]) => ({ y, f: ev ? () => drawEvil(x, y, id, light) : () => drawStatue(x, y, SS, sfg, light) }));
     const cObjs = chestsIn(cam.x - 80, cam.y - 20, cam.x + W / ZOOM + 80, cam.y + H / ZOOM + 140).map(([x, y, id, lk]) => ({ y, f: () => drawChest(x, y, id, lk, light) })).concat(LOOT.filter(l => !!l.cv === CV.in).map(l => ({ y: l.y, f: () => drawLoot(l) })));
-    const eObjs = cvEL().map(e => ({ y: e.y, f: () => drawEnemy(e, fg) })).concat((cvWorld() ? EP : []).map(p => ({ y: p.y, f: () => drawBolt(p, fg) }))), kObjs = campV.flatMap(c => campObjs(c, fg, light)), tObjs = cvz(treesIn)(cam.x - 150, cam.y - 20, cam.x + W / ZOOM + 150, cam.y + H / ZOOM + 170).map(([x, y, id]) => ({ y, f: () => drawTree(x, y, id, light) })), rObjs = cvz(rocksIn)(cam.x - 120, cam.y - 20, cam.x + W / ZOOM + 120, cam.y + H / ZOOM + 120).map(([x, y, id]) => ({ y, f: () => drawRock(x, y, id, light) })), allO = (CV.in ? cvObjs(fg) : cvDoors(fg, bgCol, light)).concat(sObjs, eObjs, cObjs, kObjs, tObjs, rObjs, flagObjs(fg, light)).sort((a, b) => a.y - b.y);
+    const eObjs = (CV.in ? [] : E).map(e => ({ y: e.y, f: () => drawEnemy(e, fg) })).concat((CV.in ? [] : EP).map(p => ({ y: p.y, f: () => drawBolt(p, fg) }))), kObjs = campV.flatMap(c => campObjs(c, fg, light)), tObjs = cvz(treesIn)(cam.x - 150, cam.y - 20, cam.x + W / ZOOM + 150, cam.y + H / ZOOM + 170).map(([x, y, id]) => ({ y, f: () => drawTree(x, y, id, light) })), rObjs = cvz(rocksIn)(cam.x - 120, cam.y - 20, cam.x + W / ZOOM + 120, cam.y + H / ZOOM + 120).map(([x, y, id]) => ({ y, f: () => drawRock(x, y, id, light) })), allO = (CV.in ? cvObjs(fg) : cvDoors(fg, bgCol, light)).concat(sObjs, eObjs, cObjs, kObjs, tObjs, rObjs, flagObjs(fg, light)).sort((a, b) => a.y - b.y);
     allO.filter(o => o.y < player.y).forEach(o => o.f());
     drawBowAim(fg);
     ctx.globalAlpha = F.flash > 0 && Math.floor(F.time * 30) % 2 ? 0.4 : 1;   // hasar alınca yanıp söner
@@ -11132,7 +10839,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
     drawSparks(fg); drawHealFx();
     allO.filter(o => o.y >= player.y).forEach(o => o.f());
     drawArrows(fg); drawPrismFx(fg); drawCampShield(campV);
-    drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawTorchFly(); drawRockFx(light); drawChestPieces(light); drawChestFx(light); drawCurseFx(light); drawTrapFx(); drawRings(); drawDmgNums(fg); drawFT(fg);
+    drawSmoke(light); drawShards(light); drawDebris(light); drawWood(); drawTreeFx(light); drawTorchFly(); drawRockFx(light); drawChestPieces(light); drawChestFx(light); drawCurseFx(light); drawRings(); drawDmgNums(fg); drawFT(fg);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     try { if (CV.in) drawCaveAtmo(dt); else drawAtmo(dt, DK, campV); } catch (_) {}
@@ -11164,7 +10871,7 @@ const MM_SW_D = 0.3, MM_BR_D = 0.55;                               // kol ezmesi
       ctx.strokeStyle = `rgba(${fg},0.35)`; ctx.stroke();
       ctx.restore();
     }
-    drawHud(fg); drawBowHud(fg); drawTimer(fg, dt); drawHealHud(fg, dt); drawDevHp(fg, dt); drawCampHud(fg, dt); drawFlagHud(fg, dt); drawCurseHud(fg, dt); drawTrapHud(fg, dt);
+    drawHud(fg); drawBowHud(fg); drawTimer(fg, dt); drawHealHud(fg, dt); drawDevHp(fg, dt); drawCampHud(fg, dt); drawFlagHud(fg, dt); drawCurseHud(fg, dt);
     drawAtk(fg, dt); drawSwapBtn(fg, dt); drawHotbar(fg, dt); drawBowBtn(fg, dt); drawHealBtns(fg, dt); drawPrismBtns(fg, dt); drawPauseBtn(fg, dt); drawBagBtn(fg, dt); drawRadial(fg, dt);
     if (PAUSE.a > 0) drawPause(dt, true);
     if (DEATH.on) drawDeath(dt, fg);
